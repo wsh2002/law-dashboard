@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/douyin/:path*",
+      "destination": "https://api.ake999.com/api/dsp/:path*"
+    }
+  ]
+}

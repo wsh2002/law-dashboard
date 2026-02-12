@@ -1,0 +1,13 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  /* ... add other overrides if needed, but default is fine */
+}
+
+body {
+  background-color: var(--color-gray-50); 
+  color: var(--color-slate-800);
+}
