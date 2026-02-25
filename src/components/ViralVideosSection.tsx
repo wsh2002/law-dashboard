@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Search, AlertCircle, Settings, Play, ThumbsUp, Clock, User, MessageCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, AlertCircle, Settings, Play, ThumbsUp, Clock, User, MessageCircle, X, Sparkles, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { VideoParser } from './VideoParser';
+import { fetchVideoAnalysis, DEFAULT_CONFIG } from '../services/aiAnalysis';
+import ReactMarkdown from 'react-markdown';
 
 // Types for the viral video data
 export interface ViralVideo {
@@ -97,53 +99,36 @@ const MOCK_VIRAL_VIDEOS: ViralVideo[] = [
   { id: 'wx20', rank: 20, title: '对外关系法正式施行', author: '外交法律', views: '0.9w', likes: 50, comments: 1, shares: 2, publishTime: getRecentTime(), cover: '', url: '#', duration: '02:05', platform: 'wechat' },
 ];
 
-const PLATFORMS = [
-  {
-    id: 'douyin',
-    name: '抖音 (Douyin)',
-    icon: (className?: string) => (
-      <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-        <path d="M19.07 4.93C17.07 4.93 15 6.42 15 8.35V15.5C15 18.26 12.76 20.5 10 20.5C7.24 20.5 5 18.26 5 15.5C5 12.74 7.24 10.5 10 10.5C10.53 10.5 11.04 10.58 11.53 10.73V5.88C11.03 5.8 10.52 5.76 10 5.76C4.48 5.76 0 10.24 0 15.76C0 21.28 4.48 25.76 10 25.76C15.52 25.76 20 21.28 20 15.76V8.35C21..."/>
-      </svg>
-    ),
-    color: 'bg-black text-white',
-    searchUrl: 'https://www.douyin.com/search/律师?publish_time=1&sort_type=2', // 1 day, most likes
-    description: '查看昨日抖音律师话题高赞视频',
-    tips: '参数：publish_time=1 (1天内), sort_type=2 (点赞最多)'
-  },
-  {
-    id: 'kuaishou',
-    name: '快手 (Kuaishou)',
-    icon: (className?: string) => (
-      <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08..."/>
-      </svg>
-    ),
-    color: 'bg-orange-500 text-white',
-    searchUrl: 'https://www.kuaishou.com/search/video?searchKey=律师',
-    description: '查看快手律师话题热门视频',
-    tips: '快手网页版暂不支持URL时间筛选，请手动点击“最新”'
-  },
-  {
-    id: 'wechat',
-    name: '视频号 (WeChat)',
-    icon: (className?: string) => (
-      <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-        <path d="M20.5 12c0-4.42-3.58-8-8-8s-8 3.58-8 8c0 2.34 1.01 4.45 2.62 5.92L6 21l3.96-1.58C10.63 19.78 11.3 20 12 20c4.42 0 8-3.58 8-8z"/>
-      </svg>
-    ),
-    color: 'bg-green-600 text-white',
-    searchUrl: 'https://weixin.sogou.com/weixin?type=2&query=律师', // Fallback to Sogou WeChat Search
-    description: '查看视频号/公众号热门内容',
-    tips: '视频号仅支持手机端查看。请在微信搜一搜中搜索“律师”并筛选“视频号”'
-  }
+const CATEGORIES = [
+  { id: 'land', name: '征地拆迁', icon: AlertCircle },
+  { id: 'general', name: '法律普法', icon: Sparkles }
 ];
 
 export const ViralVideosSection = () => {
   const [showApiConfig, setShowApiConfig] = useState(false);
-  const [selectedPlatform, setSelectedPlatform] = useState<'douyin' | 'kuaishou' | 'wechat'>('douyin');
+  const [selectedCategory, setSelectedCategory] = useState<'land' | 'general'>('land');
   const [videos, setVideos] = useState<ViralVideo[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // AI Analysis States
+  const [analyzingVideo, setAnalyzingVideo] = useState<ViralVideo | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<string>('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  const handleDeepAnalysis = async (video: ViralVideo) => {
+    setAnalyzingVideo(video);
+    setIsAnalyzing(true);
+    setAnalysisResult('');
+    
+    try {
+      const result = await fetchVideoAnalysis(DEFAULT_CONFIG, video);
+      setAnalysisResult(result);
+    } catch (error) {
+      setAnalysisResult('分析失败，请检查 API 配置或网络连接。');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   // Filter and sort videos based on selection
   useEffect(() => {
@@ -155,25 +140,35 @@ export const ViralVideosSection = () => {
             if (response.ok) {
                 const realData = await response.json();
                 const formatted = realData
-                    .filter((v: any) => v.platform === selectedPlatform || !v.platform)
-                    .map((v: any, index: number) => ({
-                        id: `real-${index}`,
-                        rank: index + 1,
-                        title: v.title || v.desc, // Support both formats
-                        author: v.author,
-                        likes: v.likes || v.digg,
-                        comments: v.comments || v.comment,
-                        shares: v.shares || 0,
-                        publishTime: v.publishTime || v.time,
-                        url: v.url,
-                        duration: v.duration || '00:00',
-                        cover: v.cover || '',
-                        platform: v.platform || 'douyin'
-                    }))
+                    .map((v: any, index: number) => {
+                        // Logic to determine category based on content
+                        let category: 'land' | 'general' = 'general';
+                        const content = (v.title || v.desc || '').toLowerCase();
+                        if (content.includes('征地') || content.includes('拆迁') || content.includes('补偿') || content.includes('土地')) {
+                            category = 'land';
+                        }
+                        
+                        return {
+                            id: `real-${index}`,
+                            rank: index + 1,
+                            title: v.title || v.desc,
+                            author: v.author,
+                            likes: v.likes || v.digg,
+                            comments: v.comments || v.comment,
+                            shares: v.shares || 0,
+                            publishTime: v.publishTime || v.time,
+                            url: v.url,
+                            duration: v.duration || '00:00',
+                            cover: v.cover || '',
+                            platform: 'douyin',
+                            category
+                        };
+                    })
+                    .filter((v: any) => v.category === selectedCategory)
                     .sort((a: any, b: any) => b.likes - a.likes);
                 
                 if (formatted.length > 0) {
-                    setVideos(formatted.slice(0, 20));
+                    setVideos(formatted.slice(0, 20).map((v: any, i: number) => ({ ...v, rank: i + 1 })));
                     setLoading(false);
                     return;
                 }
@@ -185,7 +180,15 @@ export const ViralVideosSection = () => {
         // Fallback to Mock Data
         await new Promise(resolve => setTimeout(resolve, 600));
         const filtered = MOCK_VIRAL_VIDEOS
-            .filter(v => v.platform === selectedPlatform)
+            .map(v => {
+                let category: 'land' | 'general' = 'general';
+                const content = v.title.toLowerCase();
+                if (content.includes('征地') || content.includes('拆迁') || content.includes('补偿') || content.includes('土地')) {
+                    category = 'land';
+                }
+                return { ...v, category };
+            })
+            .filter(v => v.category === selectedCategory)
             .sort((a, b) => b.likes - a.likes)
             .slice(0, 20)
             .map((v, index) => ({ ...v, rank: index + 1 }));
@@ -195,16 +198,16 @@ export const ViralVideosSection = () => {
     };
 
     fetchVideos();
-  }, [selectedPlatform]);
+  }, [selectedCategory]);
 
-  const currentPlatformName = PLATFORMS.find(p => p.id === selectedPlatform)?.name.split(' ')[0] || '抖音';
+  const currentPlatformName = '抖音';
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
             <Search className="w-6 h-6 text-purple-600" />
-            全网律师爆款视频监控 (Daily Viral Videos)
+            抖音律师爆款视频监控 (Douyin Viral Videos)
         </h3>
         <button 
           onClick={() => setShowApiConfig(!showApiConfig)}
@@ -248,55 +251,28 @@ export const ViralVideosSection = () => {
         <VideoParser />
       </motion.div>
 
-      {/* Platform Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {PLATFORMS.map((platform, index) => {
-          const isSelected = selectedPlatform === platform.id;
+      {/* Category Selection Tabs */}
+      <div className="flex flex-wrap gap-4">
+        {CATEGORIES.map((category, index) => {
+          const isSelected = selectedCategory === category.id;
+          const Icon = category.icon;
           return (
-            <motion.div 
-              key={platform.id} 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+            <motion.button 
+              key={category.id} 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.1 * index }}
-              onClick={() => setSelectedPlatform(platform.id as any)}
+              onClick={() => setSelectedCategory(category.id as any)}
               className={cn(
-                "cursor-pointer transition-all duration-300 overflow-hidden relative",
-                "bg-white/80 backdrop-blur-md rounded-xl shadow-lg border",
+                "flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all duration-300",
                 isSelected 
-                    ? "ring-2 ring-blue-500 scale-[1.02] border-blue-500 shadow-xl" 
-                    : "border-white/50 hover:scale-[1.01] hover:shadow-md"
+                    ? "bg-gray-900 text-white shadow-lg scale-105" 
+                    : "bg-white text-gray-600 border border-gray-200 hover:border-gray-900 hover:text-gray-900 shadow-sm"
               )}
             >
-              {isSelected && (
-                <div className="absolute top-2 right-2">
-                    <span className="flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
-                    </span>
-                </div>
-              )}
-              <div className={cn("p-4 flex items-center justify-between", platform.color)}>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                      {platform.icon("w-5 h-5 text-white")}
-                  </div>
-                  <h4 className="font-bold text-white text-lg">{platform.name}</h4>
-                </div>
-                <span className="text-xs bg-white/20 text-white px-2 py-1 rounded-full">
-                  {isSelected ? '正在监控' : '点击查看'}
-                </span>
-              </div>
-              
-              <div className="p-6">
-                  <p className="text-gray-600 mb-4 text-sm h-10">
-                      {platform.description}
-                  </p>
-                  <div className="text-xs text-gray-400 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      数据更新：实时
-                  </div>
-              </div>
-            </motion.div>
+              <Icon className={cn("w-5 h-5", isSelected ? "text-blue-400" : "text-gray-400")} />
+              {category.name}
+            </motion.button>
           );
         })}
       </div>
@@ -382,8 +358,10 @@ export const ViralVideosSection = () => {
                                                 {video.title}
                                             </p>
                                             <div className="flex flex-wrap gap-1.5">
-                                                <span className="text-[10px] font-medium px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full border border-blue-100">法律普法</span>
-                                                <span className="text-[10px] font-medium px-2 py-0.5 bg-purple-50 text-purple-600 rounded-full border border-purple-100">征地拆迁</span>
+                                                <span className="text-[10px] font-medium px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full border border-blue-100">
+                                                    {(video as any).category === 'land' ? '征地拆迁' : '法律普法'}
+                                                </span>
+                                                <span className="text-[10px] font-medium px-2 py-0.5 bg-purple-50 text-purple-600 rounded-full border border-purple-100">抖音爆款</span>
                                             </div>
                                         </div>
                                     </div>
@@ -434,15 +412,24 @@ export const ViralVideosSection = () => {
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                     <div className="flex flex-col items-end gap-2">
-                                        <a 
-                                            href={video.url}
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 rounded-lg text-xs font-bold shadow-md shadow-blue-200 transition-all hover:-translate-y-0.5"
-                                        >
-                                            <Play className="w-3.5 h-3.5 fill-current" />
-                                            查看视频
-                                        </a>
+                                        <div className="flex gap-2">
+                                            <button 
+                                                onClick={() => handleDeepAnalysis(video)}
+                                                className="inline-flex items-center gap-2 px-3 py-2 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded-lg text-xs font-bold transition-colors border border-purple-100"
+                                            >
+                                                <Sparkles className="w-3.5 h-3.5" />
+                                                深度分析
+                                            </button>
+                                            <a 
+                                                href={video.url}
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 rounded-lg text-xs font-bold shadow-md shadow-blue-200 transition-all hover:-translate-y-0.5"
+                                            >
+                                                <Play className="w-3.5 h-3.5 fill-current" />
+                                                查看视频
+                                            </a>
+                                        </div>
                                         <button className="text-[10px] text-gray-400 hover:text-blue-600 transition-colors font-medium">
                                             监控该账号
                                         </button>
@@ -455,6 +442,114 @@ export const ViralVideosSection = () => {
             </div>
         )}
       </motion.div>
+
+      {/* AI Deep Analysis Modal */}
+      <AnimatePresence>
+        {analyzingVideo && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm text-gray-800">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+            >
+              {/* Modal Header */}
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                    <Sparkles className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-lg">视频法律深度拆解报告</h4>
+                    <p className="text-xs text-purple-100 opacity-80">由 DeepSeek AI 驱动的专业内容分析</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setAnalyzingVideo(null)}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                {/* Video Info Card */}
+                <div className="flex gap-6 mb-8 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                  <div className="w-24 h-32 bg-gray-200 rounded-lg overflow-hidden shrink-0 shadow-sm">
+                    {analyzingVideo.cover ? (
+                      <img src={analyzingVideo.cover} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center"><Play className="w-8 h-8 text-gray-300" /></div>
+                    )}
+                  </div>
+                  <div className="flex flex-col justify-center gap-2">
+                    <h5 className="font-bold text-gray-900 text-lg line-clamp-2">{analyzingVideo.title}</h5>
+                    <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <span className="flex items-center gap-1"><User className="w-4 h-4" /> {analyzingVideo.author}</span>
+                      <span className="flex items-center gap-1"><ThumbsUp className="w-4 h-4" /> {analyzingVideo.likes.toLocaleString()}</span>
+                      <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {analyzingVideo.publishTime}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Analysis Result */}
+                <div className="prose prose-blue max-w-none">
+                  {isAnalyzing ? (
+                    <div className="py-20 flex flex-col items-center justify-center text-gray-400">
+                      <Loader2 className="w-10 h-10 animate-spin text-purple-600 mb-4" />
+                      <p className="text-lg font-medium text-gray-600">正在调动 AI 专家进行深度拆解...</p>
+                      <p className="text-sm mt-2">预计需要 10-15 秒，请稍候</p>
+                      
+                      <div className="mt-8 w-64 h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: "100%" }}
+                          transition={{ duration: 10, ease: "linear" }}
+                          className="bg-purple-600 h-full"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                      <ReactMarkdown 
+                        components={{
+                          h1: ({node, ...props}) => <h1 className="text-2xl font-bold text-gray-900 mt-8 mb-4 flex items-center gap-2 border-l-4 border-purple-500 pl-3" {...props} />,
+                          h2: ({node, ...props}) => <h2 className="text-xl font-bold text-gray-800 mt-6 mb-3 flex items-center gap-2" {...props} />,
+                          h3: ({node, ...props}) => <h3 className="text-lg font-bold text-gray-800 mt-4 mb-2" {...props} />,
+                          p: ({node, ...props}) => <p className="text-gray-600 leading-relaxed mb-4" {...props} />,
+                          ul: ({node, ...props}) => <ul className="list-disc list-inside space-y-2 mb-4 text-gray-600" {...props} />,
+                          li: ({node, ...props}) => <li className="ml-2" {...props} />,
+                          strong: ({node, ...props}) => <strong className="font-bold text-purple-700" {...props} />,
+                          blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-gray-200 pl-4 italic text-gray-500 my-4" {...props} />,
+                        }}
+                      >
+                        {analysisResult}
+                      </ReactMarkdown>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+                <button 
+                  onClick={() => setAnalyzingVideo(null)}
+                  className="px-6 py-2.5 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors"
+                >
+                  关闭报告
+                </button>
+                <button 
+                  onClick={() => window.print()}
+                  className="px-6 py-2.5 bg-gray-900 text-white font-medium hover:bg-gray-800 rounded-xl transition-colors flex items-center gap-2"
+                >
+                  导出 PDF
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
