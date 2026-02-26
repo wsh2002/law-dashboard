@@ -205,8 +205,12 @@ ${analysisResult}
         setLoading(true);
         try {
             // Try to fetch real data from local JSON
-            // Use relative path to work with any base path deployment
-            const response = await fetch('data/douyin_videos.json');
+            // Use BASE_URL from vite config to handle subdirectory deployment
+            const baseUrl = import.meta.env.BASE_URL.endsWith('/') 
+                ? import.meta.env.BASE_URL 
+                : `${import.meta.env.BASE_URL}/`;
+            
+            const response = await fetch(`${baseUrl}data/douyin_videos.json`);
             if (response.ok) {
                 const realData = await response.json();
                 console.log('Successfully loaded real data:', realData.length, 'items');
