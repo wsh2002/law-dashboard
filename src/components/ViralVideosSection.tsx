@@ -205,33 +205,36 @@ ${analysisResult}
         setLoading(true);
         try {
             // Try to fetch real data from local JSON
-            const response = await fetch('/data/douyin_videos.json');
+            // Use relative path to work with any base path deployment
+            const response = await fetch('data/douyin_videos.json');
             if (response.ok) {
                 const realData = await response.json();
+                console.log('Successfully loaded real data:', realData.length, 'items');
+                
                 const formatted = realData
                     .map((v: any, index: number) => {
                         // Logic to determine category based on content
                         let category: 'land' | 'general' = 'general';
-                        const content = (v.title || v.desc || '').toLowerCase();
-                        if (content.includes('征地') || content.includes('拆迁') || content.includes('补偿') || content.includes('土地')) {
+                        const titleText = (v.title || v.desc || '').toLowerCase();
+                        if (titleText.includes('征地') || titleText.includes('拆迁') || titleText.includes('补偿') || titleText.includes('土地') || titleText.includes('征收')) {
                             category = 'land';
                         }
                         
                         return {
                             id: `real-${index}`,
                             rank: index + 1,
-                            title: v.title || v.desc,
-                            author: v.author,
-                            likes: v.likes || v.digg,
-                            comments: v.comments || v.comment,
+                            title: v.title || v.desc || '未知标题',
+                            author: v.author || '未知作者',
+                            likes: v.likes || v.digg || 0,
+                            comments: v.comments || v.comment || 0,
                             shares: v.shares || 0,
-                            publishTime: v.publishTime || v.time,
-                            url: v.url,
+                            publishTime: v.publishTime || v.time || '未知时间',
+                            url: v.url || '#',
                             duration: v.duration || '00:00',
                             cover: v.cover || '',
-                            platform: 'douyin',
+                            platform: v.platform || 'douyin',
                             category,
-                            content: v.video_text // Capture raw transcript from JSON
+                            content: v.content || v.video_text || '' // Support both field names
                         };
                     })
                     .filter((v: any) => v.category === selectedCategory)
@@ -242,12 +245,15 @@ ${analysisResult}
                     setLoading(false);
                     return;
                 }
+            } else {
+                console.warn('Failed to fetch JSON data:', response.status);
             }
         } catch (error) {
-            console.log('Real data not found, using mock data');
+            console.error('Error loading real data:', error);
         }
 
-        // Fallback to Mock Data
+        // Fallback to Mock Data only if real data loading fails or returns empty
+        console.log('Falling back to mock data');
         await new Promise(resolve => setTimeout(resolve, 600));
         const filtered = MOCK_VIRAL_VIDEOS
             .map(v => {
