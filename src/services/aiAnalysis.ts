@@ -8,8 +8,16 @@ export interface AIAnalysisConfig {
 
 export const DEFAULT_CONFIG: AIAnalysisConfig = {
   apiKey: 'sk-be6a2391b68e4bddade06a308adbe6b1',
-  baseUrl: 'https://api.deepseek.com', // Updated to official DeepSeek API endpoint
+  baseUrl: 'https://api.deepseek.com',
   model: 'deepseek-chat',
+};
+
+// 官方路径模型映射逻辑
+export const getProviderModels = () => {
+  return {
+    R1: 'deepseek-reasoning',
+    V3: 'deepseek-chat'
+  };
 };
 
 export const generateAnalysisPrompt = (data: DataItem[]): string => {
@@ -96,6 +104,8 @@ ${topVideos}
 };
 
 export const fetchAIAnalysis = async (config: AIAnalysisConfig, prompt: string) => {
+  const isReasoning = config.model.includes('reasoning') || config.model.includes('r1');
+  
   try {
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -105,23 +115,36 @@ export const fetchAIAnalysis = async (config: AIAnalysisConfig, prompt: string) 
       },
       body: JSON.stringify({
         model: config.model,
-        messages: [
-          { role: 'system', content: 'You are a helpful and professional data analyst specialized in social media.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.7,
+        messages: isReasoning 
+          ? [ { role: 'user', content: prompt } ] // Reasoning models (R1) sometimes perform better or only support user messages
+          : [
+            { role: 'system', content: 'You are a helpful and professional data analyst specialized in social media.' },
+            { role: 'user', content: prompt }
+          ],
+        // R1 model (reasoning) usually ignores temperature or requires it to be 1.0 or undefined
+        temperature: isReasoning ? 1.0 : 0.7,
       }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error?.message || `API Error: ${response.status}`);
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (e) {
+        errorData = { error: { message: `HTTP Error ${response.status}: ${errorText}` } };
+      }
+      
+      const errorMsg = errorData.error?.message || `API Error: ${response.status}`;
+      const debugInfo = ` (URL: ${config.baseUrl}, Model: ${config.model})`;
+      console.error('DeepSeek API Error details:', errorData);
+      throw new Error(`${errorMsg}${debugInfo}`);
     }
 
     const data = await response.json();
     return data.choices[0].message.content;
-  } catch (error) {
-    console.error('AI Analysis failed:', error);
+  } catch (error: any) {
+    console.error('AI Analysis fetch failed:', error);
     throw error;
   }
 };
@@ -129,42 +152,53 @@ export const fetchAIAnalysis = async (config: AIAnalysisConfig, prompt: string) 
 /**
  * Generate analysis prompt for a single viral video
  */
-export const generateVideoAnalysisPrompt = (video: any): string => {
-  return `
-你是一位顶级短视频内容专家，擅长法律行业的爆款拆解。
-请根据以下视频的【视觉文案】、【全文台词】和【互动数据】进行深度拆解。
+/**
+ * Step 1: Convert raw ASR text to structured Legal Document using DeepSeek-R1 (Reasoning)
+ */
+export const convertToDocument = async (config: AIAnalysisConfig, video: any) => {
+  const models = getProviderModels();
+  const prompt = `
+你是一位专业的法律速记员和文档整理专家。
+请将以下这段视频的原始台词整理成一份正式的【法律咨询案例/科普文档】。
 
-【视频基本信息】
-- 标题/文案: ${video.title}
-- 全文内容/台词: ${video.content || '暂无详细台词，请根据标题分析'}
-- 作者: ${video.author}
-- 点赞数: ${video.likes.toLocaleString()}
+【原始台词/信息】:
+${video.content || video.title}
 
-【深度拆解要求】
-请特别关注视频中可能出现的“关键法条文字特效突出显示”等视觉策略，并输出以下报告：
-
-1. **⚖️ 法律核心拆解**
-   - 识别视频中提到的具体法律条文或法律概念。
-   - 分析作者是如何将枯燥的法条转化为用户听得懂的语言的。
-
-2. **🎬 视觉与文案策略**
-   - **文字特效分析**: 分析视频中为何要将某些文字（如法条、关键词）进行突出显示？这种视觉刺激对留存率有何贡献？
-   - **黄金3秒**: 拆解视频第一句话是如何钩住用户的。
-
-3. **🧠 用户心理博弈**
-   - 识别视频利用了用户哪种心理（如：对村委会的恐惧、对补偿款的期待、对法律盲区的担忧）。
-
-4. **🚀 爆款复刻指南**
-   - 总结该视频最值得模仿的 3 个点（文案钩子、视觉呈现、法条解读方式）。
-
-5. **🛠️ 针对性优化建议**
-   - 基于现有台词，给出 1 条能显著提升转化率（私信/咨询）的改写建议。
-
-请输出专业、犀利、干货满满的 Markdown 报告。
+【要求】:
+1. 修正台词中的错别字（尤其是法律术语）。
+2. 按照“案情简介”、“核心法条”、“处理建议”的结构进行排版。
+3. 保持内容原意，但语言要更书面化。
+4. 使用 Markdown 格式输出。
 `;
+  
+  // 使用 R1 模型进行逻辑整理
+  return fetchAIAnalysis({ ...config, model: models.R1 }, prompt);
 };
 
-export const fetchVideoAnalysis = async (config: AIAnalysisConfig, video: any) => {
-  const prompt = generateVideoAnalysisPrompt(video);
-  return fetchAIAnalysis(config, prompt);
+/**
+ * Step 2: Deep Analysis using DeepSeek-V3.2 (DeepSeek-Chat) based on converted document
+ */
+export const analyzeDocument = async (config: AIAnalysisConfig, document: string, video: any) => {
+  const models = getProviderModels();
+  const prompt = `
+你是一位顶级的法律内容运营专家。请根据以下由 DeepSeek-R1 整理好的【法律文档】进行深度拆解分析。
+
+【文档内容】:
+${document}
+
+【互动数据】:
+点赞: ${video.likes}, 评论: ${video.comments}
+
+【深度拆解要求】:
+1. **⚖️ 法律核心拆解**: 识别视频中提到的具体法律条文，分析作者是如何将法条“人话化”的。
+2. **🎬 视觉与文案策略**: 分析视频中的文字特效（如关键法条突出）对留存的贡献。
+3. **🧠 用户心理博弈**: 识别视频利用了用户哪种心理。
+4. **🚀 爆款复刻指南**: 总结 3 个最值得模仿的爆款因子。
+5. **🛠️ 针对性优化建议**: 给出提升转化率的建议。
+
+请输出专业、犀利的 Markdown 报告。
+`;
+
+  // 使用 V3 模型进行快速深度分析
+  return fetchAIAnalysis({ ...config, model: models.V3 }, prompt);
 };

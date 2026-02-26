@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { DataItem } from '../App';
-import { ResponsiveContainer, FunnelChart, Funnel, LabelList, Tooltip, Cell } from 'recharts';
-import { Users, MousePointerClick, Heart, Star, Share2, TrendingUp, Info, ThumbsUp } from 'lucide-react';
+import { Users, MousePointerClick, Heart, Star, Share2, TrendingUp, ThumbsUp } from 'lucide-react';
 import { format, getQuarter, getYear } from 'date-fns';
 
 interface AARRRAnalysisProps {
@@ -273,57 +272,6 @@ export const AARRRAnalysis = ({ data }: AARRRAnalysisProps) => {
             )}
           </motion.div>
         ))}
-      </div>
-
-      {/* Funnel Chart */}
-      <div className="mt-8 h-[400px] w-full bg-gray-50 rounded-xl p-4">
-        <h4 className="text-sm font-semibold text-gray-600 mb-4 flex items-center gap-2">
-            <Info className="w-4 h-4" /> 
-            漏斗转化可视化
-        </h4>
-        <ResponsiveContainer width="100%" height="100%">
-          <FunnelChart>
-            <Tooltip 
-                cursor={{ fill: 'transparent' }}
-                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                formatter={(value: any) => [value?.toLocaleString(), '数量']}
-            />
-            <Funnel
-                dataKey="value"
-                data={analysis}
-                isAnimationActive
-            >
-                <LabelList 
-                    position="right" 
-                    fill="#000" 
-                    stroke="none" 
-                    dataKey="label" 
-                    content={(props: any) => {
-                        const { x, y, width, height, index } = props;
-                        const item = analysis[index];
-                        return (
-                            <g>
-                                <text x={x + width + 20} y={y + height / 2 - 8} fill="#374151" textAnchor="start" fontSize={14} fontWeight="bold">
-                                    {item.label}
-                                </text>
-                                <text x={x + width + 20} y={y + height / 2 + 14} fill="#6b7280" textAnchor="start" fontSize={12}>
-                                    {item.value.toLocaleString()} 
-                                    {index > 0 && (
-                                        <tspan fill={item.color} fontWeight="bold" dx="5">
-                                            → 转化率: {item.conversionRate}%
-                                        </tspan>
-                                    )}
-                                </text>
-                            </g>
-                        );
-                    }}
-                />
-                {analysis.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} stroke={entry.color} />
-                ))}
-            </Funnel>
-          </FunnelChart>
-        </ResponsiveContainer>
       </div>
     </div>
   );

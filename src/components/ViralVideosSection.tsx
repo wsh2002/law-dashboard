@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, AlertCircle, Settings, Play, ThumbsUp, Clock, User, MessageCircle, X, Sparkles, Loader2 } from 'lucide-react';
+import { Search, AlertCircle, Settings, Play, ThumbsUp, Clock, User, MessageCircle, X, Sparkles, Loader2, BarChart2 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { VideoParser } from './VideoParser';
-import { fetchVideoAnalysis, DEFAULT_CONFIG } from '../services/aiAnalysis';
+import { DEFAULT_CONFIG, analyzeDocument } from '../services/aiAnalysis';
 import ReactMarkdown from 'react-markdown';
 
 // Types for the viral video data
@@ -21,6 +20,7 @@ export interface ViralVideo {
   url: string;
   duration: string;
   platform?: 'douyin' | 'kuaishou' | 'wechat'; // Added platform field
+  content?: string; // Raw ASR text
 }
 
 // Generate real-time publish time (e.g., "3 hours ago")
@@ -106,6 +106,23 @@ const CATEGORIES = [
 
 export const ViralVideosSection = () => {
   const [showApiConfig, setShowApiConfig] = useState(false);
+  const [apiConfig, setApiConfig] = useState(() => {
+    const saved = localStorage.getItem('deepseek_config');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return DEFAULT_CONFIG;
+      }
+    }
+    return DEFAULT_CONFIG;
+  });
+
+  // 监听配置变化并保存到本地存储
+  useEffect(() => {
+    localStorage.setItem('deepseek_config', JSON.stringify(apiConfig));
+  }, [apiConfig]);
+
   const [selectedCategory, setSelectedCategory] = useState<'land' | 'general'>('land');
   const [videos, setVideos] = useState<ViralVideo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,21 +130,73 @@ export const ViralVideosSection = () => {
   // AI Analysis States
   const [analyzingVideo, setAnalyzingVideo] = useState<ViralVideo | null>(null);
   const [analysisResult, setAnalysisResult] = useState<string>('');
+  const [manualTranscript, setManualTranscript] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisStep, setAnalysisStep] = useState<'idle' | 'analyzing'>('idle');
+  const [activeTab, setActiveTab] = useState<'analysis' | 'document'>('document');
 
-  const handleDeepAnalysis = async (video: ViralVideo) => {
+  const handleDeepAnalysis = (video: ViralVideo) => {
     setAnalyzingVideo(video);
-    setIsAnalyzing(true);
     setAnalysisResult('');
+    setManualTranscript(video.content || '');
+    setAnalysisStep('idle');
+    setActiveTab('document');
+  };
+
+  const handleStartAnalysis = async () => {
+    if (!manualTranscript) return;
+    
+    setIsAnalyzing(true);
+    setAnalysisStep('analyzing');
+    setActiveTab('analysis');
     
     try {
-      const result = await fetchVideoAnalysis(DEFAULT_CONFIG, video);
-      setAnalysisResult(result);
-    } catch (error) {
-      setAnalysisResult('分析失败，请检查 API 配置或网络连接。');
+      // 深度拆解分析 (使用 V3.2)
+      const analysis = await analyzeDocument(apiConfig, manualTranscript, analyzingVideo);
+      setAnalysisResult(analysis);
+    } catch (error: any) {
+      setAnalysisResult(`分析失败: ${error.message}`);
+      // 如果是 401 错误，自动展开配置面板提示用户
+      if (error.message.includes('401')) {
+        setShowApiConfig(true);
+      }
     } finally {
       setIsAnalyzing(false);
+      setAnalysisStep('idle');
     }
+  };
+
+  const handleDownloadMarkdown = () => {
+    if (!analyzingVideo || !analysisResult) return;
+
+    const content = `
+# 视频法律深度拆解报告
+生成时间: ${new Date().toLocaleString()}
+
+## 1. 视频基础信息
+- **标题**: ${analyzingVideo.title}
+- **作者**: ${analyzingVideo.author}
+- **点赞**: ${analyzingVideo.likes.toLocaleString()}
+- **发布时间**: ${analyzingVideo.publishTime}
+
+## 2. 原始文案内容
+${manualTranscript}
+
+---
+
+## 3. AI 深度拆解分析 (DeepSeek-V3.2)
+${analysisResult}
+    `.trim();
+
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `法律深度拆解_${analyzingVideo.title.slice(0, 10)}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   // Filter and sort videos based on selection
@@ -161,7 +230,8 @@ export const ViralVideosSection = () => {
                             duration: v.duration || '00:00',
                             cover: v.cover || '',
                             platform: 'douyin',
-                            category
+                            category,
+                            content: v.video_text // Capture raw transcript from JSON
                         };
                     })
                     .filter((v: any) => v.category === selectedCategory)
@@ -219,37 +289,43 @@ export const ViralVideosSection = () => {
       </div>
 
       {showApiConfig && (
-        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-sm mb-4">
-            <h4 className="font-bold text-gray-700 mb-2">API 数据源配置 (Developer Access)</h4>
-            <p className="text-gray-600 mb-3">
-                目前使用 Mock 数据模拟真实环境。接入真实 API (如抖音开放平台) 后，可在此配置 Client Key 和 Secret。
-            </p>
-            <div className="flex gap-2">
-                <input 
-                    type="password" 
-                    placeholder="Enter API Key..." 
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    disabled
-                />
-                <button className="px-4 py-2 bg-gray-200 text-gray-500 rounded cursor-not-allowed">
-                    保存配置
-                </button>
+        <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 text-sm mb-6 shadow-inner animate-in fade-in slide-in-from-top-4">
+            <div className="flex items-center justify-between mb-4">
+                <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                    <Settings className="w-4 h-4 text-purple-600" />
+                    AI 模型配置 (DeepSeek Official)
+                </h4>
             </div>
-            <p className="text-xs text-red-500 mt-2 flex items-center gap-1">
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">API Key</label>
+                    <input 
+                        type="password" 
+                        value={apiConfig.apiKey}
+                        onChange={(e) => setApiConfig({ ...apiConfig, apiKey: e.target.value })}
+                        placeholder="sk-..." 
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                    />
+                </div>
+                <div className="space-y-1.5">
+                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Base URL</label>
+                    <input 
+                        type="text" 
+                        value={apiConfig.baseUrl}
+                        onChange={(e) => setApiConfig({ ...apiConfig, baseUrl: e.target.value })}
+                        placeholder="https://api..." 
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                    />
+                </div>
+            </div>
+            
+            <p className="text-[11px] text-gray-400 mt-4 flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" />
-                注意：请勿使用不可信的第三方 API，以免造成数据泄露。当前默认使用“官方实时搜索直达”模式。
+                提示：401 错误通常是 Key 与接口地址不匹配。官方 Key 请配合官方节点使用。
             </p>
         </div>
       )}
-
-      {/* Video No-Watermark Parser */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <VideoParser />
-      </motion.div>
 
       {/* Category Selection Tabs */}
       <div className="flex flex-wrap gap-4">
@@ -290,10 +366,10 @@ export const ViralVideosSection = () => {
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                     </span>
-                    {currentPlatformName}-法律类目-24h爆款榜单
+                    {currentPlatformName}-法律类目-一周内点赞量最高
                 </h4>
                 <p className="text-xs text-gray-400 mt-1">
-                    自动筛选条件: 平台="{currentPlatformName}" & 关键词="法律" & 时间="一天内" & 排序="最多点赞"
+                    自动筛选条件: 平台="{currentPlatformName}" & 关键词="法律" & 时间="一周内" & 排序="最多点赞"
                 </p>
             </div>
             <div className="text-right">
@@ -474,60 +550,116 @@ export const ViralVideosSection = () => {
 
               {/* Modal Content */}
               <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                {/* Video Info Card */}
-                <div className="flex gap-6 mb-8 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                  <div className="w-24 h-32 bg-gray-200 rounded-lg overflow-hidden shrink-0 shadow-sm">
-                    {analyzingVideo.cover ? (
-                      <img src={analyzingVideo.cover} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center"><Play className="w-8 h-8 text-gray-300" /></div>
-                    )}
-                  </div>
-                  <div className="flex flex-col justify-center gap-2">
-                    <h5 className="font-bold text-gray-900 text-lg line-clamp-2">{analyzingVideo.title}</h5>
-                    <div className="flex items-center gap-4 text-sm text-gray-500">
-                      <span className="flex items-center gap-1"><User className="w-4 h-4" /> {analyzingVideo.author}</span>
-                      <span className="flex items-center gap-1"><ThumbsUp className="w-4 h-4" /> {analyzingVideo.likes.toLocaleString()}</span>
-                      <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {analyzingVideo.publishTime}</span>
+                <div className="bg-white p-4 rounded-xl">
+                  {/* Video Info Card */}
+                  <div className="flex gap-6 mb-8 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                    <div className="w-24 h-32 bg-gray-200 rounded-lg overflow-hidden shrink-0 shadow-sm">
+                      {analyzingVideo.cover ? (
+                        <img src={analyzingVideo.cover} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center"><Play className="w-8 h-8 text-gray-300" /></div>
+                      )}
                     </div>
-                  </div>
-                </div>
-
-                {/* Analysis Result */}
-                <div className="prose prose-blue max-w-none">
-                  {isAnalyzing ? (
-                    <div className="py-20 flex flex-col items-center justify-center text-gray-400">
-                      <Loader2 className="w-10 h-10 animate-spin text-purple-600 mb-4" />
-                      <p className="text-lg font-medium text-gray-600">正在调动 AI 专家进行深度拆解...</p>
-                      <p className="text-sm mt-2">预计需要 10-15 秒，请稍候</p>
-                      
-                      <div className="mt-8 w-64 h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: "100%" }}
-                          transition={{ duration: 10, ease: "linear" }}
-                          className="bg-purple-600 h-full"
-                        />
+                    <div className="flex flex-col justify-center gap-2">
+                      <h5 className="font-bold text-gray-900 text-lg line-clamp-2">{analyzingVideo.title}</h5>
+                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                        <span className="flex items-center gap-1"><User className="w-4 h-4" /> {analyzingVideo.author}</span>
+                        <span className="flex items-center gap-1"><ThumbsUp className="w-4 h-4" /> {analyzingVideo.likes.toLocaleString()}</span>
+                        <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> {analyzingVideo.publishTime}</span>
                       </div>
                     </div>
-                  ) : (
-                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                      <ReactMarkdown 
-                        components={{
-                          h1: ({node, ...props}) => <h1 className="text-2xl font-bold text-gray-900 mt-8 mb-4 flex items-center gap-2 border-l-4 border-purple-500 pl-3" {...props} />,
-                          h2: ({node, ...props}) => <h2 className="text-xl font-bold text-gray-800 mt-6 mb-3 flex items-center gap-2" {...props} />,
-                          h3: ({node, ...props}) => <h3 className="text-lg font-bold text-gray-800 mt-4 mb-2" {...props} />,
-                          p: ({node, ...props}) => <p className="text-gray-600 leading-relaxed mb-4" {...props} />,
-                          ul: ({node, ...props}) => <ul className="list-disc list-inside space-y-2 mb-4 text-gray-600" {...props} />,
-                          li: ({node, ...props}) => <li className="ml-2" {...props} />,
-                          strong: ({node, ...props}) => <strong className="font-bold text-purple-700" {...props} />,
-                          blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-gray-200 pl-4 italic text-gray-500 my-4" {...props} />,
-                        }}
-                      >
-                        {analysisResult}
-                      </ReactMarkdown>
-                    </div>
-                  )}
+                  </div>
+
+                  {/* Tab Switcher */}
+                  <div className="flex gap-4 mb-6 border-b border-gray-100">
+                    <button 
+                      onClick={() => setActiveTab('analysis')}
+                      className={cn(
+                        "pb-3 px-2 font-bold text-sm transition-all relative",
+                        activeTab === 'analysis' ? "text-purple-600" : "text-gray-400 hover:text-gray-600"
+                      )}
+                    >
+                      AI 深度分析
+                      {activeTab === 'analysis' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600" />}
+                    </button>
+                    <button 
+                      onClick={() => setActiveTab('document')}
+                      className={cn(
+                        "pb-3 px-2 font-bold text-sm transition-all relative",
+                        activeTab === 'document' ? "text-blue-600" : "text-gray-400 hover:text-gray-600"
+                      )}
+                    >
+                      视频转化文档 (台词)
+                      {activeTab === 'document' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />}
+                    </button>
+                  </div>
+
+                  {/* Analysis Result or Document Content */}
+                  <div className="prose prose-blue max-w-none">
+                    {activeTab === 'analysis' ? (
+                      isAnalyzing && analysisStep === 'analyzing' ? (
+                        <div className="py-20 flex flex-col items-center justify-center text-gray-400">
+                          <Loader2 className="w-10 h-10 animate-spin text-purple-600 mb-4" />
+                          <p className="text-lg font-medium text-gray-600">DeepSeek-V3.2 正在进行深度分析...</p>
+                          <p className="text-sm mt-2">正在分析法律核心、视觉策略与用户心理</p>
+                        </div>
+                      ) : analysisResult ? (
+                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                          <ReactMarkdown>{analysisResult}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <div className="py-20 flex flex-col items-center justify-center text-gray-400">
+                          <Sparkles className="w-12 h-12 text-purple-200 mb-4" />
+                          <p className="text-lg font-medium text-gray-600">准备就绪</p>
+                          <p className="text-sm mt-2 mb-6">请确认左侧“视频转化文档”中已粘贴台词内容</p>
+                          <button
+                            onClick={handleStartAnalysis}
+                            disabled={!manualTranscript}
+                            className={cn(
+                              "px-8 py-3 rounded-xl font-bold shadow-lg transition-all",
+                              manualTranscript 
+                                ? "bg-purple-600 text-white hover:bg-purple-700 hover:scale-105" 
+                                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                            )}
+                          >
+                            开始 AI 深度分析
+                          </button>
+                        </div>
+                      )
+                    ) : (
+                      <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100 min-h-[300px]">
+                        <h6 className="text-blue-800 font-bold mb-4 flex items-center gap-2">
+                          <BarChart2 className="w-4 h-4" /> 视频全文台词粘贴 (Video Script)
+                        </h6>
+                        <div className="space-y-4">
+                          <p className="text-xs text-blue-600 bg-blue-100/50 p-2 rounded">
+                            提示：请将视频的完整文案或台词粘贴在下方，AI 将基于此内容进行深度法律分析。
+                          </p>
+                          <textarea
+                            value={manualTranscript}
+                            onChange={(e) => setManualTranscript(e.target.value)}
+                            placeholder="在此处粘贴视频台词内容..."
+                            className="w-full h-64 p-4 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm leading-relaxed resize-none shadow-inner"
+                          />
+                          <div className="flex justify-end">
+                            <button
+                              onClick={() => setActiveTab('analysis')}
+                              disabled={!manualTranscript}
+                              className={cn(
+                                "px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-2",
+                                manualTranscript
+                                  ? "bg-blue-600 text-white hover:bg-blue-700"
+                                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                              )}
+                            >
+                              下一步：去分析
+                              <Sparkles className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -540,10 +672,16 @@ export const ViralVideosSection = () => {
                   关闭报告
                 </button>
                 <button 
-                  onClick={() => window.print()}
-                  className="px-6 py-2.5 bg-gray-900 text-white font-medium hover:bg-gray-800 rounded-xl transition-colors flex items-center gap-2"
+                  onClick={handleDownloadMarkdown}
+                  disabled={!analysisResult}
+                  className={cn(
+                    "px-8 py-2.5 font-bold rounded-xl transition-all flex items-center gap-2 shadow-md",
+                    analysisResult 
+                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:scale-105" 
+                      : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  )}
                 >
-                  导出 PDF
+                  保存为 MD (Markdown)
                 </button>
               </div>
             </motion.div>
