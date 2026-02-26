@@ -188,14 +188,21 @@ export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [data, setData] = useState<DataItem[]>([]);
   
+  // Dynamic today reference for initial states
+  const today = new Date();
+  const todayStr = format(today, 'yyyy-MM-dd');
+  const lastWeekStr = format(subDays(today, 7), 'yyyy-MM-dd');
+  const thisMonthStr = format(today, 'yyyy-MM');
+  const lastMonthStr = format(subMonths(today, 1), 'yyyy-MM');
+
   // Range Comparison State
-  const [dateRange, setDateRange] = useState({ start: '2026-01-02', end: '2026-01-08' });
-  const [compareRange, setCompareRange] = useState({ start: '2026-01-09', end: '2026-01-13' }); 
+  const [dateRange, setDateRange] = useState({ start: lastWeekStr, end: todayStr });
+  const [compareRange, setCompareRange] = useState({ start: format(subDays(today, 14), 'yyyy-MM-dd'), end: format(subDays(today, 8), 'yyyy-MM-dd') }); 
 
   // Month Comparison State
-  const [monthA, setMonthA] = useState('2026-01');
-  const [monthB, setMonthB] = useState('2026-02');
-  const [selectedMonthForVideos, setSelectedMonthForVideos] = useState('2026-01'); 
+  const [monthA, setMonthA] = useState(lastMonthStr);
+  const [monthB, setMonthB] = useState(thisMonthStr);
+  const [selectedMonthForVideos, setSelectedMonthForVideos] = useState(thisMonthStr); 
   
   // Data Date Range State
   const [dataDateRange, setDataDateRange] = useState<{ start: string, end: string } | null>(null);
@@ -205,14 +212,17 @@ export default function App() {
   const [showViralMonitor, setShowViralMonitor] = useState(false);
 
   // Overall Trend Filter State
-  const [trendRange, setTrendRange] = useState({ start: '2026-01-01', end: '2026-12-31' });
+  const [trendRange, setTrendRange] = useState({ start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr });
   const [trendMode, setTrendMode] = useState<'daily' | 'monthly' | 'quarterly'>('daily');
   
   // Views Trend Filter State (Independent)
-  const [viewsTrendRange, setViewsTrendRange] = useState({ start: '2026-01-01', end: '2026-12-31' });
+  const [viewsTrendRange, setViewsTrendRange] = useState({ start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr });
   const [viewsTrendMode, setViewsTrendMode] = useState<'daily' | 'monthly' | 'quarterly'>('daily');
 
   const [detailTrendMode, setDetailTrendMode] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('daily');
+
+  // AI Analysis Independent Date Range
+  const [aiDateRange, setAiDateRange] = useState({ start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr });
 
   // User Name extracted from file
   const [userName, setUserName] = useState<string>('');
@@ -293,9 +303,6 @@ export default function App() {
     end.setHours(23, 59, 59, 999);
     return data.filter(d => d.parsedDate >= start && d.parsedDate <= end);
   }, [data, compareRange]);
-
-  // AI Analysis Independent Date Range
-  const [aiDateRange, setAiDateRange] = useState({ start: '2026-01-01', end: '2026-02-08' });
 
   // AI Analysis Data Filtering
   const aiData = useMemo(() => {
@@ -988,7 +995,8 @@ export default function App() {
                         </div>
                         <button 
                             onClick={() => {
-                                const end = new Date();
+                                if (!dataDateRange) return;
+                                const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
                                 const start = subDays(end, 6);
                                 setViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
                                 setViewsTrendMode('daily');
@@ -999,7 +1007,8 @@ export default function App() {
                         </button>
                         <button 
                             onClick={() => {
-                                const end = new Date();
+                                if (!dataDateRange) return;
+                                const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
                                 const start = subDays(end, 29);
                                 setViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
                                 setViewsTrendMode('daily');
@@ -1010,8 +1019,9 @@ export default function App() {
                         </button>
                         <button 
                             onClick={() => {
-                                const start = startOfMonth(new Date());
-                                const end = endOfMonth(new Date());
+                                if (!dataDateRange) return;
+                                const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
+                                const start = startOfMonth(end);
                                 setViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
                                 setViewsTrendMode('daily');
                             }}
@@ -1021,8 +1031,10 @@ export default function App() {
                         </button>
                         <button 
                             onClick={() => {
-                                const start = startOfMonth(subMonths(new Date(), 1));
-                                const end = endOfMonth(subMonths(new Date(), 1));
+                                if (!dataDateRange) return;
+                                const today = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
+                                const start = startOfMonth(subMonths(today, 1));
+                                const end = endOfMonth(subMonths(today, 1));
                                 setViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
                                 setViewsTrendMode('daily');
                             }}
