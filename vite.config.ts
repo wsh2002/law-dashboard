@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: './',
+  base: '/law-dashboard-v1/',
   plugins: [react(), tailwindcss()],
   server: {
     host: '0.0.0.0', // Listen on all local IPs
