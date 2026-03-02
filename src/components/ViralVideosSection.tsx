@@ -537,7 +537,6 @@ ${analysisResult}
                           <Clock className="w-3.5 h-3.5 text-gray-400" />
                           {video.publishTime}
                         </div>
-                        <span className="text-[10px] text-gray-400">发布于昨天</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
