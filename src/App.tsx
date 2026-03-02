@@ -379,13 +379,17 @@ export default function App() {
 
   // Aggregations
   const getKPIs = (dataset: DataItem[]) => {
+    const views = dataset.reduce((acc, cur) => acc + cur.views, 0);
+    const count = dataset.length;
     return {
-      views: dataset.reduce((acc, cur) => acc + cur.views, 0),
+      views,
       likes: dataset.reduce((acc, cur) => acc + cur.likes, 0),
       comments: dataset.reduce((acc, cur) => acc + cur.comments, 0),
       shares: dataset.reduce((acc, cur) => acc + cur.shares, 0),
       netFans: dataset.reduce((acc, cur) => acc + cur.netFans, 0),
       favorites: dataset.reduce((acc, cur) => acc + cur.favorites, 0),
+      avgCompletionRate: count ? dataset.reduce((acc, cur) => acc + parseFloat(cur.completionRate.replace('%', '')), 0) / count : 0,
+      avgInteractionRate: count ? dataset.reduce((acc, cur) => acc + cur.interactionRate, 0) / count : 0,
     };
   };
 
@@ -662,7 +666,8 @@ export default function App() {
     { name: '点赞量', current: currentKPIs.likes, compare: compareKPIs.likes },
     { name: '净增粉', current: currentKPIs.netFans, compare: compareKPIs.netFans },
     { name: '评论量', current: currentKPIs.comments, compare: compareKPIs.comments },
-    { name: '转发量', current: currentKPIs.shares, compare: compareKPIs.shares },
+    { name: '完播率(%)', current: currentKPIs.avgCompletionRate, compare: compareKPIs.avgCompletionRate },
+    { name: '互动率(%)', current: currentKPIs.avgInteractionRate, compare: compareKPIs.avgInteractionRate },
   ];
 
   // Monthly Aggregation
@@ -1261,10 +1266,10 @@ export default function App() {
                                 <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f97316" label={{ value: '日增粉丝', angle: 90, position: 'insideRight' }} />
                                 <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
                                 <Legend />
-                                <Line yAxisId="left" type="monotone" dataKey="fans" name="累计粉丝" stroke="#3b82f6" strokeWidth={3} dot={{ r: 3 }} />
-                                <Line yAxisId="left" type="monotone" dataKey="compareFans" name={`对比 (${compareRange.start}至${compareRange.end}) 累计粉丝`} stroke="#334155" strokeDasharray="5 5" strokeWidth={2} dot={false} />
-                                <Bar yAxisId="right" dataKey="netFans" name="日增粉丝" fill="#f97316" radius={[4, 4, 0, 0]} barSize={20} />
-                                <Bar yAxisId="right" dataKey="compareNetFans" name={`对比 (${compareRange.start}至${compareRange.end}) 日增粉丝`} fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={20} />
+                                <Line yAxisId="left" type="monotone" dataKey="fans" name={`当前周期 (${dateRange.start}至${dateRange.end}) 累计粉丝`} stroke="#3b82f6" strokeWidth={3} dot={{ r: 3 }} />
+                                <Line yAxisId="left" type="monotone" dataKey="compareFans" name={`对比周期 (${compareRange.start}至${compareRange.end}) 累计粉丝`} stroke="#334155" strokeDasharray="5 5" strokeWidth={2} dot={false} />
+                                <Bar yAxisId="right" dataKey="netFans" name={`当前周期 (${dateRange.start}至${dateRange.end}) 日增粉丝`} fill="#f97316" radius={[4, 4, 0, 0]} barSize={20} />
+                                <Bar yAxisId="right" dataKey="compareNetFans" name={`对比周期 (${compareRange.start}至${compareRange.end}) 日增粉丝`} fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={20} />
                             </ComposedChart>
                         </ResponsiveContainer>
                     </div>
@@ -1290,10 +1295,10 @@ export default function App() {
                                 <YAxis fontSize={12} stroke="#94a3b8" unit="%" />
                                 <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
                                 <Legend />
-                                <Line type="monotone" dataKey="completionRate" name="平均完播率(%)" stroke="#10b981" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6, strokeWidth: 0 }} />
-                                <Line type="monotone" dataKey="compareCompletionRate" name={`对比 (${compareRange.start}至${compareRange.end}) 完播率(%)`} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
-                                <Line type="monotone" dataKey="interactionRate" name="互动率(%)" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6, strokeWidth: 0 }} />
-                                <Line type="monotone" dataKey="compareInteractionRate" name={`对比 (${compareRange.start}至${compareRange.end}) 互动率(%)`} stroke="#f59e0b" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                                <Line type="monotone" dataKey="completionRate" name={`当前周期 (${dateRange.start}至${dateRange.end}) 完播率(%)`} stroke="#10b981" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                                <Line type="monotone" dataKey="compareCompletionRate" name={`对比周期 (${compareRange.start}至${compareRange.end}) 完播率(%)`} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                                <Line type="monotone" dataKey="interactionRate" name={`当前周期 (${dateRange.start}至${dateRange.end}) 互动率(%)`} stroke="#8b5cf6" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                                <Line type="monotone" dataKey="compareInteractionRate" name={`对比周期 (${compareRange.start}至${compareRange.end}) 互动率(%)`} stroke="#f59e0b" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
                                 <ReferenceLine y={avgInteractionRate} stroke="#64748b" strokeDasharray="4 4" label={{ value: `均值: ${avgInteractionRate.toFixed(2)}%`, position: 'right', fill: '#64748b' }} />
                             </LineChart>
                         </ResponsiveContainer>
@@ -1321,10 +1326,10 @@ export default function App() {
                                 <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f97316" label={{ value: '互动总量', angle: 90, position: 'insideRight' }} />
                                 <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
                                 <Legend />
-                                <Line yAxisId="left" type="monotone" dataKey="views" name="播放量" stroke="#3b82f6" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
-                                <Line yAxisId="left" type="monotone" dataKey="compareViews" name={`对比 (${compareRange.start}至${compareRange.end}) 播放量`} stroke="#10b981" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 4 }} />
-                                <Line yAxisId="right" type="monotone" dataKey="interactions" name="互动总量" stroke="#f97316" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
-                                <Line yAxisId="right" type="monotone" dataKey="compareInteractions" name={`对比 (${compareRange.start}至${compareRange.end}) 互动总量`} stroke="#6366f1" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 4 }} />
+                                <Line yAxisId="left" type="monotone" dataKey="views" name={`当前周期 (${dateRange.start}至${dateRange.end}) 播放量`} stroke="#3b82f6" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
+                                <Line yAxisId="left" type="monotone" dataKey="compareViews" name={`对比周期 (${compareRange.start}至${compareRange.end}) 播放量`} stroke="#60a5fa" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 4 }} />
+                                <Line yAxisId="right" type="monotone" dataKey="interactions" name={`当前周期 (${dateRange.start}至${dateRange.end}) 互动总量`} stroke="#f97316" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
+                                <Line yAxisId="right" type="monotone" dataKey="compareInteractions" name={`对比周期 (${compareRange.start}至${compareRange.end}) 互动总量`} stroke="#fb923c" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 4 }} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -1350,8 +1355,8 @@ export default function App() {
                                 <YAxis fontSize={12} stroke="#94a3b8" unit="%" />
                             <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
                             <Legend />
-                            <Line type="monotone" dataKey="healthRate" name="粉赞比(%)" stroke="#ef4444" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                            <Line type="monotone" dataKey="compareHealthRate" name={`对比 (${compareRange.start}至${compareRange.end}) 粉赞比(%)`} stroke="#3b82f6" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                            <Line type="monotone" dataKey="healthRate" name={`当前周期 (${dateRange.start}至${dateRange.end}) 粉赞比(%)`} stroke="#ef4444" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                            <Line type="monotone" dataKey="compareHealthRate" name={`对比周期 (${compareRange.start}至${compareRange.end}) 粉赞比(%)`} stroke="#3b82f6" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={{ r: 2 }} activeDot={{ r: 4 }} />
                             <ReferenceLine y={avgHealthRate} stroke="#64748b" strokeDasharray="4 4" label={{ value: `均值: ${avgHealthRate}%`, position: 'right', fill: '#64748b' }} />
                         </LineChart>
                     </ResponsiveContainer>
