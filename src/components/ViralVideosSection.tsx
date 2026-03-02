@@ -189,12 +189,16 @@ export const ViralVideosSection = () => {
                 setSubtitles(data.subtitles);
                 const text = data.subtitles.map((s: any) => s.text).join('\n');
                 setManualTranscript(text);
-              } else if (curEvent === 'error') {
+              } else if (curEvent === 'error') 
+                {
                 if (data.message === 'COOKIE_EXPIRED') {
                   setTranscribeError('Cookie 已过期，请更新 cookies.txt 后重启服务');
                 } else {
                   setTranscribeError(`识别失败：${data.message}`);
-                }
+                } 
+              }
+                else if (curEvent === 'queued') {
+                  setTranscribeError(`⏳ ${data.hint}`);
               }
             } catch {}
           }
