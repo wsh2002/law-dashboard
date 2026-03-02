@@ -11,7 +11,7 @@ export interface ViralVideo {
   rank: number;
   title: string;
   author: string;
-  views: string; // Formatted string for display
+  views?: string;
   likes: number;
   comments: number;
   shares: number;
@@ -19,18 +19,17 @@ export interface ViralVideo {
   cover: string;
   url: string;
   duration: string;
-  platform?: 'douyin' | 'kuaishou' | 'wechat'; // Added platform field
-  content?: string; // Raw ASR text
+  platform?: 'douyin' | 'kuaishou' | 'wechat';
+  category?: 'land' | 'general';
+  content?: string;
 }
 
-// Generate real-time publish time (e.g., "3 hours ago")
 const getRecentTime = () => {
     const hours = Math.floor(Math.random() * 23) + 1;
     return `${hours}小时前`;
 };
 
 const MOCK_VIRAL_VIDEOS: ViralVideo[] = [
-  // Douyin Data - Focused on "征地" (Land Acquisition) based on user's scraper target
   { id: 'dy1', rank: 1, title: '农村征地补偿标准出来了！每亩地补多少钱？建议收藏 #征地补偿 #法律知识', author: '农村法律咨询', views: '25.6w', likes: 12500, comments: 1200, shares: 850, publishTime: getRecentTime(), cover: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=400&h=225&fit=crop', url: 'https://v.douyin.com/mock1/', duration: '01:30', platform: 'douyin' },
   { id: 'dy2', rank: 2, title: '家里房子被强拆怎么办？律师教你三招维权！ #拆迁维权 #法律援助', author: '张律师普法', views: '18.2w', likes: 8900, comments: 650, shares: 420, publishTime: getRecentTime(), cover: 'https://images.unsplash.com/photo-1582139329536-e7284fece509?w=400&h=225&fit=crop', url: 'https://v.douyin.com/mock2/', duration: '02:15', platform: 'douyin' },
   { id: 'dy3', rank: 3, title: '征地过程中这些字千万不能签！签了就晚了 #土地征收 #法律咨询', author: '法治先锋', views: '15.4w', likes: 7200, comments: 480, shares: 310, publishTime: getRecentTime(), cover: 'https://images.unsplash.com/photo-1590247813693-5541d1c609fd?w=400&h=225&fit=crop', url: 'https://v.douyin.com/mock3/', duration: '01:10', platform: 'douyin' },
@@ -39,7 +38,7 @@ const MOCK_VIRAL_VIDEOS: ViralVideo[] = [
   { id: 'dy6', rank: 6, title: '强制拆迁前的法定程序有哪些？没走这些程序就是违法拆迁', author: '拆迁维权卫士', views: '8.2w', likes: 3800, comments: 185, shares: 120, publishTime: getRecentTime(), cover: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=400&h=225&fit=crop', url: 'https://v.douyin.com/mock6/', duration: '01:55', platform: 'douyin' },
   { id: 'dy7', rank: 7, title: '农村宅基地征收补偿包括哪些内容？别让自己的利益受损', author: '土地法专家', views: '7.5w', likes: 3200, comments: 150, shares: 95, publishTime: getRecentTime(), cover: 'https://images.unsplash.com/photo-1516156008625-3a9d6067fab5?w=400&h=225&fit=crop', url: 'https://v.douyin.com/mock7/', duration: '02:20', platform: 'douyin' },
   { id: 'dy8', rank: 8, title: '评估公司评估价格过低？教你如何申请复核和鉴定 #房产评估', author: '房产维权专家', views: '6.9w', likes: 2900, comments: 130, shares: 80, publishTime: getRecentTime(), cover: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400&h=225&fit=crop', url: 'https://v.douyin.com/mock8/', duration: '03:15', platform: 'douyin' },
-  { id: 'dy9', rank: 9, title: '遇到“预征地”怎么办？这些情况你可以拒绝征收', author: '正义之声', views: '5.8w', likes: 2500, comments: 110, shares: 65, publishTime: getRecentTime(), cover: 'https://images.unsplash.com/photo-1574482620826-40685ca5eba2?w=400&h=225&fit=crop', url: 'https://v.douyin.com/mock9/', duration: '01:45', platform: 'douyin' },
+  { id: 'dy9', rank: 9, title: '遇到"预征地"怎么办？这些情况你可以拒绝征收', author: '正义之声', views: '5.8w', likes: 2500, comments: 110, shares: 65, publishTime: getRecentTime(), cover: 'https://images.unsplash.com/photo-1574482620826-40685ca5eba2?w=400&h=225&fit=crop', url: 'https://v.douyin.com/mock9/', duration: '01:45', platform: 'douyin' },
   { id: 'dy10', rank: 10, title: '征地补偿协议不合理，已经签了字还能反悔吗？', author: '合同法研究', views: '5.2w', likes: 2100, comments: 95, shares: 55, publishTime: getRecentTime(), cover: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=400&h=225&fit=crop', url: 'https://v.douyin.com/mock10/', duration: '02:50', platform: 'douyin' },
   { id: 'dy11', rank: 11, title: '酒驾新规解读：这些情况不算酒驾', author: '交警在线', views: '8.9w', likes: 3800, comments: 180, shares: 95, publishTime: getRecentTime(), cover: '', url: '#', duration: '01:30', platform: 'douyin' },
   { id: 'dy12', rank: 12, title: '邻里纠纷怎么处理？民法典有话说', author: '社区法律顾问', views: '7.6w', likes: 3200, comments: 150, shares: 60, publishTime: getRecentTime(), cover: '', url: '#', duration: '02:00', platform: 'douyin' },
@@ -51,14 +50,11 @@ const MOCK_VIRAL_VIDEOS: ViralVideo[] = [
   { id: 'dy18', rank: 18, title: '二手房交易避坑指南', author: '房产专家', views: '4.2w', likes: 1500, comments: 55, shares: 25, publishTime: getRecentTime(), cover: '', url: '#', duration: '03:00', platform: 'douyin' },
   { id: 'dy19', rank: 19, title: '遇到医疗纠纷怎么办？', author: '医疗律师团队', views: '3.8w', likes: 1300, comments: 45, shares: 20, publishTime: getRecentTime(), cover: '', url: '#', duration: '02:10', platform: 'douyin' },
   { id: 'dy20', rank: 20, title: '新婚姻法解读：彩礼还需要返还吗？', author: '婚姻家事律师', views: '3.5w', likes: 1200, comments: 40, shares: 15, publishTime: getRecentTime(), cover: '', url: '#', duration: '01:25', platform: 'douyin' },
-
-  // Kuaishou Data (Mock)
   { id: 'ks1', rank: 1, title: '老铁们注意了！这种合同千万别签', author: '快手大律师', views: '22.5w', likes: 8427, comments: 923, shares: 302, publishTime: getRecentTime(), cover: '', url: '#', duration: '01:20', platform: 'kuaishou' },
   { id: 'ks2', rank: 2, title: '讨薪路漫漫？一招教你快速维权', author: '正义之声', views: '18.2w', likes: 6334, comments: 545, shares: 212, publishTime: getRecentTime(), cover: '', url: '#', duration: '01:42', platform: 'kuaishou' },
   { id: 'ks3', rank: 3, title: '酒桌上的法律责任，你必须要懂', author: '法治快车', views: '15.6w', likes: 5269, comments: 428, shares: 108, publishTime: getRecentTime(), cover: '', url: '#', duration: '00:55', platform: 'kuaishou' },
   { id: 'ks4', rank: 4, title: '农村宅基地最新政策解读', author: '乡村法治', views: '14.1w', likes: 4184, comments: 332, shares: 95, publishTime: getRecentTime(), cover: '', url: '#', duration: '02:31', platform: 'kuaishou' },
   { id: 'ks5', rank: 5, title: '这种借条无效！别再踩坑了', author: '法律顾问老王', views: '13.8w', likes: 3140, comments: 215, shares: 83, publishTime: getRecentTime(), cover: '', url: '#', duration: '01:17', platform: 'kuaishou' },
-  // ... more kuaishou data to reach 20
   { id: 'ks6', rank: 6, title: '发生交通事故，第一时间该做什么？', author: '平安出行', views: '12.5w', likes: 2800, comments: 150, shares: 60, publishTime: getRecentTime(), cover: '', url: '#', duration: '01:30', platform: 'kuaishou' },
   { id: 'ks7', rank: 7, title: '房东不退押金？这几招很管用', author: '租房避坑', views: '11.2w', likes: 2600, comments: 120, shares: 50, publishTime: getRecentTime(), cover: '', url: '#', duration: '01:10', platform: 'kuaishou' },
   { id: 'ks8', rank: 8, title: '离婚冷静期到底有多长？', author: '家事调解', views: '10.8w', likes: 2400, comments: 100, shares: 40, publishTime: getRecentTime(), cover: '', url: '#', duration: '02:00', platform: 'kuaishou' },
@@ -74,14 +70,11 @@ const MOCK_VIRAL_VIDEOS: ViralVideo[] = [
   { id: 'ks18', rank: 18, title: '微信转账记录能当证据吗？', author: '证据法学', views: '6.2w', likes: 800, comments: 20, shares: 3, publishTime: getRecentTime(), cover: '', url: '#', duration: '01:10', platform: 'kuaishou' },
   { id: 'ks19', rank: 19, title: '个人信息泄露，谁来负责？', author: '隐私保护', views: '5.8w', likes: 700, comments: 15, shares: 2, publishTime: getRecentTime(), cover: '', url: '#', duration: '01:35', platform: 'kuaishou' },
   { id: 'ks20', rank: 20, title: '劳动仲裁流程详解', author: '法律援助', views: '5.5w', likes: 600, comments: 10, shares: 1, publishTime: getRecentTime(), cover: '', url: '#', duration: '03:00', platform: 'kuaishou' },
-
-  // WeChat Data (Mock)
   { id: 'wx1', rank: 1, title: '深度解读：新公司法对创业者的影响', author: '法治周末', views: '10w+', likes: 5427, comments: 323, shares: 502, publishTime: getRecentTime(), cover: '', url: '#', duration: '05:10', platform: 'wechat' },
   { id: 'wx2', rank: 2, title: '【收藏】生活中常见的100个法律常识', author: '人民日报', views: '10w+', likes: 4334, comments: 245, shares: 812, publishTime: getRecentTime(), cover: '', url: '#', duration: '03:12', platform: 'wechat' },
   { id: 'wx3', rank: 3, title: '最高法发布典型案例：保护消费者权益', author: '最高人民法院', views: '8.6w', likes: 3269, comments: 128, shares: 308, publishTime: getRecentTime(), cover: '', url: '#', duration: '02:45', platform: 'wechat' },
   { id: 'wx4', rank: 4, title: '律师视点：如何看待AI生成内容的版权问题', author: '知识产权前沿', views: '6.1w', likes: 2184, comments: 92, shares: 145, publishTime: getRecentTime(), cover: '', url: '#', duration: '04:31', platform: 'wechat' },
   { id: 'wx5', rank: 5, title: '民法典实施三周年：这些变化影响你我生活', author: '法治日报', views: '5.8w', likes: 1140, comments: 65, shares: 93, publishTime: getRecentTime(), cover: '', url: '#', duration: '03:57', platform: 'wechat' },
-   // ... more wechat data to reach 20
   { id: 'wx6', rank: 6, title: '刑法修正案（十二）草案解读', author: '刑事法治', views: '4.5w', likes: 900, comments: 50, shares: 60, publishTime: getRecentTime(), cover: '', url: '#', duration: '04:00', platform: 'wechat' },
   { id: 'wx7', rank: 7, title: '环境公益诉讼制度的发展与完善', author: '环保法律', views: '4.2w', likes: 800, comments: 40, shares: 50, publishTime: getRecentTime(), cover: '', url: '#', duration: '03:30', platform: 'wechat' },
   { id: 'wx8', rank: 8, title: '数字经济时代的法律挑战', author: '互联网法律', views: '3.8w', likes: 700, comments: 30, shares: 40, publishTime: getRecentTime(), cover: '', url: '#', duration: '05:00', platform: 'wechat' },
@@ -104,6 +97,9 @@ const CATEGORIES = [
   { id: 'general', name: '法律普法', icon: Sparkles }
 ];
 
+// ✅ Whisper 服务地址
+const WHISPER_API = 'http://192.168.3.235:8000';
+
 export const ViralVideosSection = () => {
   const [showApiConfig, setShowApiConfig] = useState(false);
   const [apiConfig, setApiConfig] = useState(() => {
@@ -118,7 +114,6 @@ export const ViralVideosSection = () => {
     return DEFAULT_CONFIG;
   });
 
-  // 监听配置变化并保存到本地存储
   useEffect(() => {
     localStorage.setItem('deepseek_config', JSON.stringify(apiConfig));
   }, [apiConfig]);
@@ -135,12 +130,81 @@ export const ViralVideosSection = () => {
   const [analysisStep, setAnalysisStep] = useState<'idle' | 'analyzing'>('idle');
   const [activeTab, setActiveTab] = useState<'analysis' | 'document'>('document');
 
+  // ✅ 自动识别状态
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [transcribeError, setTranscribeError] = useState('');
+
+  // ✅ 新增：带时间戳的字幕数据
+  const [subtitles, setSubtitles] = useState<{ start: string; end: string; text: string }[]>([]);
+
   const handleDeepAnalysis = (video: ViralVideo) => {
     setAnalyzingVideo(video);
     setAnalysisResult('');
     setManualTranscript(video.content || '');
     setAnalysisStep('idle');
     setActiveTab('document');
+    setTranscribeError('');
+    setSubtitles([]); // ✅ 重置字幕
+  };
+
+  // ✅ 自动识别函数（保留时间戳）
+  const handleAutoTranscribe = async () => {
+    if (!analyzingVideo?.url || analyzingVideo.url === '#') {
+      setTranscribeError('该视频暂无有效链接，请手动粘贴台词');
+      return;
+    }
+
+    setIsTranscribing(true);
+    setTranscribeError('');
+    setManualTranscript('');
+    setSubtitles([]); // ✅ 重置旧字幕
+
+    try {
+      const resp = await fetch(`${WHISPER_API}/api/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: analyzingVideo.url })
+      });
+
+      const reader = resp.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop()!;
+
+        let curEvent: string | null = null;
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            curEvent = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (curEvent === 'result' && data.subtitles) {
+                // ✅ 同时保存带时间戳的字幕 和 纯文本（用于AI分析）
+                setSubtitles(data.subtitles);
+                const text = data.subtitles.map((s: any) => s.text).join('\n');
+                setManualTranscript(text);
+              } else if (curEvent === 'error') {
+                if (data.message === 'COOKIE_EXPIRED') {
+                  setTranscribeError('Cookie 已过期，请更新 cookies.txt 后重启服务');
+                } else {
+                  setTranscribeError(`识别失败：${data.message}`);
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (e: any) {
+      setTranscribeError('无法连接到识别服务，请确认 Whisper 服务已启动（）');
+    } finally {
+      setIsTranscribing(false);
+    }
   };
 
   const handleStartAnalysis = async () => {
@@ -151,12 +215,10 @@ export const ViralVideosSection = () => {
     setActiveTab('analysis');
     
     try {
-      // 深度拆解分析 (使用 V3.2)
       const analysis = await analyzeDocument(apiConfig, manualTranscript, analyzingVideo);
       setAnalysisResult(analysis);
     } catch (error: any) {
       setAnalysisResult(`分析失败: ${error.message}`);
-      // 如果是 401 错误，自动展开配置面板提示用户
       if (error.message.includes('401')) {
         setShowApiConfig(true);
       }
@@ -199,333 +261,315 @@ ${analysisResult}
     URL.revokeObjectURL(url);
   };
 
-  // Filter and sort videos based on selection
   useEffect(() => {
     const fetchVideos = async () => {
-        setLoading(true);
-        try {
-            // Try to fetch real data from local JSON
-            // Use BASE_URL from vite config to handle subdirectory deployment
-            const baseUrl = import.meta.env.BASE_URL.endsWith('/') 
-                ? import.meta.env.BASE_URL 
-                : `${import.meta.env.BASE_URL}/`;
-            
-            const response = await fetch(`${baseUrl}data/douyin_videos.json`);
-            if (response.ok) {
-                const realData = await response.json();
-                console.log('Successfully loaded real data:', realData.length, 'items');
-                
-                const formatted = realData
-                    .map((v: any, index: number) => {
-                        // Logic to determine category based on content
-                        let category: 'land' | 'general' = 'general';
-                        const titleText = (v.title || v.desc || '').toLowerCase();
-                        if (titleText.includes('征地') || titleText.includes('拆迁') || titleText.includes('补偿') || titleText.includes('土地') || titleText.includes('征收')) {
-                            category = 'land';
-                        }
-                        
-                        return {
-                            id: `real-${index}`,
-                            rank: index + 1,
-                            title: v.title || v.desc || '未知标题',
-                            author: v.author || '未知作者',
-                            likes: v.likes || v.digg || 0,
-                            comments: v.comments || v.comment || 0,
-                            shares: v.shares || 0,
-                            publishTime: v.publishTime || v.time || '未知时间',
-                            url: v.url || '#',
-                            duration: v.duration || '00:00',
-                            cover: v.cover || '',
-                            platform: v.platform || 'douyin',
-                            category,
-                            content: v.content || v.video_text || '' // Support both field names
-                        };
-                    })
-                    .filter((v: any) => v.category === selectedCategory)
-                    .sort((a: any, b: any) => b.likes - a.likes);
-                
-                if (formatted.length > 0) {
-                    setVideos(formatted.slice(0, 20).map((v: any, i: number) => ({ ...v, rank: i + 1 })));
-                    setLoading(false);
-                    return;
-                }
-            } else {
-                console.warn('Failed to fetch JSON data:', response.status);
-            }
-        } catch (error) {
-            console.error('Error loading real data:', error);
-        }
+      setLoading(true);
+      try {
+        const baseUrl = import.meta.env.BASE_URL.endsWith('/')
+          ? import.meta.env.BASE_URL
+          : `${import.meta.env.BASE_URL}/`;
 
-        // Fallback to Mock Data only if real data loading fails or returns empty
-        console.log('Falling back to mock data');
-        await new Promise(resolve => setTimeout(resolve, 600));
-        const filtered = MOCK_VIRAL_VIDEOS
-            .map(v => {
-                let category: 'land' | 'general' = 'general';
-                const content = v.title.toLowerCase();
-                if (content.includes('征地') || content.includes('拆迁') || content.includes('补偿') || content.includes('土地')) {
-                    category = 'land';
-                }
-                return { ...v, category };
+        const response = await fetch(`${baseUrl}data/douyin_videos.json`);
+        if (response.ok) {
+          const realData = await response.json();
+          const formatted = realData
+            .map((v: any, index: number) => {
+              let category: 'land' | 'general' = 'general';
+              const titleText = (v.title || v.desc || '').toLowerCase();
+              if (titleText.includes('征地') || titleText.includes('拆迁') || titleText.includes('补偿') || titleText.includes('土地') || titleText.includes('征收')) {
+                category = 'land';
+              }
+              return {
+                id: `real-${index}`,
+                rank: index + 1,
+                title: v.title || v.desc || '未知标题',
+                author: v.author || '未知作者',
+                likes: v.likes || v.digg || 0,
+                comments: v.comments || v.comment || 0,
+                shares: v.shares || 0,
+                views: v.views || v.play || '0',
+                publishTime: v.publishTime || v.time || '未知时间',
+                url: v.url || '#',
+                duration: v.duration || '00:00',
+                cover: v.cover || '',
+                platform: v.platform || 'douyin',
+                category,
+                content: v.content || v.video_text || ''
+              };
             })
-            .filter(v => v.category === selectedCategory)
-            .sort((a, b) => b.likes - a.likes)
-            .slice(0, 20)
-            .map((v, index) => ({ ...v, rank: index + 1 }));
+            .filter((v: any) => v.category === selectedCategory)
+            .sort((a: any, b: any) => b.likes - a.likes);
 
-        setVideos(filtered);
-        setLoading(false);
+          if (formatted.length > 0) {
+            setVideos(formatted.slice(0, 20).map((v: any, i: number) => ({ ...v, rank: i + 1 })));
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error loading real data:', error);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 600));
+      const filtered = MOCK_VIRAL_VIDEOS
+        .filter(v => v.platform === 'douyin' && (selectedCategory === 'land' ? v.title.includes('征地') : !v.title.includes('征地')))
+        .sort((a, b) => b.likes - a.likes);
+      setVideos(filtered.map(v => ({ ...v, category: selectedCategory })));
+      setLoading(false);
     };
 
     fetchVideos();
   }, [selectedCategory]);
 
-  const currentPlatformName = '抖音';
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <Search className="w-6 h-6 text-purple-600" />
-            抖音律师爆款视频监控 (Douyin Viral Videos)
-        </h3>
-        <button 
-          onClick={() => setShowApiConfig(!showApiConfig)}
-          className="text-xs text-gray-500 flex items-center gap-1 hover:text-gray-800 transition-colors"
-        >
-            <Settings className="w-3 h-3" />
-            配置 API
-        </button>
-      </div>
-
-      {showApiConfig && (
-        <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 text-sm mb-6 shadow-inner animate-in fade-in slide-in-from-top-4">
-            <div className="flex items-center justify-between mb-4">
-                <h4 className="font-bold text-gray-800 flex items-center gap-2">
-                    <Settings className="w-4 h-4 text-purple-600" />
-                    AI 模型配置 (DeepSeek Official)
-                </h4>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">API Key</label>
-                    <input 
-                        type="password" 
-                        value={apiConfig.apiKey}
-                        onChange={(e) => setApiConfig({ ...apiConfig, apiKey: e.target.value })}
-                        placeholder="sk-..." 
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-                    />
-                </div>
-                <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Base URL</label>
-                    <input 
-                        type="text" 
-                        value={apiConfig.baseUrl}
-                        onChange={(e) => setApiConfig({ ...apiConfig, baseUrl: e.target.value })}
-                        placeholder="https://api..." 
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
-                    />
-                </div>
-            </div>
-            
-            <p className="text-[11px] text-gray-400 mt-4 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" />
-                提示：401 错误通常是 Key 与接口地址不匹配。官方 Key 请配合官方节点使用。
-            </p>
-        </div>
-      )}
-
-      {/* Category Selection Tabs */}
-      <div className="flex flex-wrap gap-4">
-        {CATEGORIES.map((category, index) => {
-          const isSelected = selectedCategory === category.id;
-          const Icon = category.icon;
-          return (
-            <motion.button 
-              key={category.id} 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1 * index }}
-              onClick={() => setSelectedCategory(category.id as any)}
+      {/* Search and Categories */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex gap-2 p-1 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id as any)}
               className={cn(
-                "flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all duration-300",
-                isSelected 
-                    ? "bg-gray-900 text-white shadow-lg scale-105" 
-                    : "bg-white text-gray-600 border border-gray-200 hover:border-gray-900 hover:text-gray-900 shadow-sm"
+                "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all",
+                selectedCategory === cat.id
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
               )}
             >
-              <Icon className={cn("w-5 h-5", isSelected ? "text-blue-400" : "text-gray-400")} />
-              {category.name}
-            </motion.button>
-          );
-        })}
-      </div>
-
-      {/* Auto-Fetched Viral Videos List */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden"
-      >
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-900 to-gray-800 text-white">
-            <div>
-                <h4 className="text-lg font-bold flex items-center gap-2">
-                    <span className="flex h-3 w-3 relative">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-                    </span>
-                    {currentPlatformName}-法律类目-一周内点赞量最高
-                </h4>
-                <p className="text-xs text-gray-400 mt-1">
-                    自动筛选条件: 平台="{currentPlatformName}" & 关键词="法律" & 时间="一周内" & 排序="最多点赞"
-                </p>
-            </div>
-            <div className="text-right">
-                <span className="text-xs bg-white/10 px-2 py-1 rounded text-gray-300">
-                    后台自动刷新中
-                </span>
-            </div>
+              <cat.icon className={cn("w-4 h-4", selectedCategory === cat.id ? "text-blue-600" : "text-gray-400")} />
+              {cat.name}
+            </button>
+          ))}
         </div>
 
+        <div className="relative w-full md:w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="搜索爆款视频..."
+            className="w-full pl-10 pr-4 py-2 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+          />
+        </div>
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden"
+      >
+        {/* Table Header */}
+        <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-8 bg-green-500 rounded-full" />
+            <div>
+              <h3 className="text-lg font-bold text-gray-800">抖音-法律类目—一周内点赞量最高</h3>
+              <p className="text-xs text-gray-400 mt-1">自动筛选条件: 平台="抖音" & 关键词="法律" & 时间="一周内" & 排序="最多点赞"</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg">
+              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-[10px] text-gray-500 font-medium">后台自动刷新中</span>
+            </div>
+            <button
+              onClick={() => setShowApiConfig(!showApiConfig)}
+              className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* API Config Panel */}
+        <AnimatePresence>
+          {showApiConfig && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden bg-purple-50/50 border-b border-purple-100"
+            >
+              <div className="p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                    <Settings className="w-4 h-4 text-purple-600" />
+                    AI 模型配置 (DeepSeek Official)
+                  </h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">API KEY</label>
+                    <input
+                      type="password"
+                      value={apiConfig.apiKey}
+                      onChange={(e) => setApiConfig({ ...apiConfig, apiKey: e.target.value })}
+                      placeholder="sk-..."
+                      className="w-full px-4 py-2 rounded-xl border border-purple-200 focus:ring-2 focus:ring-purple-500 outline-none text-sm bg-white"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Base URL</label>
+                    <input
+                      type="text"
+                      value={apiConfig.baseUrl}
+                      onChange={(e) => setApiConfig({ ...apiConfig, baseUrl: e.target.value })}
+                      className="w-full px-4 py-2 rounded-xl border border-purple-200 focus:ring-2 focus:ring-purple-500 outline-none text-sm bg-white"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-gray-400 flex items-center gap-1 italic">
+                  <AlertCircle className="w-3 h-3" />
+                  提示：401 错误通常是 Key 与接口地址不匹配。官方 Key 请配合官方节点使用。
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {loading ? (
-            <div className="p-12 flex flex-col items-center justify-center text-gray-400">
-                <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-                <p>正在连接{currentPlatformName}数据中心...</p>
-                <p className="text-xs mt-2">Fetching top 20 viral videos...</p>
-            </div>
+          <div className="py-20 flex flex-col items-center justify-center text-gray-400">
+            <Loader2 className="w-10 h-10 animate-spin text-blue-600 mb-4" />
+            <p className="font-medium">正在获取最新爆款数据...</p>
+          </div>
         ) : (
-            <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left text-gray-600">
-                    <thead className="bg-gray-50 text-gray-700 font-medium border-b border-gray-200">
-                        <tr>
-                            <th className="px-6 py-4">排名</th>
-                            <th className="px-6 py-4">视频内容</th>
-                            <th className="px-6 py-4">发布账号</th>
-                            <th className="px-6 py-4 text-center">互动数据</th>
-                            <th className="px-6 py-4">发布时间</th>
-                            <th className="px-6 py-4 text-right">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {videos.map((video) => (
-                            <tr key={video.id} className="hover:bg-blue-50/50 transition-colors group">
-                                <td className="px-6 py-4">
-                                    <div className={cn(
-                                        "w-8 h-8 rounded-lg flex items-center justify-center font-bold shadow-sm transition-transform group-hover:scale-110",
-                                        video.rank === 1 ? "bg-gradient-to-br from-yellow-300 via-yellow-500 to-yellow-600 text-white" :
-                                        video.rank === 2 ? "bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 text-white" :
-                                        video.rank === 3 ? "bg-gradient-to-br from-orange-300 via-orange-400 to-orange-500 text-white" :
-                                        "bg-gray-100 text-gray-500"
-                                    )}>
-                                        {video.rank}
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-20 h-28 bg-gray-200 rounded-lg overflow-hidden relative shrink-0 shadow-sm group-hover:shadow-md transition-shadow">
-                                            {video.cover ? (
-                                                <img src={video.cover} alt={video.title} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-300">
-                                                    <Play className="w-6 h-6" />
-                                                </div>
-                                            )}
-                                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                <Play className="w-8 h-8 text-white fill-white" />
-                                            </div>
-                                            <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1 rounded backdrop-blur-sm">
-                                                {video.duration}
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col gap-1.5">
-                                            <p className="font-bold text-gray-900 line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors">
-                                                {video.title}
-                                            </p>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                <span className="text-[10px] font-medium px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full border border-blue-100">
-                                                    {(video as any).category === 'land' ? '征地拆迁' : '法律普法'}
-                                                </span>
-                                                <span className="text-[10px] font-medium px-2 py-0.5 bg-purple-50 text-purple-600 rounded-full border border-purple-100">抖音爆款</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-gray-100 to-gray-200 flex items-center justify-center text-gray-500 border border-white shadow-sm overflow-hidden">
-                                            <User className="w-5 h-5" />
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="font-bold text-gray-800">{video.author}</span>
-                                            <span className="text-[10px] text-gray-400">认证律师/法律博主</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex flex-col gap-2 w-48">
-                                        {/* Likes Bar */}
-                                        <div className="space-y-1">
-                                            <div className="flex items-center justify-between text-[10px]">
-                                                <span className="flex items-center gap-1 font-medium text-gray-500"><ThumbsUp className="w-3 h-3 text-red-500" /> 点赞</span>
-                                                <span className="font-bold text-gray-900">{video.likes.toLocaleString()}</span>
-                                            </div>
-                                            <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden border border-gray-50">
-                                                <motion.div 
-                                                    initial={{ width: 0 }}
-                                                    animate={{ width: `${Math.min(100, (video.likes / (videos[0]?.likes || 1000)) * 100)}%` }}
-                                                    className="bg-gradient-to-r from-red-400 to-red-500 h-full rounded-full"
-                                                />
-                                            </div>
-                                        </div>
-                                        {/* Comments */}
-                                        <div className="flex items-center gap-1.5 text-[10px]">
-                                            <MessageCircle className="w-3.5 h-3.5 text-blue-500" />
-                                            <span className="font-medium text-gray-500">评论</span>
-                                            <span className="font-bold text-gray-900 ml-auto">{video.comments.toLocaleString()}</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-gray-500">
-                                    <div className="flex flex-col gap-1">
-                                        <div className="flex items-center gap-1 text-xs font-medium text-gray-700">
-                                            <Clock className="w-3 h-3" />
-                                            {video.publishTime}
-                                        </div>
-                                        <span className="text-[10px] text-gray-400">发布于昨天</span>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 text-right">
-                                    <div className="flex flex-col items-end gap-2">
-                                        <div className="flex gap-2">
-                                            <button 
-                                                onClick={() => handleDeepAnalysis(video)}
-                                                className="inline-flex items-center gap-2 px-3 py-2 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded-lg text-xs font-bold transition-colors border border-purple-100"
-                                            >
-                                                <Sparkles className="w-3.5 h-3.5" />
-                                                深度分析
-                                            </button>
-                                            <a 
-                                                href={video.url}
-                                                target="_blank" 
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 rounded-lg text-xs font-bold shadow-md shadow-blue-200 transition-all hover:-translate-y-0.5"
-                                            >
-                                                <Play className="w-3.5 h-3.5 fill-current" />
-                                                查看视频
-                                            </a>
-                                        </div>
-                                        <button className="text-[10px] text-gray-400 hover:text-blue-600 transition-colors font-medium">
-                                            监控该账号
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-gray-50/50 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                <tr>
+                  <th className="px-6 py-4">排名</th>
+                  <th className="px-6 py-4">视频内容</th>
+                  <th className="px-6 py-4">发布账号</th>
+                  <th className="px-6 py-4 text-center">互动数据</th>
+                  <th className="px-6 py-4">发布时间</th>
+                  <th className="px-6 py-4 text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {videos.map((video) => (
+                  <tr key={video.id} className="hover:bg-blue-50/50 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center font-bold shadow-sm transition-transform group-hover:scale-110",
+                        video.rank === 1 ? "bg-amber-100 text-amber-600" :
+                        video.rank === 2 ? "bg-slate-200 text-slate-600" :
+                        video.rank === 3 ? "bg-orange-100 text-orange-600" :
+                        "bg-gray-50 text-gray-400"
+                      )}>
+                        {video.rank}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-4">
+                        <div className="relative w-16 h-20 rounded-lg bg-gray-100 overflow-hidden shrink-0 shadow-sm border border-gray-200">
+                          {video.cover ? (
+                            <img src={video.cover} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                              <Play className="w-6 h-6 text-gray-200" />
+                            </div>
+                          )}
+                          <div className="absolute bottom-1 right-1 px-1 py-0.5 bg-black/60 rounded text-[8px] text-white font-medium">
+                            {video.duration}
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1.5 max-w-md">
+                          <h5 className="font-bold text-gray-900 text-sm line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors">
+                            {video.title}
+                          </h5>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-bold rounded uppercase">
+                              {video.category === 'land' ? '征地拆迁' : '通用普法'}
+                            </span>
+                            <span className="px-2 py-0.5 bg-purple-50 text-purple-600 text-[9px] font-bold rounded uppercase">
+                              抖音爆款
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-100 border-2 border-white shadow-sm flex items-center justify-center">
+                          <User className="w-5 h-5 text-gray-400" />
+                        </div>
+                        <div className="flex flex-col">
+                          <div className="font-bold text-gray-900 text-sm">{video.author}</div>
+                          <div className="text-[10px] text-gray-400 font-medium">认证律师/法律博主</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-3 min-w-[140px]">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <ThumbsUp className="w-3.5 h-3.5 text-red-500" />
+                            <span className="text-[10px] text-gray-500 font-medium">点赞</span>
+                          </div>
+                          <span className="text-xs font-bold text-gray-900 tabular-nums">{video.likes.toLocaleString()}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: '85%' }}
+                            className="h-full bg-gradient-to-r from-red-400 to-red-500 rounded-full"
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <MessageCircle className="w-3.5 h-3.5 text-blue-500" />
+                            <span className="text-[10px] text-gray-500 font-medium">评论</span>
+                          </div>
+                          <span className="text-xs font-bold text-gray-900 tabular-nums">{video.comments.toLocaleString()}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: '45%' }}
+                            className="h-full bg-gradient-to-r from-blue-400 to-blue-500 rounded-full"
+                          />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
+                          <Clock className="w-3.5 h-3.5 text-gray-400" />
+                          {video.publishTime}
+                        </div>
+                        <span className="text-[10px] text-gray-400">发布于昨天</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleDeepAnalysis(video)}
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded-lg text-xs font-bold transition-colors border border-purple-100"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                            深度分析
+                          </button>
+                          <a
+                            href={video.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 rounded-lg text-xs font-bold shadow-md shadow-blue-200 transition-all hover:-translate-y-0.5"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                            查看视频
+                          </a>
+                        </div>
+                        <button className="text-[10px] text-gray-400 hover:text-blue-600 transition-colors font-medium">
+                          监控该账号
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </motion.div>
 
@@ -550,7 +594,7 @@ ${analysisResult}
                     <p className="text-xs text-purple-100 opacity-80">由 DeepSeek AI 驱动的专业内容分析</p>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => setAnalyzingVideo(null)}
                   className="p-2 hover:bg-white/10 rounded-full transition-colors"
                 >
@@ -567,7 +611,9 @@ ${analysisResult}
                       {analyzingVideo.cover ? (
                         <img src={analyzingVideo.cover} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center"><Play className="w-8 h-8 text-gray-300" /></div>
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Play className="w-8 h-8 text-gray-300" />
+                        </div>
                       )}
                     </div>
                     <div className="flex flex-col justify-center gap-2">
@@ -582,7 +628,7 @@ ${analysisResult}
 
                   {/* Tab Switcher */}
                   <div className="flex gap-4 mb-6 border-b border-gray-100">
-                    <button 
+                    <button
                       onClick={() => setActiveTab('analysis')}
                       className={cn(
                         "pb-3 px-2 font-bold text-sm transition-all relative",
@@ -592,7 +638,7 @@ ${analysisResult}
                       AI 深度分析
                       {activeTab === 'analysis' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-600" />}
                     </button>
-                    <button 
+                    <button
                       onClick={() => setActiveTab('document')}
                       className={cn(
                         "pb-3 px-2 font-bold text-sm transition-all relative",
@@ -604,7 +650,7 @@ ${analysisResult}
                     </button>
                   </div>
 
-                  {/* Analysis Result or Document Content */}
+                  {/* Tab Content */}
                   <div className="prose prose-blue max-w-none">
                     {activeTab === 'analysis' ? (
                       isAnalyzing && analysisStep === 'analyzing' ? (
@@ -621,14 +667,14 @@ ${analysisResult}
                         <div className="py-20 flex flex-col items-center justify-center text-gray-400">
                           <Sparkles className="w-12 h-12 text-purple-200 mb-4" />
                           <p className="text-lg font-medium text-gray-600">准备就绪</p>
-                          <p className="text-sm mt-2 mb-6">请确认左侧“视频转化文档”中已粘贴台词内容</p>
+                          <p className="text-sm mt-2 mb-6">请确认左侧"视频转化文档"中已粘贴台词内容</p>
                           <button
                             onClick={handleStartAnalysis}
                             disabled={!manualTranscript}
                             className={cn(
                               "px-8 py-3 rounded-xl font-bold shadow-lg transition-all",
-                              manualTranscript 
-                                ? "bg-purple-600 text-white hover:bg-purple-700 hover:scale-105" 
+                              manualTranscript
+                                ? "bg-purple-600 text-white hover:bg-purple-700 hover:scale-105"
                                 : "bg-gray-200 text-gray-400 cursor-not-allowed"
                             )}
                           >
@@ -637,23 +683,67 @@ ${analysisResult}
                         </div>
                       )
                     ) : (
+                      // ✅ 台词页面：带时间戳显示 或 手动输入
                       <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100 min-h-[300px]">
-                        <h6 className="text-blue-800 font-bold mb-4 flex items-center gap-2">
-                          <BarChart2 className="w-4 h-4" /> 视频全文台词粘贴 (Video Script)
-                        </h6>
+                        <div className="flex items-center justify-between mb-4">
+                          <h6 className="text-blue-800 font-bold flex items-center gap-2">
+                            <BarChart2 className="w-4 h-4" /> 视频全文台词 (Video Script)
+                          </h6>
+                          <div className="flex items-center gap-2">
+                            {transcribeError && (
+                              <span className="text-[10px] text-red-500 font-medium bg-red-50 px-2 py-1 rounded">
+                                {transcribeError}
+                              </span>
+                            )}
+                            <button
+                              onClick={handleAutoTranscribe}
+                              disabled={isTranscribing}
+                              className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border",
+                                isTranscribing
+                                  ? "bg-gray-100 text-gray-400 border-gray-200"
+                                  : "bg-blue-600 text-white border-blue-700 hover:bg-blue-700 shadow-sm"
+                              )}
+                            >
+                              {isTranscribing ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Sparkles className="w-3 h-3" />
+                              )}
+                              {isTranscribing ? '正在自动识别...' : '一键识别台词'}
+                            </button>
+                          </div>
+                        </div>
+
                         <div className="space-y-4">
                           <p className="text-xs text-blue-600 bg-blue-100/50 p-2 rounded">
-                            提示：请将视频的完整文案或台词粘贴在下方，AI 将基于此内容进行深度法律分析。
+                            提示：点击"一键识别台词"自动识别，或手动粘贴视频文案，AI 将基于此内容进行深度法律分析。
                           </p>
-                          <textarea
-                            value={manualTranscript}
-                            onChange={(e) => setManualTranscript(e.target.value)}
-                            placeholder="在此处粘贴视频台词内容..."
-                            className="w-full h-64 p-4 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm leading-relaxed resize-none shadow-inner"
-                          />
+
+                          {/* ✅ 核心改动：有时间戳就显示带时间戳列表，没有就显示 textarea */}
+                          {subtitles.length > 0 ? (
+                            <div className="w-full h-64 overflow-y-auto rounded-xl border border-blue-200 bg-white shadow-inner divide-y divide-gray-50">
+                              {subtitles.map((s, i) => (
+                                <div key={i} className="flex items-start gap-3 px-4 py-2 hover:bg-blue-50/50 transition-colors">
+                                  <span className="text-[10px] font-mono text-red-500 shrink-0 mt-0.5 w-28">
+                                    {s.start} — {s.end}
+                                  </span>
+                                  <span className="text-sm text-gray-800">{s.text}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <textarea
+                              value={manualTranscript}
+                              onChange={(e) => setManualTranscript(e.target.value)}
+                              placeholder="在此处粘贴视频台词内容..."
+                              className="w-full h-64 p-4 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm leading-relaxed resize-none shadow-inner"
+                            />
+                          )}
+
                           <div className="flex justify-end">
                             <button
-                              onClick={() => setActiveTab('analysis')}
+                              onClick={() => { setActiveTab('analysis'); handleStartAnalysis(); }}
                               disabled={!manualTranscript}
                               className={cn(
                                 "px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-2",
@@ -662,7 +752,7 @@ ${analysisResult}
                                   : "bg-gray-200 text-gray-400 cursor-not-allowed"
                               )}
                             >
-                              下一步：去分析
+                              下一步：开始分析
                               <Sparkles className="w-4 h-4" />
                             </button>
                           </div>
@@ -674,55 +764,68 @@ ${analysisResult}
               </div>
 
               {/* Modal Footer */}
-              <div className="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
-                <button 
-                  onClick={() => setAnalyzingVideo(null)}
-                  className="px-6 py-2.5 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors"
-                >
-                  关闭报告
-                </button>
-                <button 
-                  onClick={handleDownloadMarkdown}
-                  disabled={!analysisResult}
-                  className={cn(
-                    "px-8 py-2.5 font-bold rounded-xl transition-all flex items-center gap-2 shadow-md",
-                    analysisResult 
-                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:scale-105" 
-                      : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  )}
-                >
-                  保存为 MD (Markdown)
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
-      >
-         <h4 className="font-bold text-gray-800 mb-4">如何获取最准确的数据？</h4>
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
-            <div className="flex gap-3">
-                <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">1</div>
-                <div>
-                    <p className="font-medium text-gray-900">点击上方按钮</p>
-                    <p>系统已预置了筛选条件（如最近1天、点赞最多），点击即可直达官方搜索结果页。</p>
-                </div>
-            </div>
-            <div className="flex gap-3">
-                <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">2</div>
-                <div>
-                    <p className="font-medium text-gray-900">使用专业数据工具</p>
-                    <p>如需自动抓取每日Top 10列表，建议使用婵妈妈(抖音)或飞瓜数据(快手)等专业SaaS平台，并在上方配置API。</p>
-                </div>
-            </div>
+              <div className="p-6 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+               <div className="text-xs text-gray-400 flex items-center gap-2">
+                 <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                 由 DeepSeek-V3.2 提供 AI 分析能力
+               </div>
+               <div className="flex items-center gap-3">
+                 {analysisResult && (
+                   <button
+                     onClick={handleDownloadMarkdown}
+                     className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-all flex items-center gap-2 shadow-sm"
+                   >
+                     下载分析报告
+                   </button>
+                 )}
+                 {manualTranscript && activeTab === 'document' && (
+                   <button
+                     onClick={() => { setActiveTab('analysis'); handleStartAnalysis(); }}
+                     disabled={isAnalyzing}
+                     className={cn(
+                       "px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-2",
+                       isAnalyzing
+                         ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                         : "bg-purple-600 text-white hover:bg-purple-700 shadow-md shadow-purple-200"
+                     )}
+                   >
+                     {isAnalyzing ? (
+                       <><Loader2 className="w-4 h-4 animate-spin" /> 分析中...</>
+                     ) : (
+                       <><Sparkles className="w-4 h-4" /> 开始 AI 深度分析</>
+                     )}
+                   </button>
+                 )}
+                 {analysisResult && activeTab === 'analysis' && (
+                   <button
+                     onClick={handleStartAnalysis}
+                     disabled={isAnalyzing}
+                     className={cn(
+                       "px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-2",
+                       isAnalyzing
+                         ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                         : "bg-purple-600 text-white hover:bg-purple-700 shadow-md shadow-purple-200"
+                     )}
+                   >
+                     {isAnalyzing ? (
+                       <><Loader2 className="w-4 h-4 animate-spin" /> 重新分析中...</>
+                     ) : (
+                       <><Sparkles className="w-4 h-4" /> 重新分析</>
+                     )}
+                   </button>
+                 )}
+                 <button
+                   onClick={() => setAnalyzingVideo(null)}
+                   className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-bold hover:bg-gray-200 transition-all"
+                 >
+                   关闭
+                 </button>
+               </div>
+             </div>
+           </motion.div>
          </div>
-      </motion.div>
-    </div>
-  );
+       )}
+     </AnimatePresence>
+   </div>
+ );
 };
