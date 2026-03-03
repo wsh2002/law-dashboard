@@ -98,7 +98,7 @@ const CATEGORIES = [
 ];
 
 // ✅ Whisper 服务地址
-const WHISPER_API = 'http://192.168.3.235:8000';
+const WHISPER_API = 'http://118.25.97.217:8000';
 
 export const ViralVideosSection = () => {
   const [showApiConfig, setShowApiConfig] = useState(false);
