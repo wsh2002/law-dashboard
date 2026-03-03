@@ -148,68 +148,85 @@ export const ViralVideosSection = () => {
   };
 
   // ✅ 自动识别函数（保留时间戳）
-  const handleAutoTranscribe = async () => {
-    if (!analyzingVideo?.url || analyzingVideo.url === '#') {
-      setTranscribeError('该视频暂无有效链接，请手动粘贴台词');
-      return;
+ const handleAutoTranscribe = async () => {
+  if (!analyzingVideo?.url || analyzingVideo.url === '#') {
+    setTranscribeError('该视频暂无有效链接,请手动粘贴台词');
+    return;
+  }
+
+  setIsTranscribing(true);
+  setTranscribeError('');
+  setManualTranscript('');
+  setSubtitles([]);
+
+  try {
+    const resp = await fetch(`${WHISPER_API}/api/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: analyzingVideo.url })
+    });
+
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status}`);
     }
 
-    setIsTranscribing(true);
-    setTranscribeError('');
-    setManualTranscript('');
-    setSubtitles([]); // ✅ 重置旧字幕
+    const reader = resp.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
 
-    try {
-      const resp = await fetch(`${WHISPER_API}/api/process`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: analyzingVideo.url })
-      });
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() || '';
 
-      const reader = resp.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
+      for (const chunk of lines) {
+        const eventLines = chunk.split('\n');
+        let eventType = '';
+        let eventData = '';
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop()!;
-
-        let curEvent: string | null = null;
-        for (const line of lines) {
+        for (const line of eventLines) {
           if (line.startsWith('event: ')) {
-            curEvent = line.slice(7).trim();
+            eventType = line.slice(7).trim();
           } else if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (curEvent === 'result' && data.subtitles) {
-                // ✅ 同时保存带时间戳的字幕 和 纯文本（用于AI分析）
-                setSubtitles(data.subtitles);
-                const text = data.subtitles.map((s: any) => s.text).join('\n');
-                setManualTranscript(text);
-              } else if (curEvent === 'error') 
-                {
-                if (data.message === 'COOKIE_EXPIRED') {
-                  setTranscribeError('Cookie 已过期，请更新 cookies.txt 后重启服务');
-                } else {
-                  setTranscribeError(`识别失败：${data.message}`);
-                } 
+            eventData = line.slice(6);
+          }
+        }
+
+        if (eventType && eventData) {
+          try {
+            const data = JSON.parse(eventData);
+            
+            if (eventType === 'result' && data.subtitles) {
+              setSubtitles(data.subtitles);
+              const text = data.subtitles.map((s: any) => s.text).join('\n');
+              setManualTranscript(text);
+            } else if (eventType === 'error') {
+              if (data.message === 'COOKIE_EXPIRED') {
+                setTranscribeError('Cookie 已过期,请更新 cookies.txt 后重启服务');
+              } else {
+                setTranscribeError(`识别失败:${data.message}`);
               }
-                else if (curEvent === 'queued') {
-                  setTranscribeError(`⏳ ${data.hint}`);
-              }
-            } catch {}
+            } else if (eventType === 'queued') {
+              setTranscribeError(`⏳ ${data.hint}`);
+            } else if (eventType === 'progress') {
+              setTranscribeError(`⏳ 识别进度: ${data.progress}%`);
+            }
+          } catch (e) {
+            console.error('解析 SSE 数据失败:', e);
           }
         }
       }
-    } catch (e: any) {
-      setTranscribeError('无法连接到识别服务，请确认 Whisper 服务已启动（）');
-    } finally {
-      setIsTranscribing(false);
     }
-  };
+  } catch (e: any) {
+    setTranscribeError('无法连接到识别服务,请确认 Whisper 服务已启动');
+    console.error('识别错误:', e);
+  } finally {
+    setIsTranscribing(false);
+  }
+};
 
   const handleStartAnalysis = async () => {
     if (!manualTranscript) return;
