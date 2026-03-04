@@ -42,9 +42,20 @@ export const generateAnalysisPrompt = (data: DataItem[]): string => {
   const retention = totalNetFans;
   
   // Adaptive Revenue Stage
-  const useRecommendations = totalFavorites === 0 && totalRecommendations > 0;
-  const revenue = useRecommendations ? totalRecommendations : totalFavorites;
-  const revenueLabel = useRecommendations ? '系统推荐 (Recommendation)' : '变现潜力 (Revenue - 收藏)';
+  const hasFavorites = totalFavorites > 0;
+  const hasRecommendations = totalRecommendations > 0;
+  
+  let revenue, revenueLabel;
+  if (hasFavorites) {
+      revenue = totalFavorites;
+      revenueLabel = '变现潜力 (Revenue - 收藏)';
+  } else if (hasRecommendations) {
+      revenue = totalRecommendations;
+      revenueLabel = '系统推荐 (Recommendation)';
+  } else {
+      revenue = 0;
+      revenueLabel = '变现意向 (Revenue - 暂无收藏数据)';
+  }
   
   const referral = totalShares;
 
@@ -77,8 +88,8 @@ export const generateAnalysisPrompt = (data: DataItem[]): string => {
 【AARRR 漏斗各环节转化率】
 1. 获取 -> 活跃 (Views -> Activation): ${rateViewToAct}% (用户看了视频后进行点赞/评论的比例)
 2. 活跃 -> 留存 (Activation -> Retention): ${rateActToRet}% (互动用户中转化为粉丝的比例)
-3. 留存 -> ${useRecommendations ? '推荐' : '变现'} (Retention -> ${useRecommendations ? 'Recommendation' : 'Revenue'}): ${rateRetToRev}% (${useRecommendations ? '粉丝中被系统/用户推荐的比例' : '粉丝中产生收藏/高意向行为的比例'})
-4. ${useRecommendations ? '推荐' : '变现'} -> 传播 (${useRecommendations ? 'Recommendation' : 'Revenue'} -> Referral): ${rateRevToRef}% (${useRecommendations ? '被推荐用户中愿意转发的比例' : '高意向用户中愿意转发推荐的比例'})
+3. 留存 -> ${hasFavorites ? '变现' : hasRecommendations ? '推荐' : '咨询'} (Retention -> ${hasFavorites ? 'Revenue' : hasRecommendations ? 'Recommendation' : 'Conversion'}): ${rateRetToRev}% (${hasFavorites ? '粉丝中产生收藏/高意向行为的比例' : hasRecommendations ? '粉丝中被系统/用户推荐的比例' : '粉丝中转化为咨询意向的比例'})
+4. ${hasFavorites ? '变现' : hasRecommendations ? '推荐' : '咨询'} -> 传播 (${hasFavorites ? 'Revenue' : hasRecommendations ? 'Recommendation' : 'Conversion'} -> Referral): ${rateRevToRef}% (${hasFavorites ? '高意向用户中愿意转发推荐的比例' : hasRecommendations ? '被推荐用户中愿意转发的比例' : '咨询意向用户中愿意转发的比例'})
 
 【头部视频表现】
 ${topVideos}

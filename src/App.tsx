@@ -6,7 +6,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, ComposedChart, ScatterChart, Scatter, ZAxis, ReferenceLine
 } from 'recharts';
-import { Upload, Calendar, ArrowUp, ArrowDown, FileSpreadsheet, TrendingUp, Activity, MousePointerClick, Heart, GitMerge, Sparkles, Play, MessageCircle, Share2, Users, Star } from 'lucide-react';
+import { Upload, Calendar, ArrowUp, ArrowDown, FileSpreadsheet, TrendingUp, Activity, MousePointerClick, Heart, GitMerge, Sparkles, Play, MessageCircle, Share2, Users, Star, ThumbsUp } from 'lucide-react';
 import { format, parse, addDays, isValid, startOfDay, subDays, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, eachWeekOfInterval } from 'date-fns';
 import { cn } from './lib/utils';
 import { ViralVideosSection } from './components/ViralVideosSection';
@@ -137,6 +137,7 @@ const parseData = (raw: any[]): DataItem[] => {
       favorites: Number(item['收藏量'] || item['Favorites'] || 0),
       shares,
       netFans: Number(item['粉丝净增量'] || item['粉丝净增'] || item['Net Fan Increase'] || 0),
+      recommendationsCount: Number(item['推荐量'] || item['Recommendations'] || 0),
       fanLikeRatio: formatPercentage(item['粉赞比'] || item['Fan/Like Ratio']),
       completionRate: formatPercentage(item['视频完播率'] || item['Completion Rate']),
       interactionRate,
@@ -226,6 +227,10 @@ export default function App() {
 
   // User Name extracted from file
   const [userName, setUserName] = useState<string>('');
+
+  // Visibility Flags based on dataset content
+  const hasFavorites = useMemo(() => data.some(d => d.favorites > 0), [data]);
+  const hasRecommendations = useMemo(() => data.some(d => (d.recommendationsCount || 0) > 0), [data]);
 
   // File Upload Handler
   const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -342,6 +347,7 @@ export default function App() {
                 comments: 0,
                 shares: 0,
                 favorites: 0,
+                recommendations: 0,
                 fans: item.fans, // Snapshot for daily, but for monthly we need logic
                 netFans: 0
             };
@@ -351,6 +357,7 @@ export default function App() {
         grouped[d].comments += item.comments;
         grouped[d].shares += item.shares;
         grouped[d].favorites += item.favorites;
+        grouped[d].recommendations += (item.recommendationsCount || 0);
         grouped[d].netFans += item.netFans;
         
         // For 'fans' (cumulative), we usually want the value at the end of the period.
@@ -388,6 +395,7 @@ export default function App() {
       shares: dataset.reduce((acc, cur) => acc + cur.shares, 0),
       netFans: dataset.reduce((acc, cur) => acc + cur.netFans, 0),
       favorites: dataset.reduce((acc, cur) => acc + cur.favorites, 0),
+      recommendations: dataset.reduce((acc, cur) => acc + (cur.recommendationsCount || 0), 0),
       avgCompletionRate: count ? dataset.reduce((acc, cur) => acc + parseFloat(cur.completionRate.replace('%', '')), 0) / count : 0,
       avgInteractionRate: count ? dataset.reduce((acc, cur) => acc + cur.interactionRate, 0) / count : 0,
     };
@@ -963,7 +971,11 @@ export default function App() {
                         <Legend />
                         <Line type="monotone" dataKey="likes" name="点赞量" stroke="#ef4444" strokeWidth={3} dot={false} />
                         <Line type="monotone" dataKey="comments" name="评论量" stroke="#8b5cf6" strokeWidth={3} dot={false} />
-                        <Line type="monotone" dataKey="favorites" name="收藏量" stroke="#f59e0b" strokeWidth={3} dot={false} />
+                        {hasFavorites ? (
+                            <Line type="monotone" dataKey="favorites" name="收藏量" stroke="#f59e0b" strokeWidth={3} dot={false} />
+                        ) : hasRecommendations ? (
+                            <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={false} />
+                        ) : null}
                         <Line type="monotone" dataKey="shares" name="转发量" stroke="#10b981" strokeWidth={3} dot={false} />
                     </LineChart>
                 </ResponsiveContainer>
@@ -1191,7 +1203,11 @@ export default function App() {
           <KPICard title="粉丝净增 (Net Fans)" value={currentKPIs.netFans} compareValue={compareKPIs.netFans} icon={Users} />
           <KPICard title="总评论量 (Comments)" value={currentKPIs.comments} compareValue={compareKPIs.comments} icon={MessageCircle} />
           <KPICard title="总转发量 (Shares)" value={currentKPIs.shares} compareValue={compareKPIs.shares} icon={Share2} />
-          <KPICard title="总收藏量 (Favorites)" value={currentKPIs.favorites} compareValue={compareKPIs.favorites} icon={Star} />
+          {hasFavorites ? (
+            <KPICard title="总收藏量 (Favorites)" value={currentKPIs.favorites} compareValue={compareKPIs.favorites} icon={Star} />
+          ) : hasRecommendations ? (
+            <KPICard title="总推荐量 (Recommendations)" value={currentKPIs.recommendations} compareValue={compareKPIs.recommendations} icon={ThumbsUp} />
+          ) : null}
         </div>
 
         {showAnalysis && (
@@ -1467,7 +1483,7 @@ export default function App() {
                   <th className="px-6 py-3">点赞</th>
                   <th className="px-6 py-3">互动率</th>
                   <th className="px-6 py-3">评论</th>
-                  <th className="px-6 py-3">收藏</th>
+                  {hasFavorites ? <th className="px-6 py-3">收藏</th> : hasRecommendations ? <th className="px-6 py-3">推荐</th> : null}
                   <th className="px-6 py-3">转发</th>
                   <th className="px-6 py-3">完播率</th>
                 </tr>
@@ -1482,7 +1498,7 @@ export default function App() {
                     <td className="px-6 py-4">{item.likes.toLocaleString()}</td>
                     <td className="px-6 py-4 text-purple-600 font-medium">{item.interactionRate.toFixed(2)}%</td>
                     <td className="px-6 py-4">{item.comments}</td>
-                    <td className="px-6 py-4">{item.favorites}</td>
+                    {hasFavorites ? <td className="px-6 py-4">{item.favorites}</td> : hasRecommendations ? <td className="px-6 py-4">{item.recommendationsCount}</td> : null}
                     <td className="px-6 py-4">{item.shares}</td>
                     <td className="px-6 py-4">{item.completionRate}</td>
                   </tr>

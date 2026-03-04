@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { DataItem } from '../App';
-import { Users, MousePointerClick, Heart, Star, Share2, TrendingUp, ThumbsUp } from 'lucide-react';
+import { Users, MousePointerClick, Heart, Star, Share2, TrendingUp, ThumbsUp, MessageCircle } from 'lucide-react';
 import { format, getQuarter, getYear } from 'date-fns';
 
 interface AARRRAnalysisProps {
@@ -78,26 +78,43 @@ export const AARRRAnalysis = ({ data }: AARRRAnalysisProps) => {
     const totalRecommendations = filteredData.reduce((acc, item) => acc + (item.recommendationsCount || 0), 0);
 
     // Determine Revenue Stage Metric (Favorites vs Recommendations)
-    // If Favorites is 0 (e.g. Video Number), try to use Recommendations
-    const useRecommendations = totalFavorites === 0 && totalRecommendations > 0;
+    // If Favorites is 0 (e.g. WeChat Video Account), try to use Recommendations
+    const hasFavorites = totalFavorites > 0;
+    const hasRecommendations = totalRecommendations > 0;
     
-    const revenueStage = useRecommendations ? {
-        name: 'Recommendation',
-        label: '系统推荐',
-        value: totalRecommendations,
-        metric: '推荐量',
-        icon: ThumbsUp,
-        color: '#f59e0b', // amber-500
-        desc: '被系统/用户推荐的总量'
-    } : {
-        name: 'Revenue',
-        label: '变现潜力',
-        value: totalFavorites,
-        metric: '收藏量',
-        icon: Star,
-        color: '#f59e0b', // amber-500
-        desc: '高意向咨询转化潜力'
-    };
+    let revenueStage;
+    if (hasFavorites) {
+        revenueStage = {
+            name: 'Revenue',
+            label: '变现潜力',
+            value: totalFavorites,
+            metric: '收藏量',
+            icon: Star,
+            color: '#f59e0b', // amber-500
+            desc: '高意向咨询转化潜力'
+        };
+    } else if (hasRecommendations) {
+        revenueStage = {
+            name: 'Recommendation',
+            label: '系统推荐',
+            value: totalRecommendations,
+            metric: '推荐量',
+            icon: ThumbsUp,
+            color: '#f59e0b', // amber-500
+            desc: '被系统/用户推荐的总量'
+        };
+    } else {
+        // Fallback for platforms without both (like WeChat Video Account in some cases)
+        revenueStage = {
+            name: 'Conversion',
+            label: '咨询意向',
+            value: 0,
+            metric: '收藏/推荐',
+            icon: MessageCircle,
+            color: '#f59e0b',
+            desc: '该平台暂未提供收藏数据'
+        };
+    }
 
     // AARRR Stages Mapping
     const stages = [
