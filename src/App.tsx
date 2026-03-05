@@ -1,4 +1,4 @@
-import { useState, useMemo, ChangeEvent } from 'react';
+import React, { useState, useMemo, ChangeEvent } from 'react';
 import * as XLSX from 'xlsx';
 import { motion } from 'framer-motion';
 // import { MOCK_DATA } from './data/mockData';
@@ -16,7 +16,7 @@ import { AnimatedBackground } from './components/AnimatedBackground';
 import { Login } from './components/Login';
 
 // Custom Tooltip for comparison charts
-const ComparisonTooltip = ({ active, payload, label }: any) => {
+const ComparisonTooltip = React.memo(({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
         const compareDate = payload[0]?.payload?.compareDate;
         return (
@@ -35,9 +35,9 @@ const ComparisonTooltip = ({ active, payload, label }: any) => {
         );
     }
     return null;
-};
+});
 
-const VideoTooltip = ({ active, payload }: any) => {
+const VideoTooltip = React.memo(({ active, payload }: any) => {
     if (active && payload && payload.length) {
         const data = payload[0].payload;
         return (
@@ -52,7 +52,7 @@ const VideoTooltip = ({ active, payload }: any) => {
         );
     }
     return null;
-};
+});
 
 // Types
 export type DataItem = {
@@ -728,10 +728,14 @@ export default function App() {
     }).filter(item => item.category); // Only include items that have a category
   }, [currentData]);
 
-  // Monthly Aggregation
+  // Monthly Aggregation - Optimized
   const monthlyData = useMemo(() => {
+    if (!data || data.length === 0) return [];
+    
     const grouped: Record<string, any> = {};
-    data.forEach(item => {
+    
+    // Process data in a single pass
+    for (const item of data) {
         const m = format(item.parsedDate, 'yyyy-MM');
         if (!grouped[m]) {
             grouped[m] = {
@@ -745,6 +749,8 @@ export default function App() {
                 count: 0
             };
         }
+        
+        // Accumulate values
         grouped[m].views += item.views;
         grouped[m].likes += item.likes;
         grouped[m].netFans += item.netFans;
@@ -752,14 +758,16 @@ export default function App() {
         grouped[m].completionRateSum += parseFloat(item.completionRate.replace('%', '')) || 0;
         grouped[m].interactionRateSum += item.interactionRate || 0;
         grouped[m].count += 1;
-    });
+    }
     
-    // Calculate averages
-    return Object.values(grouped).map(item => ({
-        ...item,
-        avgCompletionRate: item.count > 0 ? (item.completionRateSum / item.count).toFixed(2) : 0,
-        avgInteractionRate: item.count > 0 ? (item.interactionRateSum / item.count).toFixed(2) : 0
-    })).sort((a, b) => a.month.localeCompare(b.month));
+    // Calculate averages and sort
+    return Object.values(grouped)
+        .map(item => ({
+            ...item,
+            avgCompletionRate: item.count > 0 ? (item.completionRateSum / item.count).toFixed(2) : 0,
+            avgInteractionRate: item.count > 0 ? (item.interactionRateSum / item.count).toFixed(2) : 0
+        }))
+        .sort((a, b) => a.month.localeCompare(b.month));
   }, [data]);
 
   // Unique Months for Dropdowns
@@ -887,6 +895,92 @@ export default function App() {
   if (!isLoggedIn) {
       return <Login onLogin={() => setIsLoggedIn(true)} />;
   }
+
+  // Chart Components with Memo
+  const MonthlyViewsChart = React.memo(() => (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={monthViewsComparisonData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+        <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
+        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
+        <Legend />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  ));
+
+  const MonthlyOtherKPIsChart = React.memo(() => (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={monthComparisonChartData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+        <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
+        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
+        <Legend />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#6366f1" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  ));
+
+  const MonthlyCommentChart = React.memo(() => (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={monthCommentComparisonData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+        <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
+        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
+        <Legend />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#eab308" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  ));
+
+  const MonthlyRateChart = React.memo(() => (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={monthRateComparisonData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+        <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
+        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
+        <Legend />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#ef4444" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  ));
+
+  // Monthly Trend Chart Components with Memo
+  const MonthlyViewsLikesChart = React.memo(() => (
+    <ResponsiveContainer width="100%" height="100%">
+      <ComposedChart data={monthlyData}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+        <XAxis dataKey="month" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+        <YAxis yAxisId="left" fontSize={12} stroke="#3b82f6" label={{ value: '月播放量', angle: -90, position: 'insideLeft' }} domain={[0, 'dataMax * 1.2']} />
+        <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f43f5e" label={{ value: '月点赞量', angle: 90, position: 'insideRight' }} domain={[0, 'dataMax * 1.2']} />
+        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
+        <Legend />
+        <Bar yAxisId="left" dataKey="views" name="月播放量" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+        <Line yAxisId="right" type="monotone" dataKey="likes" name="月点赞量" stroke="#f43f5e" strokeWidth={2} dot={{ r: 3 }} />
+      </ComposedChart>
+    </ResponsiveContainer>
+  ));
+
+  const MonthlyNetFansChart = React.memo(() => (
+    <ResponsiveContainer width="100%" height="100%">
+      <ComposedChart data={monthlyData}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+        <XAxis dataKey="month" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+        <YAxis fontSize={12} stroke="#10b981" label={{ value: '月净增粉', angle: -90, position: 'insideLeft' }} domain={['auto', 'auto']} />
+        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
+        <Legend />
+        <Line type="monotone" dataKey="netFans" name="月净增粉" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+      </ComposedChart>
+    </ResponsiveContainer>
+  ));
 
   return (
     <div className="min-h-screen relative font-sans text-slate-800 overflow-x-hidden">
@@ -1704,17 +1798,7 @@ export default function App() {
                 <span className="text-blue-500">📊</span> 月度播放量对比
             </h3>
             <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthViewsComparisonData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                        <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-                        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
-                        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
-                        <Legend />
-                        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                </ResponsiveContainer>
+                <MonthlyViewsChart />
             </div>
           </motion.div>
 
@@ -1730,17 +1814,7 @@ export default function App() {
                 <span className="text-green-500">📊</span> 其他月度指标对比
             </h3>
             <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthComparisonChartData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                        <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-                        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
-                        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
-                        <Legend />
-                        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#6366f1" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                </ResponsiveContainer>
+                <MonthlyOtherKPIsChart />
             </div>
           </motion.div>
         </div>
@@ -1760,17 +1834,7 @@ export default function App() {
                 <span className="text-yellow-500">💬</span> 月度评论量对比
             </h3>
             <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthCommentComparisonData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                        <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-                        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
-                        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
-                        <Legend />
-                        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#eab308" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                </ResponsiveContainer>
+                <MonthlyCommentChart />
             </div>
           </motion.div>
 
@@ -1786,17 +1850,7 @@ export default function App() {
                 <span className="text-red-500">📈</span> 月度完播率和互动率对比
             </h3>
             <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={monthRateComparisonData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                        <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-                        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
-                        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
-                        <Legend />
-                        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#ef4444" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                </ResponsiveContainer>
+                <MonthlyRateChart />
             </div>
           </motion.div>
         </div>
@@ -1816,18 +1870,7 @@ export default function App() {
                     按月运营趋势 (播放量 & 点赞量)
                 </h3>
                 <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={monthlyData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="month" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-                            <YAxis yAxisId="left" fontSize={12} stroke="#3b82f6" label={{ value: '月播放量', angle: -90, position: 'insideLeft' }} domain={[0, 'dataMax * 1.2']} />
-                            <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f43f5e" label={{ value: '月点赞量', angle: 90, position: 'insideRight' }} domain={[0, 'dataMax * 1.2']} />
-                            <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
-                            <Legend />
-                            <Bar yAxisId="left" dataKey="views" name="月播放量" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                            <Line yAxisId="right" type="monotone" dataKey="likes" name="月点赞量" stroke="#f43f5e" strokeWidth={2} dot={{ r: 3 }} />
-                        </ComposedChart>
-                    </ResponsiveContainer>
+                    <MonthlyViewsLikesChart />
                 </div>
             </motion.div>
 
@@ -1844,16 +1887,7 @@ export default function App() {
                     按月运营趋势 (净增粉)
                 </h3>
                 <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={monthlyData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                            <XAxis dataKey="month" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-                            <YAxis fontSize={12} stroke="#10b981" label={{ value: '月净增粉', angle: -90, position: 'insideLeft' }} domain={['auto', 'auto']} />
-                            <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
-                            <Legend />
-                            <Line type="monotone" dataKey="netFans" name="月净增粉" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                        </ComposedChart>
-                    </ResponsiveContainer>
+                    <MonthlyNetFansChart />
                 </div>
             </motion.div>
         </div>

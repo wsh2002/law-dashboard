@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, AlertCircle, Settings, Play, ThumbsUp, Clock, User, MessageCircle, X, Sparkles, Loader2, BarChart2 } from 'lucide-react';
+import { Search, AlertCircle, Settings, Play, ThumbsUp, Clock, User, MessageCircle, X, Sparkles, Loader2, BarChart2, FileText } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { DEFAULT_CONFIG, analyzeDocument } from '../services/aiAnalysis';
+import { DEFAULT_CONFIG, analyzeDocument, extractContent } from '../services/aiAnalysis';
 import ReactMarkdown from 'react-markdown';
 
 // Types for the viral video data
@@ -128,7 +128,9 @@ export const ViralVideosSection = () => {
   const [manualTranscript, setManualTranscript] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState<'idle' | 'analyzing'>('idle');
-  const [activeTab, setActiveTab] = useState<'analysis' | 'document'>('document');
+  const [activeTab, setActiveTab] = useState<'analysis' | 'document' | 'extract'>('document');
+  const [extractedContent, setExtractedContent] = useState<string>('');
+  const [isExtracting, setIsExtracting] = useState(false);
 
   // ✅ 自动识别状态
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -246,6 +248,29 @@ export const ViralVideosSection = () => {
     } finally {
       setIsAnalyzing(false);
       setAnalysisStep('idle');
+    }
+  };
+
+  const handleExtractContent = async () => {
+    // 优先使用带时间戳的字幕内容，如果没有则使用手动输入的内容
+    const contentToExtract = subtitles.length > 0 
+      ? subtitles.map(subtitle => subtitle.text).join('\n') 
+      : manualTranscript;
+    
+    if (!contentToExtract) return;
+    
+    setIsExtracting(true);
+    
+    try {
+      const extracted = await extractContent(apiConfig, contentToExtract);
+      setExtractedContent(extracted);
+    } catch (error: any) {
+      setExtractedContent(`提取失败: ${error.message}`);
+      if (error.message.includes('401')) {
+        setShowApiConfig(true);
+      }
+    } finally {
+      setIsExtracting(false);
     }
   };
 
@@ -668,6 +693,16 @@ ${analysisResult}
                       视频转化文档 (台词)
                       {activeTab === 'document' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />}
                     </button>
+                    <button
+                      onClick={() => setActiveTab('extract')}
+                      className={cn(
+                        "pb-3 px-2 font-bold text-sm transition-all relative",
+                        activeTab === 'extract' ? "text-green-600" : "text-gray-400 hover:text-gray-600"
+                      )}
+                    >
+                      文案提取
+                      {activeTab === 'extract' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-600" />}
+                    </button>
                   </div>
 
                   {/* Tab Content */}
@@ -702,6 +737,64 @@ ${analysisResult}
                           </button>
                         </div>
                       )
+                    ) : activeTab === 'extract' ? (
+                      // 文案提取页面
+                      <div className="bg-green-50/50 p-6 rounded-xl border border-green-100 min-h-[300px]">
+                        <div className="flex items-center justify-between mb-4">
+                          <h6 className="text-green-800 font-bold flex items-center gap-2">
+                            <FileText className="w-4 h-4" /> 文案提取
+                          </h6>
+                        </div>
+                        <div className="space-y-4">
+                          <p className="text-xs text-green-600 bg-green-100/50 p-2 rounded">
+                            提示：点击下方按钮使用 DeepSeek R1 模型提取视频中的核心文案内容，去除重复词汇，保持内容的完整性和可读性。
+                          </p>
+                          <div className="bg-white p-4 rounded-xl border border-green-200 min-h-[200px]">
+                            {isExtracting ? (
+                              <div className="flex flex-col items-center justify-center h-full py-12">
+                                <Loader2 className="w-8 h-8 animate-spin text-green-600 mb-4" />
+                                <p className="text-sm text-gray-600">DeepSeek R1 正在提取文案...</p>
+                              </div>
+                            ) : extractedContent ? (
+                              <div className="text-sm text-gray-800 whitespace-pre-wrap">{extractedContent}</div>
+                            ) : subtitles.length > 0 ? (
+                              <div className="text-sm text-gray-800 whitespace-pre-wrap">
+                                {subtitles.map(subtitle => subtitle.text).join('\n')}
+                              </div>
+                            ) : manualTranscript ? (
+                              <div className="text-sm text-gray-800 whitespace-pre-wrap">{manualTranscript}</div>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center h-full text-gray-400 py-12">
+                                <FileText className="w-12 h-12 text-green-200 mb-4" />
+                                <p className="text-sm">暂无文案内容</p>
+                                <p className="text-xs mt-1">请先在"视频转化文档"中识别或粘贴台词</p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            {(manualTranscript || subtitles.length > 0) && !isExtracting && !extractedContent && (
+                              <button
+                                onClick={handleExtractContent}
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-all flex items-center gap-2"
+                              >
+                                <Sparkles className="w-4 h-4" />
+                                提取文案
+                              </button>
+                            )}
+                            {extractedContent && !isExtracting && (
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(extractedContent);
+                                }}
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-all flex items-center gap-2"
+                              >
+                                <Sparkles className="w-4 h-4" />
+                                复制文案
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     ) : (
                       // ✅ 台词页面：带时间戳显示 或 手动输入
                       <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100 min-h-[300px]">
@@ -761,21 +854,7 @@ ${analysisResult}
                             />
                           )}
 
-                          <div className="flex justify-end">
-                            <button
-                              onClick={() => { setActiveTab('analysis'); handleStartAnalysis(); }}
-                              disabled={!manualTranscript}
-                              className={cn(
-                                "px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-2",
-                                manualTranscript
-                                  ? "bg-blue-600 text-white hover:bg-blue-700"
-                                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                              )}
-                            >
-                              下一步：开始分析
-                              <Sparkles className="w-4 h-4" />
-                            </button>
-                          </div>
+
                         </div>
                       </div>
                     )}

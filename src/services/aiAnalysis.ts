@@ -201,7 +201,7 @@ ${document}
 点赞: ${video.likes}, 评论: ${video.comments}
 
 【深度拆解要求】:
-1. **⚖️ 法律核心拆解**: 识别视频中提到的具体法律条文，分析作者是如何将法条“人话化”的。
+1. **⚖️ 法律核心拆解**: 识别视频中提到的具体法律条文，分析作者是如何将法条"人话化"的。
 2. **🎬 视觉与文案策略**: 分析视频中的文字特效（如关键法条突出）对留存的贡献。
 3. **🧠 用户心理博弈**: 识别视频利用了用户哪种心理。
 4. **🚀 爆款复刻指南**: 总结 3 个最值得模仿的爆款因子。
@@ -212,4 +212,27 @@ ${document}
 
   // 使用 V3 模型进行快速深度分析
   return fetchAIAnalysis({ ...config, model: models.V3 }, prompt);
+};
+
+/**
+ * Extract clean content from raw video script using DeepSeek-R1
+ */
+export const extractContent = async (config: AIAnalysisConfig, rawContent: string) => {
+  const models = getProviderModels();
+  const prompt = `
+你是一位专业的文案提取专家。请从以下视频台词中提取核心文案内容，去除时间戳和多余的重复词汇，只保留纯文案内容。
+
+【原始台词】:
+${rawContent}
+
+【要求】:
+1. 去除时间戳信息（如 "00:00 — 00:05" 这样的时间标记）
+2. 去除重复的词汇和短语
+3. 只保留纯文案内容，去除任何格式标记
+4. 保持语句通顺流畅
+5. 直接输出提取后的纯文案，不需要任何前缀或格式
+`;
+  
+  // 使用 R1 模型进行文案提取
+  return fetchAIAnalysis({ ...config, model: models.R1 }, prompt);
 };
