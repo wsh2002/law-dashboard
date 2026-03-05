@@ -6,7 +6,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, ComposedChart, ScatterChart, Scatter, ZAxis, ReferenceLine
 } from 'recharts';
-import { Upload, Calendar, ArrowUp, ArrowDown, FileSpreadsheet, TrendingUp, Activity, MousePointerClick, Heart, GitMerge, Sparkles, Play, MessageCircle, Share2, Users, Star, ThumbsUp } from 'lucide-react';
+import { Upload, Calendar, ArrowUp, ArrowDown, FileSpreadsheet, TrendingUp, Activity, Heart, GitMerge, Sparkles, Play, MessageCircle, Share2, Users, Star, ThumbsUp } from 'lucide-react';
 import { format, parse, addDays, isValid, startOfDay, subDays, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, eachWeekOfInterval } from 'date-fns';
 import { cn } from './lib/utils';
 import { ViralVideosSection } from './components/ViralVideosSection';
@@ -14,6 +14,45 @@ import { AARRRAnalysis } from './components/AARRRAnalysis';
 import { AIAnalysisCard } from './components/AIAnalysisCard';
 import { AnimatedBackground } from './components/AnimatedBackground';
 import { Login } from './components/Login';
+
+// Custom Tooltip for comparison charts
+const ComparisonTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+        const compareDate = payload[0]?.payload?.compareDate;
+        return (
+            <div className="bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg border border-gray-200/50 min-w-[180px]">
+                <p className="font-bold text-gray-800 mb-1">{`当前: ${label}`}</p>
+                {compareDate && compareDate !== 'N/A' && (
+                   <p className="font-semibold text-gray-500 text-sm mb-2">{`对比: ${compareDate}`}</p>
+                )}
+                {payload.map((p: any, index: number) => (
+                    <p key={index} style={{ color: p.color }} className="text-sm font-medium flex justify-between">
+                        <span>{p.name}:</span>
+                        <span>{p.value.toLocaleString()}{p.unit || ''}</span>
+                    </p>
+                ))}
+            </div>
+        );
+    }
+    return null;
+};
+
+const VideoTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        return (
+            <div className="bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg border border-gray-200/50 min-w-[200px]">
+                <p className="font-bold text-gray-800">{data.x}</p>
+                <p className="text-sm text-gray-600 truncate max-w-xs" title={data.title}>{data.title}</p>
+                <hr className="my-2" />
+                <p className="text-sm font-bold" style={{ color: payload[0].fill }}>类型: {data.category}</p>
+                <p className="text-sm" style={{ color: '#333' }}>播放量: {data.y.toLocaleString()}</p>
+                <p className="text-sm" style={{ color: '#333' }}>互动率: {data.z.toFixed(2)}%</p>
+            </div>
+        );
+    }
+    return null;
+};
 
 // Types
 export type DataItem = {
@@ -203,7 +242,7 @@ export default function App() {
   // Month Comparison State
   const [monthA, setMonthA] = useState(lastMonthStr);
   const [monthB, setMonthB] = useState(thisMonthStr);
-  const [selectedMonthForVideos, setSelectedMonthForVideos] = useState(thisMonthStr); 
+  const [selectedMonthForVideos, setSelectedMonthForVideos] = useState(thisMonthStr);
   
   // Data Date Range State
   const [dataDateRange, setDataDateRange] = useState<{ start: string, end: string } | null>(null);
@@ -219,6 +258,8 @@ export default function App() {
   // Views Trend Filter State (Independent)
   const [viewsTrendRange, setViewsTrendRange] = useState({ start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr });
   const [viewsTrendMode, setViewsTrendMode] = useState<'daily' | 'monthly' | 'quarterly'>('daily');
+
+  const [topVideosMode, setTopVideosMode] = useState<'range' | 'month'>('range');
 
   const [detailTrendMode, setDetailTrendMode] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('daily');
 
@@ -292,21 +333,25 @@ export default function App() {
     reader.readAsBinaryString(file);
   };
 
-  // --- Range Analysis Logic ---
+  // --- Range Analysis Logic ---  
   // Filter Data
   const currentData = useMemo(() => {
     const start = parse(dateRange.start, 'yyyy-MM-dd', new Date());
     const end = parse(dateRange.end, 'yyyy-MM-dd', new Date());
     // Include end date fully
     end.setHours(23, 59, 59, 999);
-    return data.filter(d => d.parsedDate >= start && d.parsedDate <= end);
+    let filteredData = data.filter(d => d.parsedDate >= start && d.parsedDate <= end);
+    
+    return filteredData;
   }, [data, dateRange]);
 
   const compareData = useMemo(() => {
     const start = parse(compareRange.start, 'yyyy-MM-dd', new Date());
     const end = parse(compareRange.end, 'yyyy-MM-dd', new Date());
     end.setHours(23, 59, 59, 999);
-    return data.filter(d => d.parsedDate >= start && d.parsedDate <= end);
+    let filteredData = data.filter(d => d.parsedDate >= start && d.parsedDate <= end);
+    
+    return filteredData;
   }, [data, compareRange]);
 
   // AI Analysis Data Filtering
@@ -665,30 +710,56 @@ export default function App() {
 
   // Explosive Videos (Top 10 by Views)
   const explosiveVideos = useMemo(() => {
-    return [...currentData].sort((a, b) => b.views - a.views).slice(0, 10);
-  }, [currentData]);
+    const totalFans = currentData.length > 0 ? currentData[currentData.length - 1].fans : 0;
 
-  // Comparison Chart Data
-  const comparisonChartData = [
-    { name: '播放量', current: currentKPIs.views, compare: compareKPIs.views },
-    { name: '点赞量', current: currentKPIs.likes, compare: compareKPIs.likes },
-    { name: '净增粉', current: currentKPIs.netFans, compare: compareKPIs.netFans },
-    { name: '评论量', current: currentKPIs.comments, compare: compareKPIs.comments },
-    { name: '完播率(%)', current: currentKPIs.avgCompletionRate, compare: compareKPIs.avgCompletionRate },
-    { name: '互动率(%)', current: currentKPIs.avgInteractionRate, compare: compareKPIs.avgInteractionRate },
-  ];
+    return currentData.map(item => {
+      let category = ''; // No default category
+      if (item.views > 500000 && item.views > totalFans * 5) {
+        category = '大爆款';
+      } else if (item.views > 150000 && item.views > totalFans * 1.5) {
+        category = '中爆款';
+      } else if (item.views > 50000 && item.views > totalFans * 0.5) {
+        category = '小爆款';
+      } else if (item.views >= 3000 && item.views <= 10000) {
+        category = '正常播放';
+      }
+
+      return { ...item, category };
+    }).filter(item => item.category); // Only include items that have a category
+  }, [currentData]);
 
   // Monthly Aggregation
   const monthlyData = useMemo(() => {
     const grouped: Record<string, any> = {};
     data.forEach(item => {
         const m = format(item.parsedDate, 'yyyy-MM');
-        if (!grouped[m]) grouped[m] = { month: m, views: 0, likes: 0, netFans: 0 };
+        if (!grouped[m]) {
+            grouped[m] = {
+                month: m, 
+                views: 0, 
+                likes: 0, 
+                netFans: 0,
+                comments: 0,
+                completionRateSum: 0,
+                interactionRateSum: 0,
+                count: 0
+            };
+        }
         grouped[m].views += item.views;
         grouped[m].likes += item.likes;
         grouped[m].netFans += item.netFans;
+        grouped[m].comments += item.comments || 0;
+        grouped[m].completionRateSum += parseFloat(item.completionRate.replace('%', '')) || 0;
+        grouped[m].interactionRateSum += item.interactionRate || 0;
+        grouped[m].count += 1;
     });
-    return Object.values(grouped).sort((a, b) => a.month.localeCompare(b.month));
+    
+    // Calculate averages
+    return Object.values(grouped).map(item => ({
+        ...item,
+        avgCompletionRate: item.count > 0 ? (item.completionRateSum / item.count).toFixed(2) : 0,
+        avgInteractionRate: item.count > 0 ? (item.interactionRateSum / item.count).toFixed(2) : 0
+    })).sort((a, b) => a.month.localeCompare(b.month));
   }, [data]);
 
   // Unique Months for Dropdowns
@@ -697,21 +768,55 @@ export default function App() {
   }, [monthlyData]);
 
   // Month Comparison Logic
-  const monthDataA = useMemo(() => monthlyData.find(m => m.month === monthA) || { views: 0, likes: 0, netFans: 0 }, [monthlyData, monthA]);
-  const monthDataB = useMemo(() => monthlyData.find(m => m.month === monthB) || { views: 0, likes: 0, netFans: 0 }, [monthlyData, monthB]);
+  const monthDataA = useMemo(() => monthlyData.find(m => m.month === monthA) || { 
+      views: 0, 
+      likes: 0, 
+      netFans: 0,
+      comments: 0,
+      avgCompletionRate: 0,
+      avgInteractionRate: 0
+  }, [monthlyData, monthA]);
+  const monthDataB = useMemo(() => monthlyData.find(m => m.month === monthB) || { 
+      views: 0, 
+      likes: 0, 
+      netFans: 0,
+      comments: 0,
+      avgCompletionRate: 0,
+      avgInteractionRate: 0
+  }, [monthlyData, monthB]);
 
   const monthComparisonChartData = [
-      { name: '月播放量', A: monthDataA.views, B: monthDataB.views },
       { name: '月点赞量', A: monthDataA.likes, B: monthDataB.likes },
       { name: '月净增粉', A: monthDataA.netFans, B: monthDataB.netFans },
   ];
 
-  // Monthly Top Videos Logic
-  const monthlyTopVideos = useMemo(() => {
+  // Monthly Comment Comparison Data
+  const monthCommentComparisonData = [
+      { name: '月评论量', A: monthDataA.comments || 0, B: monthDataB.comments || 0 },
+  ];
+
+  // Monthly Rate Comparison Data
+  const monthRateComparisonData = [
+      { name: '完播率(%)', A: monthDataA.avgCompletionRate || 0, B: monthDataB.avgCompletionRate || 0 },
+      { name: '互动率(%)', A: monthDataA.avgInteractionRate || 0, B: monthDataB.avgInteractionRate || 0 },
+  ];
+
+  // Monthly Views Comparison Data
+  const monthViewsComparisonData = [
+      { name: '月播放量', A: monthDataA.views, B: monthDataB.views },
+  ];
+
+  const top10ExplosiveVideos = useMemo(() => {
+    return [...currentData]
+      .sort((a, b) => b.views - a.views)
+      .slice(0, 10);
+  }, [currentData]);
+
+  const monthlyTop10Videos = useMemo(() => {
       return data
           .filter(d => format(d.parsedDate, 'yyyy-MM') === selectedMonthForVideos)
           .sort((a, b) => b.views - a.views)
-          .slice(0, 5); // Top 5
+          .slice(0, 10); // Top 10
   }, [data, selectedMonthForVideos]);
 
   // Interaction rate average for reference line
@@ -1275,23 +1380,47 @@ export default function App() {
                     </h3>
                     <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={finalDetailTrend}>
+                            <BarChart data={finalDetailTrend}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                 <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-                                <YAxis yAxisId="left" fontSize={12} stroke="#3b82f6" label={{ value: '累计粉丝', angle: -90, position: 'insideLeft' }} />
                                 <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f97316" label={{ value: '日增粉丝', angle: 90, position: 'insideRight' }} />
-                                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
+                                <Tooltip content={<ComparisonTooltip />} />
                                 <Legend />
-                                <Line yAxisId="left" type="monotone" dataKey="fans" name={`当前周期 (${dateRange.start}至${dateRange.end}) 累计粉丝`} stroke="#3b82f6" strokeWidth={3} dot={{ r: 3 }} />
-                                <Line yAxisId="left" type="monotone" dataKey="compareFans" name={`对比周期 (${compareRange.start}至${compareRange.end}) 累计粉丝`} stroke="#334155" strokeDasharray="5 5" strokeWidth={2} dot={false} />
-                                <Bar yAxisId="right" dataKey="netFans" name={`当前周期 (${dateRange.start}至${dateRange.end}) 日增粉丝`} fill="#f97316" radius={[4, 4, 0, 0]} barSize={20} />
-                                <Bar yAxisId="right" dataKey="compareNetFans" name={`对比周期 (${compareRange.start}至${compareRange.end}) 日增粉丝`} fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={20} />
-                            </ComposedChart>
+                                <Bar yAxisId="right" dataKey="netFans" name="当前周期 日增粉丝" fill="#f97316" radius={[4, 4, 0, 0]} barSize={20} />
+                                <Bar yAxisId="right" dataKey="compareNetFans" name="对比周期 日增粉丝" fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={20} />
+                            </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </motion.div>
 
-                {/* User Stickiness (Quality Metrics) */}
+                {/* Completion Rate Chart */}
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.2 }}
+                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                >
+                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <Activity className="w-5 h-5 text-green-500" />
+                        用户粘性指标 (完播率)
+                    </h3>
+                    <div className="h-80">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={finalDetailTrend}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+                                <YAxis fontSize={12} stroke="#94a3b8" unit="%" />
+                                <Tooltip content={<ComparisonTooltip />} />
+                                <Legend />
+                                <Line type="monotone" dataKey="completionRate" name="当前周期 完播率(%)" stroke="#10b981" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                                <Line type="monotone" dataKey="compareCompletionRate" name="对比周期 完播率(%)" stroke="#ef4444" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </motion.div>
+
+                {/* Interaction Rate Chart */}
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
@@ -1301,7 +1430,7 @@ export default function App() {
                 >
                     <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                         <Activity className="w-5 h-5 text-purple-500" />
-                        用户粘性指标 (完播 vs 互动)
+                        用户粘性指标 (互动率)
                     </h3>
                     <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
@@ -1309,19 +1438,44 @@ export default function App() {
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                 <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
                                 <YAxis fontSize={12} stroke="#94a3b8" unit="%" />
-                                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
+                                <Tooltip content={<ComparisonTooltip />} />
                                 <Legend />
-                                <Line type="monotone" dataKey="completionRate" name={`当前周期 (${dateRange.start}至${dateRange.end}) 完播率(%)`} stroke="#10b981" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6, strokeWidth: 0 }} />
-                                <Line type="monotone" dataKey="compareCompletionRate" name={`对比周期 (${compareRange.start}至${compareRange.end}) 完播率(%)`} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
-                                <Line type="monotone" dataKey="interactionRate" name={`当前周期 (${dateRange.start}至${dateRange.end}) 互动率(%)`} stroke="#8b5cf6" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6, strokeWidth: 0 }} />
-                                <Line type="monotone" dataKey="compareInteractionRate" name={`对比周期 (${compareRange.start}至${compareRange.end}) 互动率(%)`} stroke="#f59e0b" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                                <Line type="monotone" dataKey="interactionRate" name="当前周期 互动率(%)" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                                <Line type="monotone" dataKey="compareInteractionRate" name="对比周期 互动率(%)" stroke="#f59e0b" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
                                 <ReferenceLine y={avgInteractionRate} stroke="#64748b" strokeDasharray="4 4" label={{ value: `均值: ${avgInteractionRate.toFixed(2)}%`, position: 'right', fill: '#64748b' }} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
                 </motion.div>
 
-                {/* Content Heat Trend */}
+                {/* Views Trend Chart */}
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.3 }}
+                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                >
+                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-blue-500" />
+                        内容热度趋势 (播放量)
+                    </h3>
+                    <div className="h-80">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={finalDetailTrend}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+                                <YAxis yAxisId="left" fontSize={12} stroke="#3b82f6" label={{ value: '播放量', angle: -90, position: 'insideLeft' }} />
+                                <Tooltip content={<ComparisonTooltip />} />
+                                <Legend />
+                                <Line yAxisId="left" type="monotone" dataKey="views" name="当前周期 播放量" stroke="#3b82f6" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
+                                <Line yAxisId="left" type="monotone" dataKey="compareViews" name="对比周期 播放量" stroke="#60a5fa" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 4 }} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </motion.div>
+
+                {/* Interactions Trend Chart */}
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
@@ -1331,21 +1485,18 @@ export default function App() {
                 >
                     <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-orange-500" />
-                        内容热度趋势 (播放量 vs 互动总量)
+                        内容热度趋势 (互动总量)
                     </h3>
                     <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={finalDetailTrend}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                 <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-                                <YAxis yAxisId="left" fontSize={12} stroke="#3b82f6" label={{ value: '播放量', angle: -90, position: 'insideLeft' }} />
                                 <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f97316" label={{ value: '互动总量', angle: 90, position: 'insideRight' }} />
-                                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
+                                <Tooltip content={<ComparisonTooltip />} />
                                 <Legend />
-                                <Line yAxisId="left" type="monotone" dataKey="views" name={`当前周期 (${dateRange.start}至${dateRange.end}) 播放量`} stroke="#3b82f6" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
-                                <Line yAxisId="left" type="monotone" dataKey="compareViews" name={`对比周期 (${compareRange.start}至${compareRange.end}) 播放量`} stroke="#60a5fa" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 4 }} />
-                                <Line yAxisId="right" type="monotone" dataKey="interactions" name={`当前周期 (${dateRange.start}至${dateRange.end}) 互动总量`} stroke="#f97316" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
-                                <Line yAxisId="right" type="monotone" dataKey="compareInteractions" name={`对比周期 (${compareRange.start}至${compareRange.end}) 互动总量`} stroke="#fb923c" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 4 }} />
+                                <Line yAxisId="right" type="monotone" dataKey="interactions" name="当前周期 互动总量" stroke="#f97316" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
+                                <Line yAxisId="right" type="monotone" dataKey="compareInteractions" name="对比周期 互动总量" stroke="#fb923c" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 4 }} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -1369,10 +1520,10 @@ export default function App() {
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                 <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
                                 <YAxis fontSize={12} stroke="#94a3b8" unit="%" />
-                            <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
+                            <Tooltip content={<ComparisonTooltip />} />
                             <Legend />
-                            <Line type="monotone" dataKey="healthRate" name={`当前周期 (${dateRange.start}至${dateRange.end}) 粉赞比(%)`} stroke="#ef4444" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                            <Line type="monotone" dataKey="compareHealthRate" name={`对比周期 (${compareRange.start}至${compareRange.end}) 粉赞比(%)`} stroke="#3b82f6" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                            <Line type="monotone" dataKey="healthRate" name="当前周期 粉赞比(%)" stroke="#ef4444" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                            <Line type="monotone" dataKey="compareHealthRate" name="对比周期 粉赞比(%)" stroke="#3b82f6" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={{ r: 2 }} activeDot={{ r: 4 }} />
                             <ReferenceLine y={avgHealthRate} stroke="#64748b" strokeDasharray="4 4" label={{ value: `均值: ${avgHealthRate}%`, position: 'right', fill: '#64748b' }} />
                         </LineChart>
                     </ResponsiveContainer>
@@ -1416,7 +1567,7 @@ export default function App() {
                 </div>
             </motion.div>
 
-            {/* High View Count Positioning (Scatter) */}
+            {/* Video Quality Scatter Plot */}
             <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -1425,33 +1576,22 @@ export default function App() {
                 className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
             >
                 <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                    <MousePointerClick className="w-5 h-5 text-red-500" />
-                    播放量高光视频定位 (Top Videos)
+                    <Sparkles className="w-5 h-5 text-yellow-500" />
+                    播放量高光视频定位
                 </h3>
-                <div className="h-80">
+                <div className="h-96">
                     <ResponsiveContainer width="100%" height="100%">
                         <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" type="category" name="日期" allowDuplicatedCategory={false} />
-                            <YAxis dataKey="views" type="number" name="播放量" unit="次" />
-                            <ZAxis dataKey="title" type="category" name="标题" />
-                            <Tooltip cursor={{ strokeDasharray: '3 3' }} content={({ active, payload }) => {
-                                if (active && payload && payload.length) {
-                                    const data = payload[0].payload;
-                                    return (
-                                        <div className="bg-white p-3 border border-gray-200 shadow-lg rounded-lg max-w-xs">
-                                            <p className="font-bold text-sm mb-1">{data.date}</p>
-                                            <p className="text-xs text-gray-600 mb-2">{data.title}</p>
-                                            <p className="text-blue-600 font-bold">播放量: {data.views.toLocaleString()}</p>
-                                            <p className="text-gray-500 text-xs">点赞: {data.likes}</p>
-                                        </div>
-                                    );
-                                }
-                                return null;
-                            }} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis type="category" dataKey="x" name="日期" fontSize={12} tickMargin={10} stroke="#94a3b8" allowDuplicatedCategory={false} />
+                            <YAxis type="number" dataKey="y" name="播放量" fontSize={12} stroke="#94a3b8" tickFormatter={(value) => `${value / 10000}w`} />
+                            <ZAxis type="number" dataKey="z" name="互动率" range={[40, 400]} />
+                            <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<VideoTooltip />} />
                             <Legend />
-                            <Scatter name="所有视频" data={currentData} fill="#8884d8" shape="circle" />
-                            <Scatter name="爆款视频 (Top 10)" data={explosiveVideos} fill="#ef4444" shape="star" />
+                            <Scatter name="大爆款 (50w+)" data={explosiveVideos.filter(v => v.category === '大爆款').map(v => ({ x: v.date, y: v.views, z: v.interactionRate, title: v.title, category: v.category }))} fill="#ef4444" shape="star" />
+                            <Scatter name="中爆款 (15w+)" data={explosiveVideos.filter(v => v.category === '中爆款').map(v => ({ x: v.date, y: v.views, z: v.interactionRate, title: v.title, category: v.category }))} fill="#f97316" shape="triangle" />
+                            <Scatter name="小爆款 (5w+)" data={explosiveVideos.filter(v => v.category === '小爆款').map(v => ({ x: v.date, y: v.views, z: v.interactionRate, title: v.title, category: v.category }))} fill="#f59e0b" shape="diamond" />
+                            <Scatter name="正常播放 (0.3w-1w)" data={explosiveVideos.filter(v => v.category === '正常播放').map(v => ({ x: v.date, y: v.views, z: v.interactionRate, title: v.title, category: v.category }))} fill="#3b82f6" shape="circle" />
                         </ScatterChart>
                     </ResponsiveContainer>
                 </div>
@@ -1466,11 +1606,27 @@ export default function App() {
           transition={{ delay: 0.3 }}
           className="bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-white/50 overflow-hidden"
         >
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+          <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                <span className="text-red-500">🔥</span> 爆款视频数据明细 (Top 10)
+                <span className="text-red-500">🔥</span> 
+                {userName ? `${userName} ` : ''}
+                {topVideosMode === 'range' ? '爆款视频数据明细 (Top 10)' : `月度爆款视频 (Top 10)`}
             </h3>
-            <span className="text-sm text-gray-500">已按播放量从高到低排序</span>
+            <div className="flex items-center gap-2">
+                <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
+                    <button onClick={() => setTopVideosMode('range')} className={cn("px-3 py-1 rounded-md transition-all", topVideosMode === 'range' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500')}>按分析周期</button>
+                    <button onClick={() => setTopVideosMode('month')} className={cn("px-3 py-1 rounded-md transition-all", topVideosMode === 'month' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500')}>按月份</button>
+                </div>
+                {topVideosMode === 'month' && (
+                    <select  
+                        value={selectedMonthForVideos}
+                        onChange={(e) => setSelectedMonthForVideos(e.target.value)}
+                        className="bg-white border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    >
+                         {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                )}
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left text-gray-500">
@@ -1489,7 +1645,7 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {explosiveVideos.map((item, index) => (
+                {(topVideosMode === 'range' ? top10ExplosiveVideos : monthlyTop10Videos).map((item, index) => (
                   <tr key={index} className="bg-white border-b hover:bg-gray-50">
                     <td className="px-6 py-4 font-bold text-gray-900">#{index + 1}</td>
                     <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{item.date}</td>
@@ -1506,14 +1662,37 @@ export default function App() {
               </tbody>
             </table>
           </div>
-          {explosiveVideos.length === 0 && (
+          {(topVideosMode === 'range' ? top10ExplosiveVideos.length === 0 : monthlyTop10Videos.length === 0) && (
              <div className="p-8 text-center text-gray-400">当前所选日期范围内无数据</div>
           )}
         </motion.div>
 
-        {/* Charts Section 1: Trends & Comparison */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Range Comparison */}
+        {/* Charts Section 1: Monthly Comparison */}
+        <div className="mb-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <span className="text-blue-500">📊</span> 月度对比分析
+                </h2>
+                <div className="flex gap-4">
+                    <select 
+                        value={monthA}
+                        onChange={(e) => setMonthA(e.target.value)}
+                        className="bg-white/50 border border-gray-200 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                        {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                    <span className="text-gray-400 self-center">VS</span>
+                    <select 
+                        value={monthB}
+                        onChange={(e) => setMonthB(e.target.value)}
+                        className="bg-white/50 border border-gray-200 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                    >
+                        {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Monthly Views Comparison */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -1522,69 +1701,107 @@ export default function App() {
             className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
           >
             <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <span className="text-green-500">📊</span> 时间段 KPI 基础对比图 (Range A vs Range B)
+                <span className="text-blue-500">📊</span> 月度播放量对比
             </h3>
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={comparisonChartData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                  <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-                  <YAxis fontSize={12} stroke="#94a3b8" scale="sqrt" domain={['auto', 'dataMax * 2']} />
-                  <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
-                  <Legend />
-                  <Bar dataKey="current" name={`当前周期 (${dateRange.start}至${dateRange.end})`} fill="#6366f1" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="compare" name={`对比周期 (${compareRange.start}至${compareRange.end})`} fill="#10b981" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthViewsComparisonData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+                        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
+                        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
+                        <Legend />
+                        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                </ResponsiveContainer>
             </div>
           </motion.div>
 
-        {/* Month vs Month Comparison */}
-        <motion.div 
+          {/* Monthly Other KPIs Comparison */}
+          <motion.div 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
             className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
-        >
-             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                    <span className="text-purple-500">📅</span> 月度对比分析 (Month A vs Month B)
-                </h3>
-                <div className="flex gap-4">
-                    <select 
-                        value={monthA}
-                        onChange={(e) => setMonthA(e.target.value)}
-                        className="bg-white/50 border border-gray-200 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
-                    >
-                        {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                    <span className="text-gray-400 self-center">VS</span>
-                    <select 
-                        value={monthB}
-                        onChange={(e) => setMonthB(e.target.value)}
-                        className="bg-white/50 border border-gray-200 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-purple-500 outline-none"
-                    >
-                        {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                </div>
-            </div>
+          >
+            <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                <span className="text-green-500">📊</span> 其他月度指标对比
+            </h3>
             <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={monthComparisonChartData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                         <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-                        <YAxis fontSize={12} stroke="#94a3b8" scale="sqrt" domain={['auto', 'dataMax * 2']} />
+                        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
                         <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
                         <Legend />
-                        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#6366f1" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
                     </BarChart>
                 </ResponsiveContainer>
             </div>
-        </motion.div>
+          </motion.div>
         </div>
-        
-        {/* Monthly Trends Split Charts */}
+        </div>
+
+        {/* Charts Section 1.5: Additional Monthly Comparison */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Comment Monthly Comparison */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+          >
+            <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                <span className="text-yellow-500">💬</span> 月度评论量对比
+            </h3>
+            <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthCommentComparisonData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+                        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
+                        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
+                        <Legend />
+                        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#eab308" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
+          </motion.div>
+
+          {/* Rate Monthly Comparison */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+            className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+          >
+            <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                <span className="text-red-500">📈</span> 月度完播率和互动率对比
+            </h3>
+            <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthRateComparisonData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+                        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
+                        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
+                        <Legend />
+                        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#ef4444" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Charts Section 2: Monthly Trends Split Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             {/* Chart 1: Views & Likes */}
             <motion.div 
@@ -1641,50 +1858,7 @@ export default function App() {
             </motion.div>
         </div>
 
-        {/* Monthly Top Videos Filter */}
-        <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.4 }}
-            className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50 mb-6"
-        >
-             <div className="flex justify-between items-center mb-4">
-                <h4 className="text-md font-bold text-gray-700 flex items-center gap-2">
-                    <span className="text-red-500">🏆</span> {userName ? `${userName}月度爆款视频 (Top 5)` : '月度爆款视频 (Top 5)'}
-                </h4>
-                <select  
-                    value={selectedMonthForVideos}
-                    onChange={(e) => setSelectedMonthForVideos(e.target.value)}
-                    className="bg-white border border-gray-200 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                >
-                     {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-            </div>
-            <div className="space-y-3">
-                {monthlyTopVideos.length > 0 ? (
-                    monthlyTopVideos.map((video, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-3 bg-white/50 rounded-lg hover:bg-white transition-colors border border-transparent hover:border-gray-100">
-                            <div className="flex items-center gap-3 overflow-hidden">
-                                <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${idx < 3 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>
-                                    {idx + 1}
-                                </span>
-                                <div className="truncate">
-                                    <p className="text-sm font-medium text-gray-800 truncate max-w-[200px] md:max-w-[300px]" title={video.title}>{video.title}</p>
-                                    <p className="text-xs text-gray-500">{video.date}</p>
-                                </div>
-                            </div>
-                            <div className="text-right whitespace-nowrap ml-4">
-                                <p className="text-sm font-bold text-blue-600">{video.views.toLocaleString()} <span className="text-xs font-normal text-gray-400">播放</span></p>
-                                <p className="text-xs text-gray-500">{video.likes.toLocaleString()} 点赞</p>
-                            </div>
-                        </div>
-                    ))
-                ) : (
-                    <div className="text-center py-8 text-gray-400 text-sm">该月份无数据</div>
-                )}
-            </div>
-        </motion.div>
+
 
 
 
