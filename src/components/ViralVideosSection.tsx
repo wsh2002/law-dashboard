@@ -150,7 +150,8 @@ export const ViralVideosSection = () => {
     setAnalysisStep('idle');
     setActiveTab('document');
     setTranscribeError('');
-    setSubtitles([]); // ✅ 重置字幕
+    // 保持 subtitles 为空，因为批量识别只保存了纯文本
+    setSubtitles([]);
   };
 
   // ✅ 自动识别函数（保留时间戳）
@@ -301,9 +302,22 @@ export const ViralVideosSection = () => {
 
             if (subtitles.length > 0) {
               const text = subtitles.map((s: any) => s.text).join('\n');
-              setVideos(prev => prev.map(v => 
-                v.id === video.id ? { ...v, content: text } : v
-              ));
+              
+              // 更新视频状态
+              setVideos(prev => {
+                const updatedVideos = prev.map(v => 
+                  v.id === video.id ? { ...v, content: text } : v
+                );
+                
+                // 保存到本地存储
+                const videosToSave = updatedVideos.reduce((acc, v) => {
+                  acc[v.id] = { content: v.content || '' };
+                  return acc;
+                }, {} as Record<string, { content: string }>);
+                localStorage.setItem('viral_videos', JSON.stringify(videosToSave));
+                
+                return updatedVideos;
+              });
             }
           } catch (error) {
             setBatchErrors(prev => [...prev, `视频 "${video.title}" 处理失败`]);
@@ -412,7 +426,18 @@ ${analysisResult}
             .sort((a: any, b: any) => b.likes - a.likes);
 
           if (formatted.length > 0) {
-            setVideos(formatted.slice(0, 20).map((v: any, i: number) => ({ ...v, rank: i + 1 })));
+            // 从本地存储读取已保存的文案数据
+            const savedVideos = localStorage.getItem('viral_videos');
+            const savedData = savedVideos ? JSON.parse(savedVideos) : {};
+            
+            // 合并保存的数据
+            const videosWithContent = formatted.slice(0, 10).map((v: any, i: number) => ({
+              ...v,
+              rank: i + 1,
+              content: savedData[v.id]?.content || v.content
+            }));
+            
+            setVideos(videosWithContent);
             setLoading(false);
             return;
           }
@@ -425,7 +450,20 @@ ${analysisResult}
       const filtered = MOCK_VIRAL_VIDEOS
         .filter(v => v.platform === 'douyin' && (selectedCategory === 'land' ? v.title.includes('征地') : !v.title.includes('征地')))
         .sort((a, b) => b.likes - a.likes);
-      setVideos(filtered.map(v => ({ ...v, category: selectedCategory })));
+      
+      // 从本地存储读取已保存的文案数据
+      const savedVideos = localStorage.getItem('viral_videos');
+      const savedData = savedVideos ? JSON.parse(savedVideos) : {};
+      
+      // 合并保存的数据
+      const videosWithContent = filtered.slice(0, 10).map((v: any, i: number) => ({
+        ...v,
+        rank: i + 1,
+        category: selectedCategory,
+        content: savedData[v.id]?.content || v.content
+      }));
+      
+      setVideos(videosWithContent);
       setLoading(false);
     };
 
@@ -875,35 +913,33 @@ ${analysisResult}
                             <p className="text-xs text-blue-600 bg-blue-100/50 p-2 rounded flex-1">
                               提示：点击"一键识别台词"自动识别，或手动粘贴视频文案，AI 将基于此内容进行深度法律分析。
                             </p>
-                            {subtitles.length > 0 && (
-                              <div className="flex gap-2 ml-4">
-                                <button
-                                  onClick={() => setScriptViewMode('timestamp')}
-                                  className={cn(
-                                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-                                    scriptViewMode === 'timestamp'
-                                      ? "bg-blue-600 text-white"
-                                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                  )}
-                                >
-                                  时间戳
-                                </button>
-                                <button
-                                  onClick={() => setScriptViewMode('plain')}
-                                  className={cn(
-                                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-                                    scriptViewMode === 'plain'
-                                      ? "bg-blue-600 text-white"
-                                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                  )}
-                                >
-                                  纯文案
-                                </button>
-                              </div>
-                            )}
+                            <div className="flex gap-2 ml-4">
+                              <button
+                                onClick={() => setScriptViewMode('timestamp')}
+                                className={cn(
+                                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                  scriptViewMode === 'timestamp'
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                )}
+                              >
+                                时间戳
+                              </button>
+                              <button
+                                onClick={() => setScriptViewMode('plain')}
+                                className={cn(
+                                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                  scriptViewMode === 'plain'
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                )}
+                              >
+                                纯文案
+                              </button>
+                            </div>
                           </div>
 
-                          {/* ✅ 核心改动：有时间戳就显示带时间戳列表，没有就显示 textarea */}
+                          {/* ✅ 核心改动：根据视图模式显示不同内容 */}
                           {subtitles.length > 0 ? (
                             scriptViewMode === 'timestamp' ? (
                               <div className="w-full h-64 overflow-y-auto rounded-xl border border-blue-200 bg-white shadow-inner divide-y divide-gray-50">
@@ -924,12 +960,20 @@ ${analysisResult}
                               </div>
                             )
                           ) : (
-                            <textarea
-                              value={manualTranscript}
-                              onChange={(e) => setManualTranscript(e.target.value)}
-                              placeholder="在此处粘贴视频台词内容..."
-                              className="w-full h-64 p-4 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm leading-relaxed resize-none shadow-inner"
-                            />
+                            scriptViewMode === 'plain' ? (
+                              <div className="w-full h-64 overflow-y-auto rounded-xl border border-blue-200 bg-white shadow-inner p-4">
+                                <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                                  {manualTranscript}
+                                </div>
+                              </div>
+                            ) : (
+                              <textarea
+                                value={manualTranscript}
+                                onChange={(e) => setManualTranscript(e.target.value)}
+                                placeholder="在此处粘贴视频台词内容..."
+                                className="w-full h-64 p-4 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm leading-relaxed resize-none shadow-inner"
+                              />
+                            )
                           )}
 
 
