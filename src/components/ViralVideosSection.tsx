@@ -142,6 +142,7 @@ export const ViralVideosSection = () => {
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const [batchProgress, setBatchProgress] = useState(0);
   const [batchErrors, setBatchErrors] = useState<string[]>([]);
+  const [batchAbortController, setBatchAbortController] = useState<AbortController | null>(null);
 
   const handleDeepAnalysis = (video: ViralVideo) => {
     setAnalyzingVideo(video);
@@ -237,21 +238,31 @@ export const ViralVideosSection = () => {
 
   // ✅ 批量识别函数
   const handleBatchTranscribe = async () => {
+    const controller = new AbortController();
+    setBatchAbortController(controller);
     setIsBatchProcessing(true);
     setBatchProgress(0);
     setBatchErrors([]);
     
     try {
-      const total = videos.length;
+      // 只处理当前选中分类的视频
+      const currentVideos = videos.filter(v => v.category === selectedCategory);
+      const total = currentVideos.length;
       let processed = 0;
       
-      for (const video of videos) {
+      for (const video of currentVideos) {
+        // 检查是否已取消
+        if (controller.signal.aborted) {
+          break;
+        }
+        
         if (video.url && video.url !== '#') {
           try {
             const resp = await fetch(`${WHISPER_API}/api/process`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ url: video.url })
+              body: JSON.stringify({ url: video.url }),
+              signal: controller.signal
             });
 
             if (!resp.ok) {
@@ -264,6 +275,11 @@ export const ViralVideosSection = () => {
             let subtitles: { start: string; end: string; text: string }[] = [];
 
             while (true) {
+              // 检查是否已取消
+              if (controller.signal.aborted) {
+                break;
+              }
+              
               const { done, value } = await reader.read();
               if (done) break;
               
@@ -320,7 +336,10 @@ export const ViralVideosSection = () => {
               });
             }
           } catch (error) {
-            setBatchErrors(prev => [...prev, `视频 "${video.title}" 处理失败`]);
+            // 忽略取消操作的错误
+            if (!controller.signal.aborted) {
+              setBatchErrors(prev => [...prev, `视频 "${video.title}" 处理失败`]);
+            }
           }
         }
         
@@ -329,6 +348,14 @@ export const ViralVideosSection = () => {
       }
     } finally {
       setIsBatchProcessing(false);
+      setBatchAbortController(null);
+    }
+  };
+
+  // ✅ 取消批量识别函数
+  const handleCancelBatchTranscribe = () => {
+    if (batchAbortController) {
+      batchAbortController.abort();
     }
   };
 
@@ -523,28 +550,39 @@ ${analysisResult}
             </div>
             
             {/* ✅ 批量识别按钮 */}
-            <button
-              onClick={handleBatchTranscribe}
-              disabled={isBatchProcessing}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border",
-                isBatchProcessing
-                  ? "bg-gray-100 text-gray-400 border-gray-200"
-                  : "bg-blue-600 text-white border-blue-700 hover:bg-blue-700 shadow-sm"
+            <div className="flex gap-2">
+              <button
+                onClick={handleBatchTranscribe}
+                disabled={isBatchProcessing}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border",
+                  isBatchProcessing
+                    ? "bg-gray-100 text-gray-400 border-gray-200"
+                    : "bg-blue-600 text-white border-blue-700 hover:bg-blue-700 shadow-sm"
+                )}
+              >
+                {isBatchProcessing ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    批量识别中... {batchProgress}%
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    批量识别台词
+                  </>
+                )}
+              </button>
+              {isBatchProcessing && (
+                <button
+                  onClick={handleCancelBatchTranscribe}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white border border-red-700 hover:bg-red-700 rounded-lg text-xs font-bold transition-all shadow-sm"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  取消识别
+                </button>
               )}
-            >
-              {isBatchProcessing ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  批量识别中... {batchProgress}%
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5" />
-                  批量识别台词
-                </>
-              )}
-            </button>
+            </div>
             
             <button
               onClick={() => setShowApiConfig(!showApiConfig)}
@@ -967,12 +1005,21 @@ ${analysisResult}
                                 </div>
                               </div>
                             ) : (
-                              <textarea
-                                value={manualTranscript}
-                                onChange={(e) => setManualTranscript(e.target.value)}
-                                placeholder="在此处粘贴视频台词内容..."
-                                className="w-full h-64 p-4 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm leading-relaxed resize-none shadow-inner"
-                              />
+                              <div className="w-full h-64 overflow-y-auto rounded-xl border border-blue-200 bg-white shadow-inner divide-y divide-gray-50">
+                                {manualTranscript.split('\n').filter(line => line.trim() !== '').map((line, i) => (
+                                  <div key={i} className="flex items-start gap-3 px-4 py-2 hover:bg-blue-50/50 transition-colors">
+                                    <span className="text-[10px] font-mono text-red-500 shrink-0 mt-0.5 w-28">
+                                      00:00 — 00:00
+                                    </span>
+                                    <span className="text-sm text-gray-800">{line}</span>
+                                  </div>
+                                ))}
+                                {manualTranscript.trim() === '' && (
+                                  <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                                    请粘贴视频台词内容或点击"一键识别台词"
+                                  </div>
+                                )}
+                              </div>
                             )
                           )}
 
