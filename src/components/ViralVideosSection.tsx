@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, AlertCircle, Settings, Play, ThumbsUp, Clock, User, MessageCircle, X, Sparkles, Loader2, BarChart2, FileText } from 'lucide-react';
+import { Search, AlertCircle, Settings, Play, ThumbsUp, Clock, User, MessageCircle, X, Sparkles, Loader2, BarChart2 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { DEFAULT_CONFIG, analyzeDocument, extractContent } from '../services/aiAnalysis';
+import { DEFAULT_CONFIG, analyzeDocument } from '../services/aiAnalysis';
 import ReactMarkdown from 'react-markdown';
 
 // Types for the viral video data
@@ -98,7 +98,7 @@ const CATEGORIES = [
 ];
 
 // ✅ Whisper 服务地址
-const WHISPER_API = 'http://118.25.97.217:8000';
+const WHISPER_API = '';
 
 export const ViralVideosSection = () => {
   const [showApiConfig, setShowApiConfig] = useState(false);
@@ -128,9 +128,8 @@ export const ViralVideosSection = () => {
   const [manualTranscript, setManualTranscript] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState<'idle' | 'analyzing'>('idle');
-  const [activeTab, setActiveTab] = useState<'analysis' | 'document' | 'extract'>('document');
-  const [extractedContent, setExtractedContent] = useState<string>('');
-  const [isExtracting, setIsExtracting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'analysis' | 'document'>('document');
+  const [scriptViewMode, setScriptViewMode] = useState<'timestamp' | 'plain'>('timestamp');
 
   // ✅ 自动识别状态
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -138,6 +137,11 @@ export const ViralVideosSection = () => {
 
   // ✅ 新增：带时间戳的字幕数据
   const [subtitles, setSubtitles] = useState<{ start: string; end: string; text: string }[]>([]);
+
+  // ✅ 批量处理状态
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+  const [batchProgress, setBatchProgress] = useState(0);
+  const [batchErrors, setBatchErrors] = useState<string[]>([]);
 
   const handleDeepAnalysis = (video: ViralVideo) => {
     setAnalyzingVideo(video);
@@ -230,6 +234,90 @@ export const ViralVideosSection = () => {
   }
 };
 
+  // ✅ 批量识别函数
+  const handleBatchTranscribe = async () => {
+    setIsBatchProcessing(true);
+    setBatchProgress(0);
+    setBatchErrors([]);
+    
+    try {
+      const total = videos.length;
+      let processed = 0;
+      
+      for (const video of videos) {
+        if (video.url && video.url !== '#') {
+          try {
+            const resp = await fetch(`${WHISPER_API}/api/process`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ url: video.url })
+            });
+
+            if (!resp.ok) {
+              throw new Error(`HTTP ${resp.status}`);
+            }
+
+            const reader = resp.body!.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let subtitles: { start: string; end: string; text: string }[] = [];
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n\n');
+              buffer = lines.pop() || '';
+
+              for (const chunk of lines) {
+                const eventLines = chunk.split('\n');
+                let eventType = '';
+                let eventData = '';
+
+                for (const line of eventLines) {
+                  if (line.startsWith('event: ')) {
+                    eventType = line.slice(7).trim();
+                  } else if (line.startsWith('data: ')) {
+                    eventData = line.slice(6);
+                  }
+                }
+
+                if (eventType && eventData) {
+                  try {
+                    const data = JSON.parse(eventData);
+                    
+                    if (eventType === 'result' && data.subtitles) {
+                      subtitles = data.subtitles;
+                    } else if (eventType === 'error') {
+                      throw new Error(data.message);
+                    }
+                  } catch (e) {
+                    console.error('解析 SSE 数据失败:', e);
+                  }
+                }
+              }
+            }
+
+            if (subtitles.length > 0) {
+              const text = subtitles.map((s: any) => s.text).join('\n');
+              setVideos(prev => prev.map(v => 
+                v.id === video.id ? { ...v, content: text } : v
+              ));
+            }
+          } catch (error) {
+            setBatchErrors(prev => [...prev, `视频 "${video.title}" 处理失败`]);
+          }
+        }
+        
+        processed++;
+        setBatchProgress(Math.round((processed / total) * 100));
+      }
+    } finally {
+      setIsBatchProcessing(false);
+    }
+  };
+
   const handleStartAnalysis = async () => {
     if (!manualTranscript) return;
     
@@ -248,29 +336,6 @@ export const ViralVideosSection = () => {
     } finally {
       setIsAnalyzing(false);
       setAnalysisStep('idle');
-    }
-  };
-
-  const handleExtractContent = async () => {
-    // 优先使用带时间戳的字幕内容，如果没有则使用手动输入的内容
-    const contentToExtract = subtitles.length > 0 
-      ? subtitles.map(subtitle => subtitle.text).join('\n') 
-      : manualTranscript;
-    
-    if (!contentToExtract) return;
-    
-    setIsExtracting(true);
-    
-    try {
-      const extracted = await extractContent(apiConfig, contentToExtract);
-      setExtractedContent(extracted);
-    } catch (error: any) {
-      setExtractedContent(`提取失败: ${error.message}`);
-      if (error.message.includes('401')) {
-        setShowApiConfig(true);
-      }
-    } finally {
-      setIsExtracting(false);
     }
   };
 
@@ -405,7 +470,7 @@ ${analysisResult}
         className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden"
       >
         {/* Table Header */}
-        <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+        <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-2 h-8 bg-green-500 rounded-full" />
             <div>
@@ -413,11 +478,36 @@ ${analysisResult}
               <p className="text-xs text-gray-400 mt-1">自动筛选条件: 平台="抖音" & 关键词="法律" & 时间="一周内" & 排序="最多点赞"</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full md:w-auto">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
               <span className="text-[10px] text-gray-500 font-medium">后台自动刷新中</span>
             </div>
+            
+            {/* ✅ 批量识别按钮 */}
+            <button
+              onClick={handleBatchTranscribe}
+              disabled={isBatchProcessing}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border",
+                isBatchProcessing
+                  ? "bg-gray-100 text-gray-400 border-gray-200"
+                  : "bg-blue-600 text-white border-blue-700 hover:bg-blue-700 shadow-sm"
+              )}
+            >
+              {isBatchProcessing ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  批量识别中... {batchProgress}%
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  批量识别台词
+                </>
+              )}
+            </button>
+            
             <button
               onClick={() => setShowApiConfig(!showApiConfig)}
               className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
@@ -425,6 +515,26 @@ ${analysisResult}
               <Settings className="w-4 h-4" />
             </button>
           </div>
+          
+          {/* ✅ 批量处理错误提示 */}
+          {batchErrors.length > 0 && (
+            <div className="w-full bg-red-50 border border-red-100 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-red-600">批量处理完成，部分视频处理失败：</p>
+                  <ul className="text-[10px] text-red-500 mt-1 space-y-1">
+                    {batchErrors.slice(0, 3).map((error, index) => (
+                      <li key={index}>• {error}</li>
+                    ))}
+                    {batchErrors.length > 3 && (
+                      <li>• 还有 {batchErrors.length - 3} 个视频处理失败</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* API Config Panel */}
@@ -693,16 +803,6 @@ ${analysisResult}
                       视频转化文档 (台词)
                       {activeTab === 'document' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />}
                     </button>
-                    <button
-                      onClick={() => setActiveTab('extract')}
-                      className={cn(
-                        "pb-3 px-2 font-bold text-sm transition-all relative",
-                        activeTab === 'extract' ? "text-green-600" : "text-gray-400 hover:text-gray-600"
-                      )}
-                    >
-                      文案提取
-                      {activeTab === 'extract' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-600" />}
-                    </button>
                   </div>
 
                   {/* Tab Content */}
@@ -737,64 +837,6 @@ ${analysisResult}
                           </button>
                         </div>
                       )
-                    ) : activeTab === 'extract' ? (
-                      // 文案提取页面
-                      <div className="bg-green-50/50 p-6 rounded-xl border border-green-100 min-h-[300px]">
-                        <div className="flex items-center justify-between mb-4">
-                          <h6 className="text-green-800 font-bold flex items-center gap-2">
-                            <FileText className="w-4 h-4" /> 文案提取
-                          </h6>
-                        </div>
-                        <div className="space-y-4">
-                          <p className="text-xs text-green-600 bg-green-100/50 p-2 rounded">
-                            提示：点击下方按钮使用 DeepSeek R1 模型提取视频中的核心文案内容，去除重复词汇，保持内容的完整性和可读性。
-                          </p>
-                          <div className="bg-white p-4 rounded-xl border border-green-200 min-h-[200px]">
-                            {isExtracting ? (
-                              <div className="flex flex-col items-center justify-center h-full py-12">
-                                <Loader2 className="w-8 h-8 animate-spin text-green-600 mb-4" />
-                                <p className="text-sm text-gray-600">DeepSeek R1 正在提取文案...</p>
-                              </div>
-                            ) : extractedContent ? (
-                              <div className="text-sm text-gray-800 whitespace-pre-wrap">{extractedContent}</div>
-                            ) : subtitles.length > 0 ? (
-                              <div className="text-sm text-gray-800 whitespace-pre-wrap">
-                                {subtitles.map(subtitle => subtitle.text).join('\n')}
-                              </div>
-                            ) : manualTranscript ? (
-                              <div className="text-sm text-gray-800 whitespace-pre-wrap">{manualTranscript}</div>
-                            ) : (
-                              <div className="flex flex-col items-center justify-center h-full text-gray-400 py-12">
-                                <FileText className="w-12 h-12 text-green-200 mb-4" />
-                                <p className="text-sm">暂无文案内容</p>
-                                <p className="text-xs mt-1">请先在"视频转化文档"中识别或粘贴台词</p>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex justify-end gap-2">
-                            {(manualTranscript || subtitles.length > 0) && !isExtracting && !extractedContent && (
-                              <button
-                                onClick={handleExtractContent}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-all flex items-center gap-2"
-                              >
-                                <Sparkles className="w-4 h-4" />
-                                提取文案
-                              </button>
-                            )}
-                            {extractedContent && !isExtracting && (
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(extractedContent);
-                                }}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-bold hover:bg-green-700 transition-all flex items-center gap-2"
-                              >
-                                <Sparkles className="w-4 h-4" />
-                                复制文案
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
                     ) : (
                       // ✅ 台词页面：带时间戳显示 或 手动输入
                       <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100 min-h-[300px]">
@@ -829,22 +871,58 @@ ${analysisResult}
                         </div>
 
                         <div className="space-y-4">
-                          <p className="text-xs text-blue-600 bg-blue-100/50 p-2 rounded">
-                            提示：点击"一键识别台词"自动识别，或手动粘贴视频文案，AI 将基于此内容进行深度法律分析。
-                          </p>
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs text-blue-600 bg-blue-100/50 p-2 rounded flex-1">
+                              提示：点击"一键识别台词"自动识别，或手动粘贴视频文案，AI 将基于此内容进行深度法律分析。
+                            </p>
+                            {subtitles.length > 0 && (
+                              <div className="flex gap-2 ml-4">
+                                <button
+                                  onClick={() => setScriptViewMode('timestamp')}
+                                  className={cn(
+                                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                    scriptViewMode === 'timestamp'
+                                      ? "bg-blue-600 text-white"
+                                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                  )}
+                                >
+                                  时间戳
+                                </button>
+                                <button
+                                  onClick={() => setScriptViewMode('plain')}
+                                  className={cn(
+                                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                    scriptViewMode === 'plain'
+                                      ? "bg-blue-600 text-white"
+                                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                  )}
+                                >
+                                  纯文案
+                                </button>
+                              </div>
+                            )}
+                          </div>
 
                           {/* ✅ 核心改动：有时间戳就显示带时间戳列表，没有就显示 textarea */}
                           {subtitles.length > 0 ? (
-                            <div className="w-full h-64 overflow-y-auto rounded-xl border border-blue-200 bg-white shadow-inner divide-y divide-gray-50">
-                              {subtitles.map((s, i) => (
-                                <div key={i} className="flex items-start gap-3 px-4 py-2 hover:bg-blue-50/50 transition-colors">
-                                  <span className="text-[10px] font-mono text-red-500 shrink-0 mt-0.5 w-28">
-                                    {s.start} — {s.end}
-                                  </span>
-                                  <span className="text-sm text-gray-800">{s.text}</span>
+                            scriptViewMode === 'timestamp' ? (
+                              <div className="w-full h-64 overflow-y-auto rounded-xl border border-blue-200 bg-white shadow-inner divide-y divide-gray-50">
+                                {subtitles.map((s, i) => (
+                                  <div key={i} className="flex items-start gap-3 px-4 py-2 hover:bg-blue-50/50 transition-colors">
+                                    <span className="text-[10px] font-mono text-red-500 shrink-0 mt-0.5 w-28">
+                                      {s.start} — {s.end}
+                                    </span>
+                                    <span className="text-sm text-gray-800">{s.text}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="w-full h-64 overflow-y-auto rounded-xl border border-blue-200 bg-white shadow-inner p-4">
+                                <div className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                                  {subtitles.map(s => s.text).join('\n')}
                                 </div>
-                              ))}
-                            </div>
+                              </div>
+                            )
                           ) : (
                             <textarea
                               value={manualTranscript}
