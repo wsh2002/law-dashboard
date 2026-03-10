@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, TrendingUp, AlertTriangle, Lightbulb, CheckCircle2, Settings, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -10,12 +10,16 @@ interface AIAnalysisCardProps {
   data: DataItem[];
   title?: string;
   mode?: 'all' | 'aarrr-only' | 'general-only';
+  platform?: string;
 }
 
-export const AIAnalysisCard = ({ data, title, mode = 'all' }: AIAnalysisCardProps) => {
+export const AIAnalysisCard = ({ data, title, mode = 'all', platform = 'default' }: AIAnalysisCardProps) => {
   const [showConfig, setShowConfig] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [aiResult, setAiResult] = useState<string | null>(null);
+  const [aiResult, setAiResult] = useState<string | null>(() => {
+    const saved = localStorage.getItem(`ai_result_${platform}`);
+    return saved ? saved : null;
+  });
   const [config, setConfig] = useState<AIAnalysisConfig>(() => {
     const saved = localStorage.getItem('ai_config');
     if (saved) {
@@ -33,6 +37,12 @@ export const AIAnalysisCard = ({ data, title, mode = 'all' }: AIAnalysisCardProp
     return DEFAULT_CONFIG;
   });
 
+  // Update AI result when platform changes
+  useEffect(() => {
+    const saved = localStorage.getItem(`ai_result_${platform}`);
+    setAiResult(saved ? saved : null);
+  }, [platform]);
+
   const handleSaveConfig = () => {
     localStorage.setItem('ai_config', JSON.stringify(config));
     setShowConfig(false);
@@ -49,6 +59,7 @@ export const AIAnalysisCard = ({ data, title, mode = 'all' }: AIAnalysisCardProp
       const prompt = generateAnalysisPrompt(data);
       const result = await fetchAIAnalysis(config, prompt);
       setAiResult(result);
+      localStorage.setItem(`ai_result_${platform}`, result);
     } catch (error) {
       alert('AI 分析失败，请检查 API Key 或网络设置。\n' + (error as Error).message);
     } finally {
@@ -477,7 +488,10 @@ export const AIAnalysisCard = ({ data, title, mode = 'all' }: AIAnalysisCardProp
                      <div className="prose prose-sm prose-indigo max-w-none">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-bold text-indigo-600 px-2 py-0.5 bg-indigo-50 rounded">✨ AI 深度分析报告</span>
-                            <button onClick={() => setAiResult(null)} className="text-xs text-gray-400 hover:text-gray-600">清除</button>
+                            <button onClick={() => {
+                              setAiResult(null);
+                              localStorage.removeItem(`ai_result_${platform}`);
+                            }} className="text-xs text-gray-400 hover:text-gray-600">清除</button>
                         </div>
                         <ReactMarkdown>{aiResult}</ReactMarkdown>
                      </div>

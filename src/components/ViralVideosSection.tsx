@@ -22,6 +22,7 @@ export interface ViralVideo {
   platform?: 'douyin' | 'kuaishou' | 'wechat';
   category?: 'land' | 'general';
   content?: string;
+  subtitles?: { start: string; end: string; text: string }[];
 }
 
 const getRecentTime = () => {
@@ -152,7 +153,7 @@ export const ViralVideosSection = () => {
     setActiveTab('document');
     setTranscribeError('');
     // 保持 subtitles 为空，因为批量识别只保存了纯文本
-    setSubtitles([]);
+    setSubtitles(video.subtitles || []);
   };
 
   // ✅ 自动识别函数（保留时间戳）
@@ -322,14 +323,14 @@ export const ViralVideosSection = () => {
               // 更新视频状态
               setVideos(prev => {
                 const updatedVideos = prev.map(v => 
-                  v.id === video.id ? { ...v, content: text } : v
+                  v.id === video.id ? { ...v, content: text , subtitles: subtitles} : v
                 );
                 
                 // 保存到本地存储
                 const videosToSave = updatedVideos.reduce((acc, v) => {
-                  acc[v.id] = { content: v.content || '' };
+                  acc[v.id] = { content: v.content || '' , subtitles: v.subtitles || []};
                   return acc;
-                }, {} as Record<string, { content: string }>);
+                }, {} as Record<string, Partial<ViralVideo>>);
                 localStorage.setItem('viral_videos', JSON.stringify(videosToSave));
                 
                 return updatedVideos;
@@ -361,6 +362,11 @@ export const ViralVideosSection = () => {
 
   const handleStartAnalysis = async () => {
     if (!manualTranscript) return;
+    if (!analyzingVideo) {
+      setAnalysisResult('分析失败: 请先选择一个视频进行分析');
+      setActiveTab('analysis');
+      return;
+    }
     
     setIsAnalyzing(true);
     setAnalysisStep('analyzing');
@@ -461,7 +467,8 @@ ${analysisResult}
             const videosWithContent = formatted.slice(0, 10).map((v: any, i: number) => ({
               ...v,
               rank: i + 1,
-              content: savedData[v.id]?.content || v.content
+              content: savedData[v.id]?.content || v.content,
+              subtitles: savedData[v.id]?.subtitles || []
             }));
             
             setVideos(videosWithContent);
@@ -487,7 +494,8 @@ ${analysisResult}
         ...v,
         rank: i + 1,
         category: selectedCategory,
-        content: savedData[v.id]?.content || v.content
+        content: savedData[v.id]?.content || v.content,
+              subtitles: savedData[v.id]?.subtitles || []
       }));
       
       setVideos(videosWithContent);
@@ -519,14 +527,7 @@ ${analysisResult}
           ))}
         </div>
 
-        <div className="relative w-full md:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="搜索爆款视频..."
-            className="w-full pl-10 pr-4 py-2 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-          />
-        </div>
+
       </div>
 
       <motion.div

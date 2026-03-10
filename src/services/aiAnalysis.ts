@@ -191,6 +191,8 @@ ${video.content || video.title}
  */
 export const analyzeDocument = async (config: AIAnalysisConfig, document: string, video: any) => {
   const models = getProviderModels();
+  const likes = video?.likes || 0;
+  const comments = video?.comments || 0;
   const prompt = `
 你是一位顶级的法律内容运营专家。请根据以下由 DeepSeek-R1 整理好的【法律文档】进行深度拆解分析。
 
@@ -198,7 +200,7 @@ export const analyzeDocument = async (config: AIAnalysisConfig, document: string
 ${document}
 
 【互动数据】:
-点赞: ${video.likes}, 评论: ${video.comments}
+点赞: ${likes}, 评论: ${comments}
 
 【深度拆解要求】:
 1. **⚖️ 法律核心拆解**: 识别视频中提到的具体法律条文，分析作者是如何将法条"人话化"的。

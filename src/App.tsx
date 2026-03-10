@@ -6,7 +6,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, ComposedChart, ScatterChart, Scatter, ZAxis, ReferenceLine
 } from 'recharts';
-import { Upload, Calendar, ArrowUp, ArrowDown, FileSpreadsheet, TrendingUp, Activity, Heart, GitMerge, Sparkles, Play, MessageCircle, Share2, Users, Star, ThumbsUp } from 'lucide-react';
+import { Upload, Calendar, ArrowUp, ArrowDown, FileSpreadsheet, TrendingUp, Activity, Heart, GitMerge, Sparkles, Play, MessageCircle, Share2, Users, Star, ThumbsUp, Search } from 'lucide-react';
 import { format, parse, addDays, isValid, startOfDay, subDays, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, eachWeekOfInterval } from 'date-fns';
 import { cn } from './lib/utils';
 import { ViralVideosSection } from './components/ViralVideosSection';
@@ -73,10 +73,11 @@ export type DataItem = {
   recommendationsCount?: number;
   interactionRate: number; // Calculated: (likes+comments+shares)/views
   parsedDate: Date;
+  platform?: 'douyin' | 'kuaishou' | 'wechat';
 };
 
 // Helper to parse raw data
-const parseData = (raw: any[]): DataItem[] => {
+const parseData = (raw: any[], platform?: 'douyin' | 'kuaishou' | 'wechat'): DataItem[] => {
   return raw.map(item => {
     const dateStr = item['日期'] || item['Date'];
     // Handle Excel serial date
@@ -180,7 +181,8 @@ const parseData = (raw: any[]): DataItem[] => {
       fanLikeRatio: formatPercentage(item['粉赞比'] || item['Fan/Like Ratio']),
       completionRate: formatPercentage(item['视频完播率'] || item['Completion Rate']),
       interactionRate,
-      parsedDate
+      parsedDate,
+      platform
     };
   }).filter(item => isValid(item.parsedDate)); // Filter invalid dates
 };
@@ -227,6 +229,8 @@ const KPICard = ({ title, value, compareValue, unit = '', icon: Icon }: { title:
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [data, setData] = useState<DataItem[]>([]);
+  const [platformData, setPlatformData] = useState<Record<string, DataItem[]>>({});
+  const [selectedPlatform, setSelectedPlatform] = useState<'douyin' | 'kuaishou' | 'wechat'>('douyin');
   
   // Dynamic today reference for initial states
   const today = new Date();
@@ -235,14 +239,7 @@ export default function App() {
   const thisMonthStr = format(today, 'yyyy-MM');
   const lastMonthStr = format(subMonths(today, 1), 'yyyy-MM');
 
-  // Range Comparison State
-  const [dateRange, setDateRange] = useState({ start: lastWeekStr, end: todayStr });
-  const [compareRange, setCompareRange] = useState({ start: format(subDays(today, 14), 'yyyy-MM-dd'), end: format(subDays(today, 8), 'yyyy-MM-dd') }); 
 
-  // Month Comparison State
-  const [monthA, setMonthA] = useState(lastMonthStr);
-  const [monthB, setMonthB] = useState(thisMonthStr);
-  const [selectedMonthForVideos, setSelectedMonthForVideos] = useState(thisMonthStr);
   
   // Data Date Range State
   const [dataDateRange, setDataDateRange] = useState<{ start: string, end: string } | null>(null);
@@ -251,27 +248,187 @@ export default function App() {
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showViralMonitor, setShowViralMonitor] = useState(false);
 
-  // Overall Trend Filter State
-  const [trendRange, setTrendRange] = useState({ start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr });
-  const [trendMode, setTrendMode] = useState<'daily' | 'monthly' | 'quarterly'>('daily');
-  
-  // Views Trend Filter State (Independent)
-  const [viewsTrendRange, setViewsTrendRange] = useState({ start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr });
-  const [viewsTrendMode, setViewsTrendMode] = useState<'daily' | 'monthly' | 'quarterly'>('daily');
+  // Platform-specific time ranges
+  const [platformTimeRanges, setPlatformTimeRanges] = useState<Record<string, {
+    trendRange: { start: string; end: string };
+    trendMode: 'daily' | 'monthly' | 'quarterly';
+    viewsTrendRange: { start: string; end: string };
+    viewsTrendMode: 'daily' | 'monthly' | 'quarterly';
+    aiDateRange: { start: string; end: string };
+    monthA: string;
+    monthB: string;
+    selectedMonthForVideos: string;
+    dateRange: { start: string; end: string };
+    compareRange: { start: string; end: string };
+  }>>({ 
+    douyin: {
+      trendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
+      trendMode: 'daily',
+      viewsTrendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
+      viewsTrendMode: 'daily',
+      aiDateRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
+      monthA: lastMonthStr,
+      monthB: thisMonthStr,
+      selectedMonthForVideos: thisMonthStr,
+      dateRange: { start: lastWeekStr, end: todayStr },
+      compareRange: { start: format(subDays(today, 14), 'yyyy-MM-dd'), end: format(subDays(today, 8), 'yyyy-MM-dd') }
+    },
+    kuaishou: {
+      trendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
+      trendMode: 'daily',
+      viewsTrendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
+      viewsTrendMode: 'daily',
+      aiDateRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
+      monthA: lastMonthStr,
+      monthB: thisMonthStr,
+      selectedMonthForVideos: thisMonthStr,
+      dateRange: { start: lastWeekStr, end: todayStr },
+      compareRange: { start: format(subDays(today, 14), 'yyyy-MM-dd'), end: format(subDays(today, 8), 'yyyy-MM-dd') }
+    },
+    wechat: {
+      trendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
+      trendMode: 'daily',
+      viewsTrendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
+      viewsTrendMode: 'daily',
+      aiDateRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
+      monthA: lastMonthStr,
+      monthB: thisMonthStr,
+      selectedMonthForVideos: thisMonthStr,
+      dateRange: { start: lastWeekStr, end: todayStr },
+      compareRange: { start: format(subDays(today, 14), 'yyyy-MM-dd'), end: format(subDays(today, 8), 'yyyy-MM-dd') }
+    }
+  });
+
+  // Get current platform's time ranges
+  const currentTimeRanges = platformTimeRanges[selectedPlatform];
+  const { trendRange, trendMode, viewsTrendRange, viewsTrendMode, aiDateRange, monthA, monthB, selectedMonthForVideos, dateRange, compareRange } = currentTimeRanges;
+
+  // Platform-specific setters
+  const setPlatformTrendRange = (range: { start: string; end: string } | ((prev: { start: string; end: string }) => { start: string; end: string })) => {
+    setPlatformTimeRanges(prev => {
+      const newRange = typeof range === 'function' ? range(prev[selectedPlatform].trendRange) : range;
+      return {
+        ...prev,
+        [selectedPlatform]: {
+          ...prev[selectedPlatform],
+          trendRange: newRange
+        }
+      };
+    });
+  };
+
+  const setPlatformTrendMode = (mode: 'daily' | 'monthly' | 'quarterly') => {
+    setPlatformTimeRanges(prev => ({
+      ...prev,
+      [selectedPlatform]: {
+        ...prev[selectedPlatform],
+        trendMode: mode
+      }
+    }));
+  };
+
+  const setPlatformViewsTrendRange = (range: { start: string; end: string } | ((prev: { start: string; end: string }) => { start: string; end: string })) => {
+    setPlatformTimeRanges(prev => {
+      const newRange = typeof range === 'function' ? range(prev[selectedPlatform].viewsTrendRange) : range;
+      return {
+        ...prev,
+        [selectedPlatform]: {
+          ...prev[selectedPlatform],
+          viewsTrendRange: newRange
+        }
+      };
+    });
+  };
+
+  const setPlatformViewsTrendMode = (mode: 'daily' | 'monthly' | 'quarterly') => {
+    setPlatformTimeRanges(prev => ({
+      ...prev,
+      [selectedPlatform]: {
+        ...prev[selectedPlatform],
+        viewsTrendMode: mode
+      }
+    }));
+  };
+
+  const setPlatformAiDateRange = (range: { start: string; end: string } | ((prev: { start: string; end: string }) => { start: string; end: string })) => {
+    setPlatformTimeRanges(prev => {
+      const newRange = typeof range === 'function' ? range(prev[selectedPlatform].aiDateRange) : range;
+      return {
+        ...prev,
+        [selectedPlatform]: {
+          ...prev[selectedPlatform],
+          aiDateRange: newRange
+        }
+      };
+    });
+  };
+
+  // Month comparison setters
+  const setPlatformMonthA = (month: string) => {
+    setPlatformTimeRanges(prev => ({
+      ...prev,
+      [selectedPlatform]: {
+        ...prev[selectedPlatform],
+        monthA: month
+      }
+    }));
+  };
+
+  const setPlatformMonthB = (month: string) => {
+    setPlatformTimeRanges(prev => ({
+      ...prev,
+      [selectedPlatform]: {
+        ...prev[selectedPlatform],
+        monthB: month
+      }
+    }));
+  };
+
+  const setPlatformSelectedMonthForVideos = (month: string) => {
+    setPlatformTimeRanges(prev => ({
+      ...prev,
+      [selectedPlatform]: {
+        ...prev[selectedPlatform],
+        selectedMonthForVideos: month
+      }
+    }));
+  };
+
+  // Date range setters
+  const setPlatformDateRange = (range: { start: string; end: string } | ((prev: { start: string; end: string }) => { start: string; end: string })) => {
+    setPlatformTimeRanges(prev => {
+      const newRange = typeof range === 'function' ? range(prev[selectedPlatform].dateRange) : range;
+      return {
+        ...prev,
+        [selectedPlatform]: {
+          ...prev[selectedPlatform],
+          dateRange: newRange
+        }
+      };
+    });
+  };
+
+  const setPlatformCompareRange = (range: { start: string; end: string } | ((prev: { start: string; end: string }) => { start: string; end: string })) => {
+    setPlatformTimeRanges(prev => {
+      const newRange = typeof range === 'function' ? range(prev[selectedPlatform].compareRange) : range;
+      return {
+        ...prev,
+        [selectedPlatform]: {
+          ...prev[selectedPlatform],
+          compareRange: newRange
+        }
+      };
+    });
+  };
 
   const [topVideosMode, setTopVideosMode] = useState<'range' | 'month'>('range');
 
   const [detailTrendMode, setDetailTrendMode] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('daily');
 
-  // AI Analysis Independent Date Range
-  const [aiDateRange, setAiDateRange] = useState({ start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr });
-
   // User Name extracted from file
-  const [userName, setUserName] = useState<string>('');
+  const [userNames, setUserNames] = useState<Record<string, string>>({});
 
-  // Visibility Flags based on dataset content
-  const hasFavorites = useMemo(() => data.some(d => d.favorites > 0), [data]);
-  const hasRecommendations = useMemo(() => data.some(d => (d.recommendationsCount || 0) > 0), [data]);
+
 
   // File Upload Handler
   const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
@@ -285,7 +442,28 @@ export default function App() {
     if (name.includes('的')) {
         name = name.split('的')[0];
     }
-    setUserName(name);
+    // Extract platform from filename
+    let platform: 'douyin' | 'kuaishou' | 'wechat' | undefined;
+    if (filename.includes('抖音')) {
+        platform = 'douyin';
+    } else if (filename.includes('快手')) {
+        platform = 'kuaishou';
+    } else if (filename.includes('视频号')) {
+        platform = 'wechat';
+    }
+    
+    // Store user name for each platform
+    if (platform) {
+        setUserNames(prev => ({
+            ...prev,
+            [platform]: name
+        }));
+    }
+    
+    // Set the extracted platform as the current selected platform
+    if (platform) {
+        setSelectedPlatform(platform);
+    }
 
     const reader = new FileReader();
     reader.onload = (evt) => {
@@ -294,40 +472,69 @@ export default function App() {
       const wsname = wb.SheetNames[0];
       const ws = wb.Sheets[wsname];
       const rawData = XLSX.utils.sheet_to_json(ws);
-      const parsedData = parseData(rawData);
+      const parsedData = parseData(rawData, platform);
       
       if (parsedData.length > 0) {
-          setData(parsedData);
-          
-          // Auto-adjust dates based on new data
-          const dates = parsedData.map(d => d.parsedDate.getTime()).sort((a, b) => a - b);
-          const minDate = new Date(dates[0]);
-          const maxDate = new Date(dates[dates.length - 1]);
-          const midDate = new Date(dates[Math.floor(dates.length / 2)]);
-          
-          const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
-          
-          // Set data date range
-          setDataDateRange({ start: fmt(minDate), end: fmt(maxDate) });
-          
-          // Set default AI date range (same as full range initially)
-          setAiDateRange({ start: fmt(minDate), end: fmt(maxDate) });
+          // 合并新数据到现有数据中，而不是替换
+          setData(prevData => {
+              // 合并数据
+              const mergedData = [...prevData, ...parsedData];
+              
+              // 按平台分组数据
+              const groupedData: Record<string, DataItem[]> = {
+                  douyin: [],
+                  kuaishou: [],
+                  wechat: []
+              };
+              
+              mergedData.forEach(item => {
+                  if (item.platform) {
+                      groupedData[item.platform].push(item);
+                  }
+              });
+              
+              // 更新platformData
+              setPlatformData(groupedData);
+              
+              // 自动调整日期范围 - 只针对当前上传的平台
+              if (platform) {
+                  // 过滤出当前平台的数据
+                  const platformData = groupedData[platform];
+                  if (platformData.length > 0) {
+                      const dates = platformData.map(d => d.parsedDate.getTime()).sort((a, b) => a - b);
+                      const minDate = new Date(dates[0]);
+                      const maxDate = new Date(dates[dates.length - 1]);
+                      const midDate = new Date(dates[Math.floor(dates.length / 2)]);
+                      
+                      const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
+                      
+                      // 更新日期范围
+                      setPlatformAiDateRange({ start: fmt(minDate), end: fmt(maxDate) });
+                      setPlatformTrendRange({ start: fmt(minDate), end: fmt(maxDate) });
+                      setPlatformViewsTrendRange({ start: fmt(minDate), end: fmt(maxDate) });
 
-          // Set default Trend date range
-          setTrendRange({ start: fmt(minDate), end: fmt(maxDate) });
-          setViewsTrendRange({ start: fmt(minDate), end: fmt(maxDate) });
+                      // 更新月度比较默认值
+                      const months = Array.from(new Set(platformData.map(d => format(d.parsedDate, 'yyyy-MM')))).sort();
+                      if (months.length > 0) {
+                          setPlatformMonthA(months[0]);
+                          setPlatformMonthB(months.length > 1 ? months[months.length - 1] : months[0]);
+                          setPlatformSelectedMonthForVideos(months[0]);
+                      }
 
-          // Auto-set monthly comparison defaults based on data
-          const months = Array.from(new Set(parsedData.map(d => format(d.parsedDate, 'yyyy-MM')))).sort();
-          if (months.length > 0) {
-              setMonthA(months[0]);
-              setMonthB(months.length > 1 ? months[months.length - 1] : months[0]);
-              setSelectedMonthForVideos(months[0]);
-          }
-
-          // Set sensible defaults for the new data
-          setDateRange({ start: fmt(minDate), end: fmt(midDate) });
-          setCompareRange({ start: fmt(addDays(midDate, 1)), end: fmt(maxDate) });
+                      // 设置默认日期范围
+                      setPlatformDateRange({ start: fmt(minDate), end: fmt(midDate) });
+                      setPlatformCompareRange({ start: fmt(addDays(midDate, 1)), end: fmt(maxDate) });
+                  }
+              }
+              
+              // 更新整体数据日期范围
+              const allDates = mergedData.map(d => d.parsedDate.getTime()).sort((a, b) => a - b);
+              const allMinDate = new Date(allDates[0]);
+              const allMaxDate = new Date(allDates[allDates.length - 1]);
+              setDataDateRange({ start: format(allMinDate, 'yyyy-MM-dd'), end: format(allMaxDate, 'yyyy-MM-dd') });
+              
+              return mergedData;
+          });
       }
     };
     reader.readAsBinaryString(file);
@@ -340,27 +547,40 @@ export default function App() {
     const end = parse(dateRange.end, 'yyyy-MM-dd', new Date());
     // Include end date fully
     end.setHours(23, 59, 59, 999);
-    let filteredData = data.filter(d => d.parsedDate >= start && d.parsedDate <= end);
+    let filteredData = (platformData[selectedPlatform] || []).filter(d => {
+      const dateMatch = d.parsedDate >= start && d.parsedDate <= end;
+      return dateMatch;
+    });
     
     return filteredData;
-  }, [data, dateRange]);
+  }, [platformData, dateRange, selectedPlatform]);
+
+  // Visibility Flags based on dataset content
+  const hasFavorites = useMemo(() => currentData.some(d => d.favorites > 0), [currentData]);
+  const hasRecommendations = useMemo(() => currentData.some(d => (d.recommendationsCount || 0) > 0), [currentData]);
 
   const compareData = useMemo(() => {
     const start = parse(compareRange.start, 'yyyy-MM-dd', new Date());
     const end = parse(compareRange.end, 'yyyy-MM-dd', new Date());
     end.setHours(23, 59, 59, 999);
-    let filteredData = data.filter(d => d.parsedDate >= start && d.parsedDate <= end);
+    let filteredData = (platformData[selectedPlatform] || []).filter(d => {
+      const dateMatch = d.parsedDate >= start && d.parsedDate <= end;
+      return dateMatch;
+    });
     
     return filteredData;
-  }, [data, compareRange]);
+  }, [platformData, compareRange, selectedPlatform]);
 
   // AI Analysis Data Filtering
   const aiData = useMemo(() => {
     const start = parse(aiDateRange.start, 'yyyy-MM-dd', new Date());
     const end = parse(aiDateRange.end, 'yyyy-MM-dd', new Date());
     end.setHours(23, 59, 59, 999);
-    return data.filter(d => d.parsedDate >= start && d.parsedDate <= end);
-  }, [data, aiDateRange]);
+    return (platformData[selectedPlatform] || []).filter(d => {
+      const dateMatch = d.parsedDate >= start && d.parsedDate <= end;
+      return dateMatch;
+    });
+  }, [platformData, aiDateRange, selectedPlatform]);
 
   // Helper for trend aggregation
   const getTrendData = (targetRange: {start: string, end: string}, targetMode: 'daily' | 'monthly' | 'quarterly') => {
@@ -369,7 +589,10 @@ export default function App() {
     end.setHours(23, 59, 59, 999);
     
     // Filter raw data
-    const filtered = data.filter(d => d.parsedDate >= start && d.parsedDate <= end);
+    const filtered = (platformData[selectedPlatform] || []).filter(d => {
+      const dateMatch = d.parsedDate >= start && d.parsedDate <= end;
+      return dateMatch;
+    });
     
     // Aggregate data
     const grouped: Record<string, any> = {};
@@ -413,10 +636,10 @@ export default function App() {
   };
 
   // Trend Chart Data (Filtered by trendRange)
-  const trendData = useMemo(() => getTrendData(trendRange, trendMode), [data, trendRange, trendMode]);
+  const trendData = useMemo(() => getTrendData(trendRange, trendMode), [data, trendRange, trendMode, selectedPlatform]);
   
   // Views Trend Chart Data (Independent)
-  const viewsTrendData = useMemo(() => getTrendData(viewsTrendRange, viewsTrendMode), [data, viewsTrendRange, viewsTrendMode]);
+  const viewsTrendData = useMemo(() => getTrendData(viewsTrendRange, viewsTrendMode), [data, viewsTrendRange, viewsTrendMode, selectedPlatform]);
 
   const toggleAnalysis = () => {
       setShowAnalysis(true);
@@ -504,7 +727,7 @@ export default function App() {
             compareInteractionRate: compareItem.interactionRate || 0,
         };
     });
-  }, [currentData, compareData, dateRange, compareRange]);
+  }, [currentData, compareData, dateRange, compareRange, selectedPlatform]);
 
   // Helper to aggregate monthly metrics for detailed analysis
   const aggregateMonthlyDetailData = (dataset: DataItem[]) => {
@@ -659,7 +882,7 @@ export default function App() {
             compareInteractionRate: compareItem.interactionRate || 0,
         };
     });
-  }, [currentData, compareData]);
+  }, [currentData, compareData, selectedPlatform]);
 
   const quarterlyDetailTrend = useMemo(() => {
     const currentTrend = aggregateQuarterlyDetailData(currentData);
@@ -678,7 +901,7 @@ export default function App() {
             compareInteractionRate: compareItem.interactionRate || 0,
         };
     });
-  }, [currentData, compareData]);
+  }, [currentData, compareData, selectedPlatform]);
 
   const weeklyDetailTrend = useMemo(() => {
     const currentTrend = aggregateWeeklyDetailData(currentData, dateRange);
@@ -697,7 +920,7 @@ export default function App() {
             compareInteractionRate: compareItem.interactionRate || 0,
         };
     });
-  }, [currentData, compareData, dateRange, compareRange]);
+  }, [currentData, compareData, dateRange, compareRange, selectedPlatform]);
 
   const finalDetailTrend = useMemo(() => {
       switch (detailTrendMode) {
@@ -730,12 +953,14 @@ export default function App() {
 
   // Monthly Aggregation - Optimized
   const monthlyData = useMemo(() => {
-    if (!data || data.length === 0) return [];
+    const platformItems = platformData[selectedPlatform] || [];
+    if (platformItems.length === 0) return [];
     
     const grouped: Record<string, any> = {};
     
     // Process data in a single pass
-    for (const item of data) {
+    for (const item of platformItems) {
+        
         const m = format(item.parsedDate, 'yyyy-MM');
         if (!grouped[m]) {
             grouped[m] = {
@@ -768,7 +993,7 @@ export default function App() {
             avgInteractionRate: item.count > 0 ? (item.interactionRateSum / item.count).toFixed(2) : 0
         }))
         .sort((a, b) => a.month.localeCompare(b.month));
-  }, [data]);
+  }, [platformData, selectedPlatform]);
 
   // Unique Months for Dropdowns
   const uniqueMonths = useMemo(() => {
@@ -822,10 +1047,14 @@ export default function App() {
 
   const monthlyTop10Videos = useMemo(() => {
       return data
-          .filter(d => format(d.parsedDate, 'yyyy-MM') === selectedMonthForVideos)
+          .filter(d => {
+              const dateMatch = format(d.parsedDate, 'yyyy-MM') === selectedMonthForVideos;
+              const platformMatch = d.platform === selectedPlatform;
+              return dateMatch && platformMatch;
+          })
           .sort((a, b) => b.views - a.views)
           .slice(0, 10); // Top 10
-  }, [data, selectedMonthForVideos]);
+  }, [data, selectedMonthForVideos, selectedPlatform]);
 
   // Interaction rate average for reference line
   const avgInteractionRate = useMemo(() => {
@@ -1011,13 +1240,50 @@ export default function App() {
             )}
           </div>
           
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm border border-white/50 hover:bg-white/90 text-gray-700 rounded-lg cursor-pointer transition-all shadow-sm hover:shadow-md">
-              <Upload className="w-4 h-4" />
-              <span className="text-sm font-medium">Drag and drop file here</span>
-              <input type="file" className="hidden" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} />
-            </label>
-             <span className="text-xs text-gray-500">Limit 200MB per file • CSV, XLSX, XLS</span>
+          <div className="flex flex-col items-end gap-4">
+            <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm border border-white/50 rounded-lg p-1">
+              <button
+                onClick={() => setSelectedPlatform('douyin')}
+                className={cn(
+                  "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
+                  selectedPlatform === 'douyin'
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-600 hover:bg-white/50"
+                )}
+              >
+                抖音
+              </button>
+              <button
+                onClick={() => setSelectedPlatform('kuaishou')}
+                className={cn(
+                  "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
+                  selectedPlatform === 'kuaishou'
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-600 hover:bg-white/50"
+                )}
+              >
+                快手
+              </button>
+              <button
+                onClick={() => setSelectedPlatform('wechat')}
+                className={cn(
+                  "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
+                  selectedPlatform === 'wechat'
+                    ? "bg-blue-600 text-white"
+                    : "text-gray-600 hover:bg-white/50"
+                )}
+              >
+                视频号
+              </button>
+            </div>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm border border-white/50 hover:bg-white/90 text-gray-700 rounded-lg cursor-pointer transition-all shadow-sm hover:shadow-md">
+                <Upload className="w-4 h-4" />
+                <span className="text-sm font-medium">Drag and drop file here</span>
+                <input type="file" className="hidden" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} />
+              </label>
+               <span className="text-xs text-gray-500">Limit 200MB per file • CSV, XLSX, XLS</span>
+            </div>
           </div>
         </motion.div>
 
@@ -1045,8 +1311,8 @@ export default function App() {
                             type="date" 
                             value={trendRange.start} 
                             onChange={e => {
-                                setTrendRange(prev => ({ ...prev, start: e.target.value }));
-                                setTrendMode('daily');
+                                setPlatformTrendRange(prev => ({ ...prev, start: e.target.value }));
+                                setPlatformTrendMode('daily');
                             }}
                             className="bg-transparent text-sm px-2 py-1 outline-none text-gray-600 w-32"
                         />
@@ -1055,8 +1321,8 @@ export default function App() {
                             type="date" 
                             value={trendRange.end} 
                             onChange={e => {
-                                setTrendRange(prev => ({ ...prev, end: e.target.value }));
-                                setTrendMode('daily');
+                                setPlatformTrendRange(prev => ({ ...prev, end: e.target.value }));
+                                setPlatformTrendMode('daily');
                             }}
                             className="bg-transparent text-sm px-2 py-1 outline-none text-gray-600 w-32"
                         />
@@ -1065,8 +1331,8 @@ export default function App() {
                         <button 
                             onClick={() => {
                                 if (!dataDateRange) return;
-                                setTrendRange(dataDateRange);
-                                setTrendMode('quarterly');
+                                setPlatformTrendRange(dataDateRange);
+                                setPlatformTrendMode('quarterly');
                             }}
                             className={cn(
                                 "px-3 py-1 text-xs font-medium rounded-md transition-colors",
@@ -1082,8 +1348,8 @@ export default function App() {
                                 if (!dataDateRange) return;
                                 const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
                                 const start = subDays(end, 7);
-                                setTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setTrendMode('daily');
+                                setPlatformTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                setPlatformTrendMode('daily');
                             }}
                             className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                         >
@@ -1094,8 +1360,8 @@ export default function App() {
                                 if (!dataDateRange) return;
                                 const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
                                 const start = subDays(end, 30);
-                                setTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setTrendMode('daily');
+                                setPlatformTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                setPlatformTrendMode('daily');
                             }}
                             className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                         >
@@ -1106,8 +1372,8 @@ export default function App() {
                                 if (!dataDateRange) return;
                                 const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
                                 const start = startOfMonth(end);
-                                setTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setTrendMode('daily');
+                                setPlatformTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                setPlatformTrendMode('daily');
                             }}
                             className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                         >
@@ -1119,8 +1385,8 @@ export default function App() {
                                 const today = parse(dataDateRange.end, 'yyyy-MM-dd', new Date()); // Use data end as anchor
                                 const start = startOfMonth(subMonths(today, 1));
                                 const end = endOfMonth(subMonths(today, 1));
-                                setTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setTrendMode('daily');
+                                setPlatformTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                setPlatformTrendMode('daily');
                             }}
                             className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                         >
@@ -1129,8 +1395,8 @@ export default function App() {
                         <button 
                             onClick={() => {
                                 if (!dataDateRange) return;
-                                setTrendRange(dataDateRange);
-                                setTrendMode('daily');
+                                setPlatformTrendRange(dataDateRange);
+                                setPlatformTrendMode('daily');
                             }}
                             className={cn(
                                 "px-3 py-1 text-xs font-medium rounded-md transition-colors",
@@ -1145,8 +1411,8 @@ export default function App() {
                             onClick={() => {
                                 if (!dataDateRange) return;
                                 // Use the data range but switch mode
-                                setTrendRange(dataDateRange); 
-                                setTrendMode('monthly');
+                                setPlatformTrendRange(dataDateRange); 
+                                setPlatformTrendMode('monthly');
                             }}
                             className={cn(
                                 "px-3 py-1 text-xs font-medium rounded-md transition-colors",
@@ -1170,7 +1436,10 @@ export default function App() {
                         <Legend />
                         <Line type="monotone" dataKey="likes" name="点赞量" stroke="#ef4444" strokeWidth={3} dot={false} />
                         <Line type="monotone" dataKey="comments" name="评论量" stroke="#8b5cf6" strokeWidth={3} dot={false} />
-                        {hasFavorites ? (
+                        {/* 根据平台类型显示不同的指标 */}
+                        {selectedPlatform === 'wechat' ? (
+                            <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={false} />
+                        ) : hasFavorites ? (
                             <Line type="monotone" dataKey="favorites" name="收藏量" stroke="#f59e0b" strokeWidth={3} dot={false} />
                         ) : hasRecommendations ? (
                             <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={false} />
@@ -1193,8 +1462,8 @@ export default function App() {
                                 type="date" 
                                 value={viewsTrendRange.start} 
                                 onChange={e => {
-                                    setViewsTrendRange(prev => ({ ...prev, start: e.target.value }));
-                                    setViewsTrendMode('daily');
+                                    setPlatformViewsTrendRange(prev => ({ ...prev, start: e.target.value }));
+                                    setPlatformViewsTrendMode('daily');
                                 }}
                                 className="bg-transparent text-sm px-2 py-1 outline-none text-gray-600 w-32"
                             />
@@ -1203,8 +1472,8 @@ export default function App() {
                                 type="date" 
                                 value={viewsTrendRange.end} 
                                 onChange={e => {
-                                    setViewsTrendRange(prev => ({ ...prev, end: e.target.value }));
-                                    setViewsTrendMode('daily');
+                                    setPlatformViewsTrendRange(prev => ({ ...prev, end: e.target.value }));
+                                    setPlatformViewsTrendMode('daily');
                                 }}
                                 className="bg-transparent text-sm px-2 py-1 outline-none text-gray-600 w-32"
                             />
@@ -1214,8 +1483,8 @@ export default function App() {
                                 if (!dataDateRange) return;
                                 const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
                                 const start = subDays(end, 6);
-                                setViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setViewsTrendMode('daily');
+                                setPlatformViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                setPlatformViewsTrendMode('daily');
                             }}
                             className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                         >
@@ -1226,8 +1495,8 @@ export default function App() {
                                 if (!dataDateRange) return;
                                 const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
                                 const start = subDays(end, 29);
-                                setViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setViewsTrendMode('daily');
+                                setPlatformViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                setPlatformViewsTrendMode('daily');
                             }}
                             className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                         >
@@ -1238,8 +1507,8 @@ export default function App() {
                                 if (!dataDateRange) return;
                                 const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
                                 const start = startOfMonth(end);
-                                setViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setViewsTrendMode('daily');
+                                setPlatformViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                setPlatformViewsTrendMode('daily');
                             }}
                             className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                         >
@@ -1251,8 +1520,8 @@ export default function App() {
                                 const today = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
                                 const start = startOfMonth(subMonths(today, 1));
                                 const end = endOfMonth(subMonths(today, 1));
-                                setViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setViewsTrendMode('daily');
+                                setPlatformViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                setPlatformViewsTrendMode('daily');
                             }}
                             className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
                         >
@@ -1261,8 +1530,8 @@ export default function App() {
                         <button 
                             onClick={() => {
                                 if (!dataDateRange) return;
-                                setViewsTrendRange(dataDateRange);
-                                setViewsTrendMode('daily');
+                                setPlatformViewsTrendRange(dataDateRange);
+                                setPlatformViewsTrendMode('daily');
                             }}
                             className={cn(
                                 "px-3 py-1 text-xs font-medium rounded-md transition-colors",
@@ -1276,8 +1545,8 @@ export default function App() {
                         <button 
                             onClick={() => {
                                 if (!dataDateRange) return;
-                                setViewsTrendRange(dataDateRange); 
-                                setViewsTrendMode('monthly');
+                                setPlatformViewsTrendRange(dataDateRange); 
+                                setPlatformViewsTrendMode('monthly');
                             }}
                             className={cn(
                                 "px-3 py-1 text-xs font-medium rounded-md transition-colors",
@@ -1308,7 +1577,7 @@ export default function App() {
 
             {/* AARRR Model Analysis */}
             <div className="mt-8">
-                <AARRRAnalysis data={data} />
+                <AARRRAnalysis data={currentData} />
             </div>
         </motion.div>
 
@@ -1319,7 +1588,7 @@ export default function App() {
             transition={{ delay: 0.1 }}
             className="mb-8"
         >
-             <AIAnalysisCard data={data} title="整体数据深度诊断 (Global Intelligent Diagnosis)" mode="aarrr-only" />
+             <AIAnalysisCard data={currentData} title="整体数据深度诊断 (Global Intelligent Diagnosis)" mode="aarrr-only" platform={selectedPlatform} />
         </motion.div>
 
 
@@ -1352,14 +1621,14 @@ export default function App() {
               <input 
                 type="date" 
                 value={dateRange.start} 
-                onChange={e => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                onChange={e => setPlatformDateRange(prev => ({ ...prev, start: e.target.value }))}
                 className="border border-gray-200 rounded px-3 py-1.5 text-sm w-full bg-white/50 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               />
               <span className="text-gray-400">-</span>
               <input 
                 type="date" 
                 value={dateRange.end} 
-                onChange={e => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                onChange={e => setPlatformDateRange(prev => ({ ...prev, end: e.target.value }))}
                 className="border border-gray-200 rounded px-3 py-1.5 text-sm w-full bg-white/50 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
               />
             </div>
@@ -1373,14 +1642,14 @@ export default function App() {
                             <input 
                                 type="date" 
                                 value={compareRange.start} 
-                                onChange={e => setCompareRange(prev => ({ ...prev, start: e.target.value }))}
+                                onChange={e => setPlatformCompareRange(prev => ({ ...prev, start: e.target.value }))}
                                 className="border border-gray-200 rounded px-3 py-1.5 text-sm w-full bg-white/50 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                             />
                             <span className="text-gray-400">-</span>
                             <input 
                                 type="date" 
                                 value={compareRange.end} 
-                                onChange={e => setCompareRange(prev => ({ ...prev, end: e.target.value }))}
+                                onChange={e => setPlatformCompareRange(prev => ({ ...prev, end: e.target.value }))}
                                 className="border border-gray-200 rounded px-3 py-1.5 text-sm w-full bg-white/50 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                             />
                         </div>
@@ -1402,7 +1671,10 @@ export default function App() {
           <KPICard title="粉丝净增 (Net Fans)" value={currentKPIs.netFans} compareValue={compareKPIs.netFans} icon={Users} />
           <KPICard title="总评论量 (Comments)" value={currentKPIs.comments} compareValue={compareKPIs.comments} icon={MessageCircle} />
           <KPICard title="总转发量 (Shares)" value={currentKPIs.shares} compareValue={compareKPIs.shares} icon={Share2} />
-          {hasFavorites ? (
+          {/* 根据平台类型显示不同的指标 */}
+          {selectedPlatform === 'wechat' ? (
+            <KPICard title="总推荐量 (Recommendations)" value={currentKPIs.recommendations} compareValue={compareKPIs.recommendations} icon={ThumbsUp} />
+          ) : hasFavorites ? (
             <KPICard title="总收藏量 (Favorites)" value={currentKPIs.favorites} compareValue={compareKPIs.favorites} icon={Star} />
           ) : hasRecommendations ? (
             <KPICard title="总推荐量 (Recommendations)" value={currentKPIs.recommendations} compareValue={compareKPIs.recommendations} icon={ThumbsUp} />
@@ -1703,10 +1975,11 @@ export default function App() {
           <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <span className="text-red-500">🔥</span> 
-                {userName ? `${userName} ` : ''}
+                {userNames[selectedPlatform] ? `${userNames[selectedPlatform]} ` : ''}
+                {selectedPlatform === 'douyin' ? '抖音' : selectedPlatform === 'kuaishou' ? '快手' : '视频号'}
                 {topVideosMode === 'range' ? '爆款视频数据明细 (Top 10)' : `月度爆款视频 (Top 10)`}
             </h3>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
                 <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
                     <button onClick={() => setTopVideosMode('range')} className={cn("px-3 py-1 rounded-md transition-all", topVideosMode === 'range' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500')}>按分析周期</button>
                     <button onClick={() => setTopVideosMode('month')} className={cn("px-3 py-1 rounded-md transition-all", topVideosMode === 'month' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500')}>按月份</button>
@@ -1714,12 +1987,68 @@ export default function App() {
                 {topVideosMode === 'month' && (
                     <select  
                         value={selectedMonthForVideos}
-                        onChange={(e) => setSelectedMonthForVideos(e.target.value)}
+                        onChange={(e) => setPlatformSelectedMonthForVideos(e.target.value)}
                         className="bg-white border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
                     >
                          {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                 )}
+                
+                {/* 平台搜索框 */}
+                <div className="relative w-full sm:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: selectedPlatform === 'douyin' ? '#ff0000' : selectedPlatform === 'kuaishou' ? '#fe2c55' : '#07C160' }} />
+                    <input
+                        type="text"
+                        placeholder={`${selectedPlatform === 'douyin' ? '抖音' : selectedPlatform === 'kuaishou' ? '快手' : '视频号'}搜索视频...`}
+                        className="w-full pl-10 pr-24 py-2 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl text-sm focus:ring-2 outline-none transition-all"
+                        style={{ boxShadow: selectedPlatform === 'douyin' ? '0 0 0 2px rgba(255, 0, 0, 0.2)' : selectedPlatform === 'kuaishou' ? '0 0 0 2px rgba(254, 44, 85, 0.2)' : '0 0 0 2px rgba(7, 193, 96, 0.2)' }}
+                        onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                                const query = (e.target as HTMLInputElement).value;
+                                if (query) {
+                                    let searchUrl = '';
+                                    switch (selectedPlatform) {
+                                        case 'douyin':
+                                            searchUrl = `https://www.douyin.com/search/${encodeURIComponent(query)}`;
+                                            break;
+                                        case 'kuaishou':
+                                            searchUrl = `https://www.kuaishou.com/search/video?keyword=${encodeURIComponent(query)}`;
+                                            break;
+                                        case 'wechat':
+                                            searchUrl = `https://channels.weixin.qq.com/search?query=${encodeURIComponent(query)}`;
+                                            break;
+                                    }
+                                    window.open(searchUrl, '_blank');
+                                }
+                            }
+                        }}
+                    />
+                    <button
+                        className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 rounded-lg text-white text-xs font-bold transition-colors"
+                        style={{ backgroundColor: selectedPlatform === 'douyin' ? '#ff0000' : selectedPlatform === 'kuaishou' ? '#fe2c55' : '#07C160' }}
+                        onClick={(e) => {
+                            const input = (e.currentTarget.previousSibling as HTMLInputElement);
+                            const query = input.value;
+                            if (query) {
+                                let searchUrl = '';
+                                switch (selectedPlatform) {
+                                    case 'douyin':
+                                        searchUrl = `https://www.douyin.com/search/${encodeURIComponent(query)}`;
+                                        break;
+                                    case 'kuaishou':
+                                        searchUrl = `https://www.kuaishou.com/search/video?keyword=${encodeURIComponent(query)}`;
+                                        break;
+                                    case 'wechat':
+                                        searchUrl = `https://channels.weixin.qq.com/search?query=${encodeURIComponent(query)}`;
+                                        break;
+                                }
+                                window.open(searchUrl, '_blank');
+                            }
+                        }}
+                    >
+                        搜索
+                    </button>
+                </div>
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -1770,7 +2099,7 @@ export default function App() {
                 <div className="flex gap-4">
                     <select 
                         value={monthA}
-                        onChange={(e) => setMonthA(e.target.value)}
+                        onChange={(e) => setPlatformMonthA(e.target.value)}
                         className="bg-white/50 border border-gray-200 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     >
                         {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
@@ -1778,7 +2107,7 @@ export default function App() {
                     <span className="text-gray-400 self-center">VS</span>
                     <select 
                         value={monthB}
-                        onChange={(e) => setMonthB(e.target.value)}
+                        onChange={(e) => setPlatformMonthB(e.target.value)}
                         className="bg-white/50 border border-gray-200 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                     >
                         {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
@@ -1912,20 +2241,20 @@ export default function App() {
                   <input 
                     type="date" 
                     value={aiDateRange.start} 
-                    onChange={e => setAiDateRange(prev => ({ ...prev, start: e.target.value }))}
+                    onChange={e => setPlatformAiDateRange(prev => ({ ...prev, start: e.target.value }))}
                     className="border border-gray-200 rounded px-3 py-1.5 text-sm w-full sm:w-auto bg-white/50 focus:ring-2 focus:ring-purple-500 outline-none transition-all"
                   />
                   <span className="text-gray-400">-</span>
                   <input 
                     type="date" 
                     value={aiDateRange.end} 
-                    onChange={e => setAiDateRange(prev => ({ ...prev, end: e.target.value }))}
+                    onChange={e => setPlatformAiDateRange(prev => ({ ...prev, end: e.target.value }))}
                     className="border border-gray-200 rounded px-3 py-1.5 text-sm w-full sm:w-auto bg-white/50 focus:ring-2 focus:ring-purple-500 outline-none transition-all"
                   />
                </div>
             </motion.div>
 
-            <AIAnalysisCard data={aiData} title="AI 智能运营诊断 (Intelligent Advisor)" mode="general-only" />
+            <AIAnalysisCard data={aiData} title="AI 智能运营诊断 (Intelligent Advisor)" mode="general-only" platform={selectedPlatform} />
         </div>
 
 
