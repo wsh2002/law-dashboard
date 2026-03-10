@@ -131,6 +131,18 @@ export const ViralVideosSection = () => {
   const [analysisStep, setAnalysisStep] = useState<'idle' | 'analyzing'>('idle');
   const [activeTab, setActiveTab] = useState<'analysis' | 'document'>('document');
   const [scriptViewMode, setScriptViewMode] = useState<'timestamp' | 'plain'>('timestamp');
+  // 分析结果缓存
+  const [analysisCache, setAnalysisCache] = useState<Record<string, string>>(() => {
+    const saved = localStorage.getItem('analysis_cache');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return {};
+      }
+    }
+    return {};
+  });
 
   // ✅ 自动识别状态
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -147,7 +159,13 @@ export const ViralVideosSection = () => {
 
   const handleDeepAnalysis = (video: ViralVideo) => {
     setAnalyzingVideo(video);
-    setAnalysisResult('');
+    // 检查分析缓存
+    if (analysisCache[video.id]) {
+      setAnalysisResult(analysisCache[video.id]);
+      setActiveTab('analysis');
+    } else {
+      setAnalysisResult('');
+    }
     setManualTranscript(video.content || '');
     setAnalysisStep('idle');
     setActiveTab('document');
@@ -368,6 +386,13 @@ export const ViralVideosSection = () => {
       return;
     }
     
+    // 检查是否已有缓存的分析结果
+    if (analysisCache[analyzingVideo.id]) {
+      setAnalysisResult(analysisCache[analyzingVideo.id]);
+      setActiveTab('analysis');
+      return;
+    }
+    
     setIsAnalyzing(true);
     setAnalysisStep('analyzing');
     setActiveTab('analysis');
@@ -375,6 +400,15 @@ export const ViralVideosSection = () => {
     try {
       const analysis = await analyzeDocument(apiConfig, manualTranscript, analyzingVideo);
       setAnalysisResult(analysis);
+      // 缓存分析结果
+      setAnalysisCache(prev => ({
+        ...prev,
+        [analyzingVideo.id]: analysis
+      }));
+      // 持久化到本地存储
+      const savedCache = JSON.parse(localStorage.getItem('analysis_cache') || '{}');
+      savedCache[analyzingVideo.id] = analysis;
+      localStorage.setItem('analysis_cache', JSON.stringify(savedCache));
     } catch (error: any) {
       setAnalysisResult(`分析失败: ${error.message}`);
       if (error.message.includes('401')) {
