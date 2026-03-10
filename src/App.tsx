@@ -251,9 +251,9 @@ export default function App() {
   // Platform-specific time ranges
   const [platformTimeRanges, setPlatformTimeRanges] = useState<Record<string, {
     trendRange: { start: string; end: string };
-    trendMode: 'daily' | 'monthly' | 'quarterly';
+    trendMode: 'daily' | 'weekly' | 'monthly' | 'quarterly';
     viewsTrendRange: { start: string; end: string };
-    viewsTrendMode: 'daily' | 'monthly' | 'quarterly';
+    viewsTrendMode: 'daily' | 'weekly' | 'monthly' | 'quarterly';
     aiDateRange: { start: string; end: string };
     monthA: string;
     monthB: string;
@@ -263,9 +263,9 @@ export default function App() {
   }>>({ 
     douyin: {
       trendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
-      trendMode: 'daily',
+      trendMode: 'weekly',
       viewsTrendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
-      viewsTrendMode: 'daily',
+      viewsTrendMode: 'weekly',
       aiDateRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
       monthA: lastMonthStr,
       monthB: thisMonthStr,
@@ -275,9 +275,9 @@ export default function App() {
     },
     kuaishou: {
       trendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
-      trendMode: 'daily',
+      trendMode: 'weekly',
       viewsTrendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
-      viewsTrendMode: 'daily',
+      viewsTrendMode: 'weekly',
       aiDateRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
       monthA: lastMonthStr,
       monthB: thisMonthStr,
@@ -287,9 +287,9 @@ export default function App() {
     },
     wechat: {
       trendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
-      trendMode: 'daily',
+      trendMode: 'weekly',
       viewsTrendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
-      viewsTrendMode: 'daily',
+      viewsTrendMode: 'weekly',
       aiDateRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
       monthA: lastMonthStr,
       monthB: thisMonthStr,
@@ -317,7 +317,7 @@ export default function App() {
     });
   };
 
-  const setPlatformTrendMode = (mode: 'daily' | 'monthly' | 'quarterly') => {
+  const setPlatformTrendMode = (mode: 'daily' | 'weekly' | 'monthly' | 'quarterly') => {
     setPlatformTimeRanges(prev => ({
       ...prev,
       [selectedPlatform]: {
@@ -340,7 +340,7 @@ export default function App() {
     });
   };
 
-  const setPlatformViewsTrendMode = (mode: 'daily' | 'monthly' | 'quarterly') => {
+  const setPlatformViewsTrendMode = (mode: 'daily' | 'weekly' | 'monthly' | 'quarterly') => {
     setPlatformTimeRanges(prev => ({
       ...prev,
       [selectedPlatform]: {
@@ -432,71 +432,73 @@ export default function App() {
 
   // File Upload Handler
   const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    // Extract name from filename
-    // Logic: Take part before "的", or filename without extension if "的" not present
-    const filename = file.name;
-    let name = filename.substring(0, filename.lastIndexOf('.')); // Remove extension
-    if (name.includes('的')) {
-        name = name.split('的')[0];
-    }
-    // Extract platform from filename
-    let platform: 'douyin' | 'kuaishou' | 'wechat' | undefined;
-    if (filename.includes('抖音')) {
-        platform = 'douyin';
-    } else if (filename.includes('快手')) {
-        platform = 'kuaishou';
-    } else if (filename.includes('视频号')) {
-        platform = 'wechat';
-    }
-    
-    // Store user name for each platform
-    if (platform) {
-        setUserNames(prev => ({
-            ...prev,
-            [platform]: name
-        }));
-    }
-    
-    // Set the extracted platform as the current selected platform
-    if (platform) {
-        setSelectedPlatform(platform);
-    }
+    // Process each file
+    Array.from(files).forEach(file => {
+        // Extract name from filename
+        // Logic: Take part before "的", or filename without extension if "的" not present
+        const filename = file.name;
+        let name = filename.substring(0, filename.lastIndexOf('.')); // Remove extension
+        if (name.includes('的')) {
+            name = name.split('的')[0];
+        }
+        // Extract platform from filename
+        let platform: 'douyin' | 'kuaishou' | 'wechat' | undefined;
+        if (filename.includes('抖音')) {
+            platform = 'douyin';
+        } else if (filename.includes('快手')) {
+            platform = 'kuaishou';
+        } else if (filename.includes('视频号')) {
+            platform = 'wechat';
+        }
+        
+        // Store user name for each platform
+        if (platform) {
+            setUserNames(prev => ({
+                ...prev,
+                [platform]: name
+            }));
+        }
+        
+        // Set the first extracted platform as the current selected platform
+        if (platform && files[0] === file) {
+            setSelectedPlatform(platform);
+        }
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const bstr = evt.target?.result;
-      const wb = XLSX.read(bstr, { type: 'binary' });
-      const wsname = wb.SheetNames[0];
-      const ws = wb.Sheets[wsname];
-      const rawData = XLSX.utils.sheet_to_json(ws);
-      const parsedData = parseData(rawData, platform);
-      
-      if (parsedData.length > 0) {
-          // 合并新数据到现有数据中，而不是替换
-          setData(prevData => {
-              // 合并数据
-              const mergedData = [...prevData, ...parsedData];
-              
-              // 按平台分组数据
-              const groupedData: Record<string, DataItem[]> = {
-                  douyin: [],
-                  kuaishou: [],
-                  wechat: []
-              };
-              
-              mergedData.forEach(item => {
-                  if (item.platform) {
-                      groupedData[item.platform].push(item);
-                  }
-              });
-              
-              // 更新platformData
-              setPlatformData(groupedData);
-              
-              // 自动调整日期范围 - 只针对当前上传的平台
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const bstr = evt.target?.result;
+          const wb = XLSX.read(bstr, { type: 'binary' });
+          const wsname = wb.SheetNames[0];
+          const ws = wb.Sheets[wsname];
+          const rawData = XLSX.utils.sheet_to_json(ws);
+          const parsedData = parseData(rawData, platform);
+          
+          if (parsedData.length > 0) {
+              // 合并新数据到现有数据中，而不是替换
+              setData(prevData => {
+                  // 合并数据
+                  const mergedData = [...prevData, ...parsedData];
+                  
+                  // 按平台分组数据
+                  const groupedData: Record<string, DataItem[]> = {
+                      douyin: [],
+                      kuaishou: [],
+                      wechat: []
+                  };
+                  
+                  mergedData.forEach(item => {
+                      if (item.platform) {
+                          groupedData[item.platform].push(item);
+                      }
+                  });
+                  
+                  // 更新platformData
+                  setPlatformData(groupedData);
+                  
+                  // 自动调整日期范围 - 只针对当前上传的平台
               if (platform) {
                   // 过滤出当前平台的数据
                   const platformData = groupedData[platform];
@@ -538,6 +540,7 @@ export default function App() {
       }
     };
     reader.readAsBinaryString(file);
+    });
   };
 
   // --- Range Analysis Logic ---  
@@ -583,7 +586,7 @@ export default function App() {
   }, [platformData, aiDateRange, selectedPlatform]);
 
   // Helper for trend aggregation
-  const getTrendData = (targetRange: {start: string, end: string}, targetMode: 'daily' | 'monthly' | 'quarterly') => {
+  const getTrendData = (targetRange: {start: string, end: string}, targetMode: 'daily' | 'weekly' | 'monthly' | 'quarterly') => {
     const start = parse(targetRange.start, 'yyyy-MM-dd', new Date());
     const end = parse(targetRange.end, 'yyyy-MM-dd', new Date());
     end.setHours(23, 59, 59, 999);
@@ -600,6 +603,10 @@ export default function App() {
         let d = '';
         if (targetMode === 'daily') {
              d = format(item.parsedDate, 'yyyy-MM-dd');
+        } else if (targetMode === 'weekly') {
+             // Weekly aggregation
+             const weekStart = startOfWeek(item.parsedDate, { weekStartsOn: 1 });
+             d = format(weekStart, 'yyyy-MM-dd');
         } else if (targetMode === 'monthly') {
              d = format(item.parsedDate, 'yyyy-MM');
         } else {
@@ -1280,7 +1287,7 @@ export default function App() {
               <label className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm border border-white/50 hover:bg-white/90 text-gray-700 rounded-lg cursor-pointer transition-all shadow-sm hover:shadow-md">
                 <Upload className="w-4 h-4" />
                 <span className="text-sm font-medium">Drag and drop file here</span>
-                <input type="file" className="hidden" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} />
+                <input type="file" className="hidden" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} multiple />
               </label>
                <span className="text-xs text-gray-500">Limit 200MB per file • CSV, XLSX, XLS</span>
             </div>
@@ -1406,6 +1413,22 @@ export default function App() {
                             )}
                         >
                             全部(日)
+                        </button>
+                        <button 
+                            onClick={() => {
+                                if (!dataDateRange) return;
+                                // Use the data range but switch mode
+                                setPlatformTrendRange(dataDateRange); 
+                                setPlatformTrendMode('weekly');
+                            }}
+                            className={cn(
+                                "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                                trendMode === 'weekly'
+                                    ? "text-white bg-green-600 hover:bg-green-700"
+                                    : "text-gray-600 bg-gray-100 hover:bg-gray-200"
+                            )}
+                        >
+                            按周
                         </button>
                         <button 
                             onClick={() => {
@@ -1541,6 +1564,21 @@ export default function App() {
                             )}
                         >
                             全部(日)
+                        </button>
+                        <button 
+                            onClick={() => {
+                                if (!dataDateRange) return;
+                                setPlatformViewsTrendRange(dataDateRange); 
+                                setPlatformViewsTrendMode('weekly');
+                            }}
+                            className={cn(
+                                "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                                viewsTrendMode === 'weekly'
+                                    ? "text-white bg-green-600 hover:bg-green-700"
+                                    : "text-gray-600 bg-gray-100 hover:bg-gray-200"
+                            )}
+                        >
+                            按周
                         </button>
                         <button 
                             onClick={() => {

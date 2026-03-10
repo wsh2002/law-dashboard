@@ -56,7 +56,7 @@ export const AIAnalysisCard = ({ data, title, mode = 'all', platform = 'default'
     
     setIsAnalyzing(true);
     try {
-      const prompt = generateAnalysisPrompt(data);
+      const prompt = generateAnalysisPrompt(data, platform);
       const result = await fetchAIAnalysis(config, prompt);
       setAiResult(result);
       localStorage.setItem(`ai_result_${platform}`, result);

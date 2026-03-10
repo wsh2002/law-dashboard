@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertCircle, Settings, Play, ThumbsUp, Clock, User, MessageCircle, X, Sparkles, Loader2, BarChart2 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { DEFAULT_CONFIG, analyzeDocument } from '../services/aiAnalysis';
+import { DEFAULT_CONFIG, analyzeDocument, getProviderModels, fetchAIAnalysis } from '../services/aiAnalysis';
 import ReactMarkdown from 'react-markdown';
 
 // Types for the viral video data
@@ -143,6 +143,21 @@ export const ViralVideosSection = () => {
     }
     return {};
   });
+  // 文案二次创作状态
+  const [rewriteResult, setRewriteResult] = useState<string>('');
+  const [isRewriting, setIsRewriting] = useState(false);
+  const [rewriteStyle, setRewriteStyle] = useState<string>('professional');
+  const [rewriteCache, setRewriteCache] = useState<Record<string, Record<string, string>>>(() => {
+    const saved = localStorage.getItem('rewrite_cache');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return {};
+      }
+    }
+    return {};
+  });
 
   // ✅ 自动识别状态
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -201,8 +216,10 @@ export const ViralVideosSection = () => {
     const decoder = new TextDecoder();
     let buffer = '';
 
-    while (true) {
-      const { done, value } = await reader.read();
+    let done = false;
+    while (!done) {
+      const { done: readerDone, value } = await reader.read();
+      done = readerDone;
       if (done) break;
       
       buffer += decoder.decode(value, { stream: true });
@@ -228,7 +245,7 @@ export const ViralVideosSection = () => {
             
             if (eventType === 'result' && data.subtitles) {
               setSubtitles(data.subtitles);
-              const text = data.subtitles.map((s: any) => s.text).join('\n');
+              const text = data.subtitles.map((s: { text: string }) => s.text).join('\n');
               setManualTranscript(text);
             } else if (eventType === 'error') {
               if (data.message === 'COOKIE_EXPIRED') {
@@ -247,7 +264,7 @@ export const ViralVideosSection = () => {
         }
       }
     }
-  } catch (e: any) {
+  } catch (e) {
     setTranscribeError('无法连接到识别服务,请确认 Whisper 服务已启动');
     console.error('识别错误:', e);
   } finally {
@@ -292,14 +309,16 @@ export const ViralVideosSection = () => {
             const decoder = new TextDecoder();
             let buffer = '';
             let subtitles: { start: string; end: string; text: string }[] = [];
+            let done = false;
 
-            while (true) {
+            while (!done) {
               // 检查是否已取消
               if (controller.signal.aborted) {
                 break;
               }
               
-              const { done, value } = await reader.read();
+              const { done: readerDone, value } = await reader.read();
+              done = readerDone;
               if (done) break;
               
               buffer += decoder.decode(value, { stream: true });
@@ -336,7 +355,7 @@ export const ViralVideosSection = () => {
             }
 
             if (subtitles.length > 0) {
-              const text = subtitles.map((s: any) => s.text).join('\n');
+              const text = subtitles.map((s) => s.text).join('\n');
               
               // 更新视频状态
               setVideos(prev => {
@@ -409,14 +428,86 @@ export const ViralVideosSection = () => {
       const savedCache = JSON.parse(localStorage.getItem('analysis_cache') || '{}');
       savedCache[analyzingVideo.id] = analysis;
       localStorage.setItem('analysis_cache', JSON.stringify(savedCache));
-    } catch (error: any) {
-      setAnalysisResult(`分析失败: ${error.message}`);
-      if (error.message.includes('401')) {
+    } catch (error) {
+      setAnalysisResult(`分析失败: ${(error as Error).message}`);
+      if ((error as Error).message.includes('401')) {
         setShowApiConfig(true);
       }
     } finally {
       setIsAnalyzing(false);
       setAnalysisStep('idle');
+    }
+  };
+
+  // 文案二次创作函数
+  const handleRewriteContent = async () => {
+    if (!manualTranscript) return;
+    if (!analyzingVideo) {
+      setRewriteResult('创作失败: 请先选择一个视频进行分析');
+      return;
+    }
+    
+    // 检查是否已有缓存的创作结果
+    if (rewriteCache[analyzingVideo.id] && rewriteCache[analyzingVideo.id][rewriteStyle]) {
+      setRewriteResult(rewriteCache[analyzingVideo.id][rewriteStyle]);
+      return;
+    }
+    
+    setIsRewriting(true);
+    
+    try {
+      const models = getProviderModels();
+      const stylePrompt = {
+        professional: '专业法律风格，正式严谨，使用法律术语',
+        conversational: '口语化风格，亲切自然，易于理解',
+        storytelling: '故事化风格，情节引人入胜，有情感共鸣',
+        authoritative: '权威专家风格，自信果断，说服力强'
+      }[rewriteStyle];
+      
+      const prompt = `
+你是一位专业的法律内容创作者。请根据以下视频文案，按照指定风格进行二次创作，使其更加吸引人、专业且易于传播。
+
+【原始文案】:
+${manualTranscript}
+
+【创作风格】:
+${stylePrompt}
+
+【要求】:
+1. 保持原文的核心法律信息不变
+2. 优化语言表达，使其更加流畅自然
+3. 增强吸引力和感染力，适合短视频平台
+4. 适当添加情感元素，提高用户共鸣
+5. 保持适当的长度，适合短视频时长
+6. 使用 Markdown 格式输出
+`;
+      
+      const rewrite = await fetchAIAnalysis({ ...apiConfig, model: models.V3 }, prompt);
+      setRewriteResult(rewrite);
+      
+      // 缓存创作结果
+      setRewriteCache(prev => ({
+        ...prev,
+        [analyzingVideo.id]: {
+          ...prev[analyzingVideo.id],
+          [rewriteStyle]: rewrite
+        }
+      }));
+      
+      // 持久化到本地存储
+      const savedCache = JSON.parse(localStorage.getItem('rewrite_cache') || '{}');
+      if (!savedCache[analyzingVideo.id]) {
+        savedCache[analyzingVideo.id] = {};
+      }
+      savedCache[analyzingVideo.id][rewriteStyle] = rewrite;
+      localStorage.setItem('rewrite_cache', JSON.stringify(savedCache));
+    } catch (error) {
+      setRewriteResult(`创作失败: ${(error as Error).message}`);
+      if ((error as Error).message.includes('401')) {
+        setShowApiConfig(true);
+      }
+    } finally {
+      setIsRewriting(false);
     }
   };
 
@@ -465,7 +556,7 @@ ${analysisResult}
         if (response.ok) {
           const realData = await response.json();
           const formatted = realData
-            .map((v: any, index: number) => {
+            .map((v: { title?: string; desc?: string; author?: string; likes?: number; digg?: number; comments?: number; comment?: number; shares?: number; views?: string; play?: string; publishTime?: string; time?: string; url?: string; duration?: string; cover?: string; platform?: string; content?: string; video_text?: string }, index: number) => {
               let category: 'land' | 'general' = 'general';
               const titleText = (v.title || v.desc || '').toLowerCase();
               if (titleText.includes('征地') || titleText.includes('拆迁') || titleText.includes('补偿') || titleText.includes('土地') || titleText.includes('征收')) {
@@ -489,8 +580,8 @@ ${analysisResult}
                 content: v.content || v.video_text || ''
               };
             })
-            .filter((v: any) => v.category === selectedCategory)
-            .sort((a: any, b: any) => b.likes - a.likes);
+            .filter((v: { category: 'land' | 'general' }) => v.category === selectedCategory)
+            .sort((a: { likes: number }, b: { likes: number }) => b.likes - a.likes);
 
           if (formatted.length > 0) {
             // 从本地存储读取已保存的文案数据
@@ -498,7 +589,7 @@ ${analysisResult}
             const savedData = savedVideos ? JSON.parse(savedVideos) : {};
             
             // 合并保存的数据
-            const videosWithContent = formatted.slice(0, 10).map((v: any, i: number) => ({
+            const videosWithContent = formatted.slice(0, 10).map((v: { id: string; content?: string }, i: number) => ({
               ...v,
               rank: i + 1,
               content: savedData[v.id]?.content || v.content,
@@ -524,7 +615,7 @@ ${analysisResult}
       const savedData = savedVideos ? JSON.parse(savedVideos) : {};
       
       // 合并保存的数据
-      const videosWithContent = filtered.slice(0, 10).map((v: any, i: number) => ({
+      const videosWithContent = filtered.slice(0, 10).map((v, i: number) => ({
         ...v,
         rank: i + 1,
         category: selectedCategory,
@@ -547,7 +638,7 @@ ${analysisResult}
           {CATEGORIES.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => setSelectedCategory(cat.id as any)}
+              onClick={() => setSelectedCategory(cat.id as 'land' | 'general')}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all",
                 selectedCategory === cat.id
@@ -914,6 +1005,7 @@ ${analysisResult}
                       视频转化文档 (台词)
                       {activeTab === 'document' && <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />}
                     </button>
+
                   </div>
 
                   {/* Tab Content */}
@@ -1126,9 +1218,117 @@ ${analysisResult}
                </div>
              </div>
            </motion.div>
-         </div>
-       )}
-     </AnimatePresence>
-   </div>
- );
+        </div>
+      )}
+    </AnimatePresence>
+
+    {/* 文案二次创作 Section */}
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.3 }}
+      className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden"
+    >
+      {/* Section Header */}
+      <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-2 h-8 bg-green-500 rounded-full" />
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">文案二次创作</h3>
+            <p className="text-xs text-gray-400 mt-1">基于爆款视频内容，生成更加吸引人的法律文案</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Section Content */}
+      <div className="p-6">
+        <div className="bg-green-50/50 p-6 rounded-xl border border-green-100 min-h-[300px]">
+          <div className="flex items-center justify-between mb-4">
+            <h6 className="text-green-800 font-bold flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> 文案二次创作 (Content Rewrite)
+            </h6>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-green-600 bg-green-100/50 p-2 rounded flex-1">
+                提示：选择创作风格，AI 将基于视频文案进行二次创作，生成更加吸引人的内容。
+              </p>
+              <div className="flex gap-2 ml-4">
+                {['professional', 'conversational', 'storytelling', 'authoritative'].map((style) => (
+                  <button
+                    key={style}
+                    onClick={() => setRewriteStyle(style)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                      rewriteStyle === style
+                        ? "bg-green-600 text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    )}
+                  >
+                    {{
+                      professional: '专业法律',
+                      conversational: '口语化',
+                      storytelling: '故事化',
+                      authoritative: '权威专家'
+                    }[style]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {isRewriting ? (
+              <div className="py-20 flex flex-col items-center justify-center text-gray-400">
+                <Loader2 className="w-10 h-10 animate-spin text-green-600 mb-4" />
+                <p className="text-lg font-medium text-gray-600">正在进行文案二次创作...</p>
+                <p className="text-sm mt-2">正在优化语言表达，增强吸引力和感染力</p>
+              </div>
+            ) : rewriteResult ? (
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <ReactMarkdown>{rewriteResult}</ReactMarkdown>
+              </div>
+            ) : (
+              <div className="py-20 flex flex-col items-center justify-center text-gray-400">
+                <Sparkles className="w-12 h-12 text-green-200 mb-4" />
+                <p className="text-lg font-medium text-gray-600">准备就绪</p>
+                <p className="text-sm mt-2 mb-6">请先选择一个视频并获取其文案内容</p>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => {
+                      if (videos.length > 0) {
+                        setAnalyzingVideo(videos[0]);
+                        setManualTranscript(videos[0].content || '');
+                      }
+                    }}
+                    disabled={videos.length === 0}
+                    className={cn(
+                      "px-6 py-3 rounded-xl font-bold shadow-lg transition-all",
+                      videos.length > 0
+                        ? "bg-blue-600 text-white hover:bg-blue-700 hover:scale-105"
+                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    )}
+                  >
+                    使用第一个视频
+                  </button>
+                  <button
+                    onClick={handleRewriteContent}
+                    disabled={!manualTranscript || !analyzingVideo}
+                    className={cn(
+                      "px-8 py-3 rounded-xl font-bold shadow-lg transition-all",
+                      manualTranscript && analyzingVideo
+                        ? "bg-green-600 text-white hover:bg-green-700 hover:scale-105"
+                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    )}
+                  >
+                    开始文案二次创作
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  </div>
+);
 };
