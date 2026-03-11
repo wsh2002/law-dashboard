@@ -148,6 +148,13 @@ export const ViralVideosSection = () => {
   const [isRewriting, setIsRewriting] = useState(false);
   const [rewriteStyle, setRewriteStyle] = useState<string>('professional');
 
+  // 当文案内容变化时，自动生成默认风格的内容
+  useEffect(() => {
+    if (manualTranscript) {
+      handleRewriteContent();
+    }
+  }, [manualTranscript]);
+
   // ✅ 自动识别状态
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcribeError, setTranscribeError] = useState('');
@@ -1220,7 +1227,12 @@ ${analysisResult}
                 {['professional', 'conversational', 'storytelling', 'authoritative'].map((style) => (
                   <button
                     key={style}
-                    onClick={() => setRewriteStyle(style)}
+                    onClick={async () => {
+                      setRewriteStyle(style);
+                      if (manualTranscript) {
+                        await handleRewriteContent();
+                      }
+                    }}
                     className={cn(
                       "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
                       rewriteStyle === style
