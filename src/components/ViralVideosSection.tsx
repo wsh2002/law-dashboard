@@ -147,13 +147,17 @@ export const ViralVideosSection = () => {
   const [rewriteResult, setRewriteResult] = useState<string>('');
   const [isRewriting, setIsRewriting] = useState(false);
   const [rewriteStyle, setRewriteStyle] = useState<string>('professional');
+  const [rewritePlatform, setRewritePlatform] = useState<string>('douyin');
+  const [rewriteCache, setRewriteCache] = useState<Record<string, Record<string, Record<string, string>>>>({});
 
-  // 当文案内容变化时，自动生成默认风格的内容
+  // 当平台或风格变化时，从缓存中加载内容
   useEffect(() => {
-    if (manualTranscript) {
+    if (rewriteCache[manualTranscript]?.[rewritePlatform]?.[rewriteStyle]) {
+      setRewriteResult(rewriteCache[manualTranscript][rewritePlatform][rewriteStyle]);
+    } else if (manualTranscript) {
       handleRewriteContent();
     }
-  }, [manualTranscript]);
+  }, [rewritePlatform, rewriteStyle, manualTranscript, rewriteCache]);
 
   // ✅ 自动识别状态
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -450,8 +454,33 @@ export const ViralVideosSection = () => {
         authoritative: '权威专家风格，自信果断，说服力强'
       }[rewriteStyle];
       
+      // 平台特定的爆款文案特点
+      const platformPrompt = {
+        douyin: `【抖音平台特点】:
+- 算法推荐机制强，内容节奏快，用户年轻化（18-35 岁为主）
+- 注重前 3 秒黄金开场，快速抓住注意力
+- 善用热门音乐、特效和话题标签
+- 文案特点：节奏感强、情绪饱满、金句频出、互动性强
+- 爆款元素：悬念开场、反差对比、情感共鸣、实用干货
+- 时长建议：30-60 秒为佳，信息密度高`,
+        kuaishou: `【快手平台特点】:
+- 老铁文化浓厚，用户更接地气，三四线城市用户占比高
+- 注重真实感和亲近感，强调"自己人"的认同感
+- 文案特点：朴实真诚、接地气、方言化、生活化
+- 爆款元素：真实故事、生活场景、情感共鸣、实用技巧
+- 互动方式：强调"老铁们"、"家人们"的称呼
+- 时长建议：45-90 秒，注重情节完整性`,
+        wechat: `【视频号平台特点】:
+- 基于微信社交关系链传播，用户年龄层更广（25-50 岁）
+- 注重内容价值和社交属性，适合深度内容
+- 文案特点：专业权威、逻辑清晰、有价值感
+- 爆款元素：热点解读、实用干货、权威观点、情感故事
+- 传播方式：依赖朋友圈转发和群分享，注重社交价值
+- 时长建议：60-120 秒，内容更有深度`
+      }[rewritePlatform];
+      
       const prompt = `
-你是一位专业的法律内容创作者。请根据以下视频文案，按照指定风格进行二次创作，使其更加吸引人、专业且易于传播。
+你是一位专业的法律内容创作者，精通抖音、快手、视频号三大平台的爆款文案创作规律。请根据以下视频文案，按照指定风格和平台特点进行二次创作。
 
 【原始文案】:
 ${manualTranscript}
@@ -459,17 +488,40 @@ ${manualTranscript}
 【创作风格】:
 ${stylePrompt}
 
+${platformPrompt}
+
 【要求】:
 1. 保持原文的核心法律信息不变
-2. 优化语言表达，使其更加流畅自然
-3. 增强吸引力和感染力，适合短视频平台
-4. 适当添加情感元素，提高用户共鸣
-5. 保持适当的长度，适合短视频时长
-6. 使用 Markdown 格式输出
+2. 根据平台特点优化语言表达和节奏
+3. 增强吸引力和感染力，符合该平台用户喜好
+4. 适当添加情感元素和互动引导，提高用户共鸣
+5. 使用 Markdown 格式输出，包含以下结构：
+   - 📌 爆款标题（3-5 个备选）
+   - 🎬 开场白（前 3 秒黄金开场）
+   - 📝 正文内容（分段清晰，重点突出）
+   - 💬 互动引导（引导点赞、评论、转发）
+   - 🏷️ 推荐话题标签
+6. 在文案末尾添加【运营建议】板块，包含：
+   - 最佳发布时间建议
+   - 封面设计建议
+   - 背景音乐推荐
+   - 评论区互动策略
 `;
       
       const rewrite = await fetchAIAnalysis({ ...apiConfig, model: models.V3 }, prompt);
       setRewriteResult(rewrite);
+      
+      // 缓存生成的内容
+      setRewriteCache(prev => ({
+        ...prev,
+        [manualTranscript]: {
+          ...prev[manualTranscript],
+          [rewritePlatform]: {
+            ...prev[manualTranscript]?.[rewritePlatform],
+            [rewriteStyle]: rewrite
+          }
+        }
+      }));
     } catch (error) {
       setRewriteResult(`创作失败: ${(error as Error).message}`);
       if ((error as Error).message.includes('401')) {
@@ -1219,6 +1271,36 @@ ${analysisResult}
           </div>
 
           <div className="space-y-4">
+            {/* 平台选择 */}
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-green-600 bg-green-100/50 p-2 rounded flex-1">
+                提示：选择目标平台和创作风格，AI 将生成适合该平台的爆款文案。
+              </p>
+              <div className="flex gap-2 ml-4">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">平台:</span>
+                {[
+                  { key: 'douyin', name: '抖音', icon: '🎵' },
+                  { key: 'kuaishou', name: '快手', icon: '📹' },
+                  { key: 'wechat', name: '视频号', icon: '💬' }
+                ].map((platform) => (
+                  <button
+                    key={platform.key}
+                    onClick={() => setRewritePlatform(platform.key)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1",
+                      rewritePlatform === platform.key
+                        ? "bg-green-600 text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    )}
+                  >
+                    <span>{platform.icon}</span>
+                    <span>{platform.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 风格选择 */}
             <div className="flex items-center justify-between">
               <p className="text-xs text-green-600 bg-green-100/50 p-2 rounded flex-1">
                 提示：选择创作风格，AI 将基于文案进行二次创作，生成更加吸引人的内容。
@@ -1227,12 +1309,7 @@ ${analysisResult}
                 {['professional', 'conversational', 'storytelling', 'authoritative'].map((style) => (
                   <button
                     key={style}
-                    onClick={async () => {
-                      setRewriteStyle(style);
-                      if (manualTranscript) {
-                        await handleRewriteContent();
-                      }
-                    }}
+                    onClick={() => setRewriteStyle(style)}
                     className={cn(
                       "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
                       rewriteStyle === style
