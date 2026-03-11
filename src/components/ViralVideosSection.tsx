@@ -147,17 +147,6 @@ export const ViralVideosSection = () => {
   const [rewriteResult, setRewriteResult] = useState<string>('');
   const [isRewriting, setIsRewriting] = useState(false);
   const [rewriteStyle, setRewriteStyle] = useState<string>('professional');
-  const [rewriteCache, setRewriteCache] = useState<Record<string, Record<string, string>>>(() => {
-    const saved = localStorage.getItem('rewrite_cache');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return {};
-      }
-    }
-    return {};
-  });
 
   // ✅ 自动识别状态
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -442,16 +431,6 @@ export const ViralVideosSection = () => {
   // 文案二次创作函数
   const handleRewriteContent = async () => {
     if (!manualTranscript) return;
-    if (!analyzingVideo) {
-      setRewriteResult('创作失败: 请先选择一个视频进行分析');
-      return;
-    }
-    
-    // 检查是否已有缓存的创作结果
-    if (rewriteCache[analyzingVideo.id] && rewriteCache[analyzingVideo.id][rewriteStyle]) {
-      setRewriteResult(rewriteCache[analyzingVideo.id][rewriteStyle]);
-      return;
-    }
     
     setIsRewriting(true);
     
@@ -484,23 +463,6 @@ ${stylePrompt}
       
       const rewrite = await fetchAIAnalysis({ ...apiConfig, model: models.V3 }, prompt);
       setRewriteResult(rewrite);
-      
-      // 缓存创作结果
-      setRewriteCache(prev => ({
-        ...prev,
-        [analyzingVideo.id]: {
-          ...prev[analyzingVideo.id],
-          [rewriteStyle]: rewrite
-        }
-      }));
-      
-      // 持久化到本地存储
-      const savedCache = JSON.parse(localStorage.getItem('rewrite_cache') || '{}');
-      if (!savedCache[analyzingVideo.id]) {
-        savedCache[analyzingVideo.id] = {};
-      }
-      savedCache[analyzingVideo.id][rewriteStyle] = rewrite;
-      localStorage.setItem('rewrite_cache', JSON.stringify(savedCache));
     } catch (error) {
       setRewriteResult(`创作失败: ${(error as Error).message}`);
       if ((error as Error).message.includes('401')) {
@@ -1252,7 +1214,7 @@ ${analysisResult}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <p className="text-xs text-green-600 bg-green-100/50 p-2 rounded flex-1">
-                提示：选择创作风格，AI 将基于视频文案进行二次创作，生成更加吸引人的内容。
+                提示：选择创作风格，AI 将基于文案进行二次创作，生成更加吸引人的内容。
               </p>
               <div className="flex gap-2 ml-4">
                 {['professional', 'conversational', 'storytelling', 'authoritative'].map((style) => (
@@ -1277,6 +1239,16 @@ ${analysisResult}
               </div>
             </div>
 
+            {/* 文案输入区域 */}
+            <div className="w-full h-64 overflow-y-auto rounded-xl border border-green-200 bg-white shadow-inner p-4">
+              <textarea
+                value={manualTranscript}
+                onChange={(e) => setManualTranscript(e.target.value)}
+                placeholder="请复制粘贴任何视频的文案内容，然后点击'开始文案二次创作'"
+                className="w-full h-full border-none outline-none resize-none text-sm text-gray-800"
+              />
+            </div>
+
             {isRewriting ? (
               <div className="py-20 flex flex-col items-center justify-center text-gray-400">
                 <Loader2 className="w-10 h-10 animate-spin text-green-600 mb-4" />
@@ -1288,34 +1260,17 @@ ${analysisResult}
                 <ReactMarkdown>{rewriteResult}</ReactMarkdown>
               </div>
             ) : (
-              <div className="py-20 flex flex-col items-center justify-center text-gray-400">
+              <div className="py-10 flex flex-col items-center justify-center text-gray-400">
                 <Sparkles className="w-12 h-12 text-green-200 mb-4" />
                 <p className="text-lg font-medium text-gray-600">准备就绪</p>
-                <p className="text-sm mt-2 mb-6">请先选择一个视频并获取其文案内容</p>
-                <div className="flex gap-4">
-                  <button
-                    onClick={() => {
-                      if (videos.length > 0) {
-                        setAnalyzingVideo(videos[0]);
-                        setManualTranscript(videos[0].content || '');
-                      }
-                    }}
-                    disabled={videos.length === 0}
-                    className={cn(
-                      "px-6 py-3 rounded-xl font-bold shadow-lg transition-all",
-                      videos.length > 0
-                        ? "bg-blue-600 text-white hover:bg-blue-700 hover:scale-105"
-                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    )}
-                  >
-                    使用第一个视频
-                  </button>
+                <p className="text-sm mt-2 mb-6">请复制粘贴任何视频的文案内容，然后点击'开始文案二次创作'</p>
+                <div className="flex justify-center">
                   <button
                     onClick={handleRewriteContent}
-                    disabled={!manualTranscript || !analyzingVideo}
+                    disabled={!manualTranscript}
                     className={cn(
                       "px-8 py-3 rounded-xl font-bold shadow-lg transition-all",
-                      manualTranscript && analyzingVideo
+                      manualTranscript
                         ? "bg-green-600 text-white hover:bg-green-700 hover:scale-105"
                         : "bg-gray-200 text-gray-400 cursor-not-allowed"
                     )}
