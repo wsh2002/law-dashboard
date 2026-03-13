@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertCircle, Settings, Play, ThumbsUp, Clock, User, MessageCircle, X, Sparkles, Loader2, BarChart2 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { DEFAULT_CONFIG, analyzeDocument, getProviderModels, fetchAIAnalysis } from '../services/aiAnalysis';
+import { DEFAULT_CONFIG, analyzeDocument } from '../services/aiAnalysis';
 import ReactMarkdown from 'react-markdown';
 
 // Types for the viral video data
@@ -101,7 +101,7 @@ const CATEGORIES = [
 // ✅ Whisper 服务地址
 const WHISPER_API = '';
 
-export const ViralVideosSection = () => {
+const ViralVideosSection = () => {
   const [showApiConfig, setShowApiConfig] = useState(false);
   const [apiConfig, setApiConfig] = useState(() => {
     const saved = localStorage.getItem('deepseek_config');
@@ -143,21 +143,7 @@ export const ViralVideosSection = () => {
     }
     return {};
   });
-  // 文案二次创作状态
-  const [rewriteResult, setRewriteResult] = useState<string>('');
-  const [isRewriting, setIsRewriting] = useState(false);
-  const [rewriteStyle, setRewriteStyle] = useState<string>('professional');
-  const [rewritePlatform, setRewritePlatform] = useState<string>('douyin');
-  const [rewriteCache, setRewriteCache] = useState<Record<string, Record<string, Record<string, string>>>>({});
 
-  // 当平台或风格变化时，从缓存中加载内容
-  useEffect(() => {
-    if (rewriteCache[manualTranscript]?.[rewritePlatform]?.[rewriteStyle]) {
-      setRewriteResult(rewriteCache[manualTranscript][rewritePlatform][rewriteStyle]);
-    } else if (manualTranscript) {
-      handleRewriteContent();
-    }
-  }, [rewritePlatform, rewriteStyle, manualTranscript, rewriteCache]);
 
   // ✅ 自动识别状态
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -439,98 +425,7 @@ export const ViralVideosSection = () => {
     }
   };
 
-  // 文案二次创作函数
-  const handleRewriteContent = async () => {
-    if (!manualTranscript) return;
-    
-    setIsRewriting(true);
-    
-    try {
-      const models = getProviderModels();
-      const stylePrompt = {
-        professional: '专业法律风格，正式严谨，使用法律术语',
-        conversational: '口语化风格，亲切自然，易于理解',
-        storytelling: '故事化风格，情节引人入胜，有情感共鸣',
-        authoritative: '权威专家风格，自信果断，说服力强'
-      }[rewriteStyle];
-      
-      // 平台特定的爆款文案特点
-      const platformPrompt = {
-        douyin: `【抖音平台特点】:
-- 算法推荐机制强，内容节奏快，用户年轻化（18-35 岁为主）
-- 注重前 3 秒黄金开场，快速抓住注意力
-- 善用热门音乐、特效和话题标签
-- 文案特点：节奏感强、情绪饱满、金句频出、互动性强
-- 爆款元素：悬念开场、反差对比、情感共鸣、实用干货
-- 时长建议：30-60 秒为佳，信息密度高`,
-        kuaishou: `【快手平台特点】:
-- 老铁文化浓厚，用户更接地气，三四线城市用户占比高
-- 注重真实感和亲近感，强调"自己人"的认同感
-- 文案特点：朴实真诚、接地气、方言化、生活化
-- 爆款元素：真实故事、生活场景、情感共鸣、实用技巧
-- 互动方式：强调"老铁们"、"家人们"的称呼
-- 时长建议：45-90 秒，注重情节完整性`,
-        wechat: `【视频号平台特点】:
-- 基于微信社交关系链传播，用户年龄层更广（25-50 岁）
-- 注重内容价值和社交属性，适合深度内容
-- 文案特点：专业权威、逻辑清晰、有价值感
-- 爆款元素：热点解读、实用干货、权威观点、情感故事
-- 传播方式：依赖朋友圈转发和群分享，注重社交价值
-- 时长建议：60-120 秒，内容更有深度`
-      }[rewritePlatform];
-      
-      const prompt = `
-你是一位专业的法律内容创作者，精通抖音、快手、视频号三大平台的爆款文案创作规律。请根据以下视频文案，按照指定风格和平台特点进行二次创作。
 
-【原始文案】:
-${manualTranscript}
-
-【创作风格】:
-${stylePrompt}
-
-${platformPrompt}
-
-【要求】:
-1. 保持原文的核心法律信息不变
-2. 根据平台特点优化语言表达和节奏
-3. 增强吸引力和感染力，符合该平台用户喜好
-4. 适当添加情感元素和互动引导，提高用户共鸣
-5. 使用 Markdown 格式输出，包含以下结构：
-   - 📌 爆款标题（3-5 个备选）
-   - 🎬 开场白（前 3 秒黄金开场）
-   - 📝 正文内容（分段清晰，重点突出）
-   - 💬 互动引导（引导点赞、评论、转发）
-   - 🏷️ 推荐话题标签
-6. 在文案末尾添加【运营建议】板块，包含：
-   - 最佳发布时间建议
-   - 封面设计建议
-   - 背景音乐推荐
-   - 评论区互动策略
-`;
-      
-      const rewrite = await fetchAIAnalysis({ ...apiConfig, model: models.V3 }, prompt);
-      setRewriteResult(rewrite);
-      
-      // 缓存生成的内容
-      setRewriteCache(prev => ({
-        ...prev,
-        [manualTranscript]: {
-          ...prev[manualTranscript],
-          [rewritePlatform]: {
-            ...prev[manualTranscript]?.[rewritePlatform],
-            [rewriteStyle]: rewrite
-          }
-        }
-      }));
-    } catch (error) {
-      setRewriteResult(`创作失败: ${(error as Error).message}`);
-      if ((error as Error).message.includes('401')) {
-        setShowApiConfig(true);
-      }
-    } finally {
-      setIsRewriting(false);
-    }
-  };
 
   const handleDownloadMarkdown = () => {
     if (!analyzingVideo || !analysisResult) return;
@@ -1243,136 +1138,9 @@ ${analysisResult}
       )}
     </AnimatePresence>
 
-    {/* 文案二次创作 Section */}
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.3 }}
-      className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden"
-    >
-      {/* Section Header */}
-      <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-2 h-8 bg-green-500 rounded-full" />
-          <div>
-            <h3 className="text-lg font-bold text-gray-800">文案二次创作</h3>
-            <p className="text-xs text-gray-400 mt-1">基于爆款视频内容，生成更加吸引人的法律文案</p>
-          </div>
-        </div>
-      </div>
 
-      {/* Section Content */}
-      <div className="p-6">
-        <div className="bg-green-50/50 p-6 rounded-xl border border-green-100 min-h-[300px]">
-          <div className="flex items-center justify-between mb-4">
-            <h6 className="text-green-800 font-bold flex items-center gap-2">
-              <Sparkles className="w-4 h-4" /> 文案二次创作 (Content Rewrite)
-            </h6>
-          </div>
-
-          <div className="space-y-4">
-            {/* 平台选择 */}
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-green-600 bg-green-100/50 p-2 rounded flex-1">
-                提示：选择目标平台和创作风格，AI 将生成适合该平台的爆款文案。
-              </p>
-              <div className="flex gap-2 ml-4">
-                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">平台:</span>
-                {[
-                  { key: 'douyin', name: '抖音', icon: '🎵' },
-                  { key: 'kuaishou', name: '快手', icon: '📹' },
-                  { key: 'wechat', name: '视频号', icon: '💬' }
-                ].map((platform) => (
-                  <button
-                    key={platform.key}
-                    onClick={() => setRewritePlatform(platform.key)}
-                    className={cn(
-                      "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1",
-                      rewritePlatform === platform.key
-                        ? "bg-green-600 text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    )}
-                  >
-                    <span>{platform.icon}</span>
-                    <span>{platform.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 风格选择 */}
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-green-600 bg-green-100/50 p-2 rounded flex-1">
-                提示：选择创作风格，AI 将基于文案进行二次创作，生成更加吸引人的内容。
-              </p>
-              <div className="flex gap-2 ml-4">
-                {['professional', 'conversational', 'storytelling', 'authoritative'].map((style) => (
-                  <button
-                    key={style}
-                    onClick={() => setRewriteStyle(style)}
-                    className={cn(
-                      "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-                      rewriteStyle === style
-                        ? "bg-green-600 text-white"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    )}
-                  >
-                    {{
-                      professional: '专业法律',
-                      conversational: '口语化',
-                      storytelling: '故事化',
-                      authoritative: '权威专家'
-                    }[style]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 文案输入区域 */}
-            <div className="w-full h-64 overflow-y-auto rounded-xl border border-green-200 bg-white shadow-inner p-4">
-              <textarea
-                value={manualTranscript}
-                onChange={(e) => setManualTranscript(e.target.value)}
-                placeholder="请复制粘贴任何视频的文案内容，然后点击'开始文案二次创作'"
-                className="w-full h-full border-none outline-none resize-none text-sm text-gray-800"
-              />
-            </div>
-
-            {isRewriting ? (
-              <div className="py-20 flex flex-col items-center justify-center text-gray-400">
-                <Loader2 className="w-10 h-10 animate-spin text-green-600 mb-4" />
-                <p className="text-lg font-medium text-gray-600">正在进行文案二次创作...</p>
-                <p className="text-sm mt-2">正在优化语言表达，增强吸引力和感染力</p>
-              </div>
-            ) : rewriteResult ? (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <ReactMarkdown>{rewriteResult}</ReactMarkdown>
-              </div>
-            ) : (
-              <div className="py-10 flex flex-col items-center justify-center text-gray-400">
-                <Sparkles className="w-12 h-12 text-green-200 mb-4" />
-                <p className="text-lg font-medium text-gray-600">准备就绪</p>
-                <p className="text-sm mt-2 mb-6">请复制粘贴任何视频的文案内容，然后点击'开始文案二次创作'</p>
-                <div className="flex justify-center">
-                  <button
-                    onClick={handleRewriteContent}
-                    disabled={!manualTranscript}
-                    className={cn(
-                      "px-8 py-3 rounded-xl font-bold shadow-lg transition-all",
-                      manualTranscript
-                        ? "bg-green-600 text-white hover:bg-green-700 hover:scale-105"
-                        : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    )}
-                  >
-                    开始文案二次创作
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </motion.div>
   </div>
 );
 };
+
+export default ViralVideosSection;

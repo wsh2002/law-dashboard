@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 
 const PARTICLE_COUNT = 50;
 
-export const AnimatedBackground = () => {
+const AnimatedBackground = () => {
   const [particles, setParticles] = useState<Array<{
     id: number;
     x: number;
@@ -116,3 +116,5 @@ export const AnimatedBackground = () => {
     </div>
   );
 };
+
+export default AnimatedBackground;

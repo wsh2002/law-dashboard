@@ -1,4 +1,4 @@
-import React, { useState, useMemo, ChangeEvent } from 'react';
+import React, { useState, useMemo, useEffect, ChangeEvent, lazy, Suspense } from 'react';
 import * as XLSX from 'xlsx';
 import { motion } from 'framer-motion';
 // import { MOCK_DATA } from './data/mockData';
@@ -9,11 +9,13 @@ import {
 import { Upload, Calendar, ArrowUp, ArrowDown, FileSpreadsheet, TrendingUp, Activity, Heart, GitMerge, Sparkles, Play, MessageCircle, Share2, Users, Star, ThumbsUp, Search } from 'lucide-react';
 import { format, parse, addDays, isValid, startOfDay, subDays, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, eachWeekOfInterval } from 'date-fns';
 import { cn } from './lib/utils';
-import { ViralVideosSection } from './components/ViralVideosSection';
-import { AARRRAnalysis } from './components/AARRRAnalysis';
-import { AIAnalysisCard } from './components/AIAnalysisCard';
-import { AnimatedBackground } from './components/AnimatedBackground';
-import { Login } from './components/Login';
+
+// 懒加载组件
+const ViralVideosSection = lazy(() => import('./components/ViralVideosSection'));
+const AARRRAnalysis = lazy(() => import('./components/AARRRAnalysis'));
+const AIAnalysisCard = lazy(() => import('./components/AIAnalysisCard'));
+const AnimatedBackground = lazy(() => import('./components/AnimatedBackground'));
+const Login = lazy(() => import('./components/Login'));
 
 // Custom Tooltip for comparison charts
 const ComparisonTooltip = React.memo(({ active, payload, label }: any) => {
@@ -227,10 +229,41 @@ const KPICard = ({ title, value, compareValue, unit = '', icon: Icon }: { title:
 
 
 export default function App() {
+  // 从 localStorage 加载状态，如果没有则使用默认值
+  const loadState = () => {
+    try {
+      const savedState = localStorage.getItem('lawDashboardState');
+      if (savedState) {
+        return JSON.parse(savedState);
+      }
+    } catch (error) {
+      console.error('Error loading state from localStorage:', error);
+    }
+    return null;
+  };
+
+  // 保存状态到 localStorage
+  const saveState = (state: any) => {
+    try {
+      localStorage.setItem('lawDashboardState', JSON.stringify(state));
+    } catch (error) {
+      console.error('Error saving state to localStorage:', error);
+    }
+  };
+
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [data, setData] = useState<DataItem[]>([]);
   const [platformData, setPlatformData] = useState<Record<string, DataItem[]>>({});
   const [selectedPlatform, setSelectedPlatform] = useState<'douyin' | 'kuaishou' | 'wechat'>('douyin');
+  const [tabPlatforms, setTabPlatforms] = useState<Record<string, 'douyin' | 'kuaishou' | 'wechat'>>({
+    overview: 'douyin',
+    monthly: 'douyin',
+    range: 'douyin',
+    personal: 'douyin',
+    viral: 'douyin',
+    rewrite: 'douyin'
+  });
+  const [activeTab, setActiveTab] = useState<'overview' | 'monthly' | 'range' | 'personal' | 'viral' | 'rewrite'>('overview');
   
   // Dynamic today reference for initial states
   const today = new Date();
@@ -239,14 +272,14 @@ export default function App() {
   const thisMonthStr = format(today, 'yyyy-MM');
   const lastMonthStr = format(subMonths(today, 1), 'yyyy-MM');
 
+  // 加载保存的状态或使用默认值
+  const savedState = loadState();
 
-  
   // Data Date Range State
-  const [dataDateRange, setDataDateRange] = useState<{ start: string, end: string } | null>(null);
+  const [dataDateRange, setDataDateRange] = useState<{ start: string, end: string } | null>(savedState?.dataDateRange || null);
 
   // Analysis Visibility State
-  const [showAnalysis, setShowAnalysis] = useState(false);
-  const [showViralMonitor, setShowViralMonitor] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(savedState?.showAnalysis || false);
 
   // Platform-specific time ranges
   const [platformTimeRanges, setPlatformTimeRanges] = useState<Record<string, {
@@ -261,7 +294,7 @@ export default function App() {
     dateRange: { start: string; end: string };
     compareRange: { start: string; end: string };
   }>>({ 
-    douyin: {
+    douyin: savedState?.platformTimeRanges?.douyin || {
       trendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
       trendMode: 'weekly',
       viewsTrendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
@@ -273,7 +306,7 @@ export default function App() {
       dateRange: { start: lastWeekStr, end: todayStr },
       compareRange: { start: format(subDays(today, 14), 'yyyy-MM-dd'), end: format(subDays(today, 8), 'yyyy-MM-dd') }
     },
-    kuaishou: {
+    kuaishou: savedState?.platformTimeRanges?.kuaishou || {
       trendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
       trendMode: 'weekly',
       viewsTrendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
@@ -285,7 +318,7 @@ export default function App() {
       dateRange: { start: lastWeekStr, end: todayStr },
       compareRange: { start: format(subDays(today, 14), 'yyyy-MM-dd'), end: format(subDays(today, 8), 'yyyy-MM-dd') }
     },
-    wechat: {
+    wechat: savedState?.platformTimeRanges?.wechat || {
       trendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
       trendMode: 'weekly',
       viewsTrendRange: { start: format(startOfMonth(today), 'yyyy-MM-dd'), end: todayStr },
@@ -303,6 +336,29 @@ export default function App() {
   const currentTimeRanges = platformTimeRanges[selectedPlatform];
   const { trendRange, trendMode, viewsTrendRange, viewsTrendMode, aiDateRange, monthA, monthB, selectedMonthForVideos, dateRange, compareRange } = currentTimeRanges;
 
+  // 当状态变化时保存到 localStorage
+  useEffect(() => {
+    saveState({
+      dataDateRange,
+      showAnalysis,
+      platformTimeRanges,
+      tabPlatforms
+    });
+  }, [dataDateRange, showAnalysis, platformTimeRanges, tabPlatforms]);
+
+  // 当切换标签页时，更新 selectedPlatform 为该标签页的平台选择
+  useEffect(() => {
+    setSelectedPlatform(tabPlatforms[activeTab]);
+  }, [activeTab, tabPlatforms]);
+
+  // 平台选择处理函数
+  const handlePlatformSelect = (platform: 'douyin' | 'kuaishou' | 'wechat') => {
+    setTabPlatforms(prev => ({
+      ...prev,
+      [activeTab]: platform
+    }));
+  };
+
   // Platform-specific setters
   const setPlatformTrendRange = (range: { start: string; end: string } | ((prev: { start: string; end: string }) => { start: string; end: string })) => {
     setPlatformTimeRanges(prev => {
@@ -316,6 +372,23 @@ export default function App() {
       };
     });
   };
+
+  // Auto adjust date ranges when platform changes
+  useEffect(() => {
+    const platformDataList = platformData[selectedPlatform] || [];
+    if (platformDataList.length > 0) {
+      const dates = platformDataList.map(d => d.parsedDate.getTime()).sort((a, b) => a - b);
+      const minDate = new Date(dates[0]);
+      const maxDate = new Date(dates[dates.length - 1]);
+      const midDate = new Date(dates[Math.floor(dates.length / 2)]);
+      
+      const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
+      
+      // Update date ranges for the current platform
+      setPlatformDateRange({ start: fmt(minDate), end: fmt(midDate) });
+      setPlatformCompareRange({ start: fmt(addDays(midDate, 1)), end: fmt(maxDate) });
+    }
+  }, [selectedPlatform, platformData]);
 
   const setPlatformTrendMode = (mode: 'daily' | 'weekly' | 'monthly' | 'quarterly') => {
     setPlatformTimeRanges(prev => ({
@@ -436,7 +509,7 @@ export default function App() {
     if (!files || files.length === 0) return;
 
     // Process each file
-    Array.from(files).forEach(file => {
+    Array.from(files).forEach((file: File) => {
         // Extract name from filename
         // Logic: Take part before "的", or filename without extension if "的" not present
         const filename = file.name;
@@ -464,7 +537,7 @@ export default function App() {
         
         // Set the first extracted platform as the current selected platform
         if (platform && files[0] === file) {
-            setSelectedPlatform(platform);
+            handlePlatformSelect(platform);
         }
 
         const reader = new FileReader();
@@ -535,11 +608,14 @@ export default function App() {
               const allMaxDate = new Date(allDates[allDates.length - 1]);
               setDataDateRange({ start: format(allMinDate, 'yyyy-MM-dd'), end: format(allMaxDate, 'yyyy-MM-dd') });
               
+              // 上传数据后自动显示分析内容
+              setShowAnalysis(true);
+              
               return mergedData;
           });
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsBinaryString(file as Blob);
     });
   };
 
@@ -639,25 +715,22 @@ export default function App() {
         grouped[d].fans = Math.max(grouped[d].fans, item.fans); 
     });
 
-    return Object.values(grouped).sort((a: any, b: any) => a.date.localeCompare(b.date));
+    let result = Object.values(grouped).sort((a: any, b: any) => a.date.localeCompare(b.date));
+    
+    // 限制数据点数量，提高图表渲染性能
+    if (result.length > 30) {
+        const step = Math.ceil(result.length / 30);
+        result = result.filter((_, index) => index % step === 0);
+    }
+    
+    return result;
   };
 
   // Trend Chart Data (Filtered by trendRange)
-  const trendData = useMemo(() => getTrendData(trendRange, trendMode), [data, trendRange, trendMode, selectedPlatform]);
+  const trendData = useMemo(() => getTrendData(trendRange, trendMode), [platformData, trendRange, trendMode, selectedPlatform]);
   
   // Views Trend Chart Data (Independent)
-  const viewsTrendData = useMemo(() => getTrendData(viewsTrendRange, viewsTrendMode), [data, viewsTrendRange, viewsTrendMode, selectedPlatform]);
-
-  const toggleAnalysis = () => {
-      setShowAnalysis(true);
-      // Optional: Scroll to the next section
-      setTimeout(() => {
-          const element = document.getElementById('analysis-content');
-          if (element) {
-              element.scrollIntoView({ behavior: 'smooth' });
-          }
-      }, 100);
-  };
+  const viewsTrendData = useMemo(() => getTrendData(viewsTrendRange, viewsTrendMode), [platformData, viewsTrendRange, viewsTrendMode, selectedPlatform]);
 
   // Aggregations
   const getKPIs = (dataset: DataItem[]) => {
@@ -676,8 +749,8 @@ export default function App() {
     };
   };
 
-  const currentKPIs = getKPIs(currentData);
-  const compareKPIs = getKPIs(compareData);
+  const currentKPIs = useMemo(() => getKPIs(currentData), [currentData]);
+  const compareKPIs = useMemo(() => getKPIs(compareData), [compareData]);
 
   // Helper to aggregate daily metrics
   const aggregateDailyData = (dataset: DataItem[]) => {
@@ -707,11 +780,19 @@ export default function App() {
         grouped[d].count += 1;
     });
     
-    return Object.values(grouped).map((g: any) => ({
+    let result = Object.values(grouped).map((g: any) => ({
         ...g,
         completionRate: g.count ? (g.completionRate / g.count).toFixed(2) : 0,
         interactionRate: g.count ? (g.interactionRate / g.count).toFixed(2) : 0,
     })).sort((a: any, b: any) => a.date.localeCompare(b.date));
+    
+    // 限制数据点数量，提高图表渲染性能
+    if (result.length > 30) {
+        const step = Math.ceil(result.length / 30);
+        result = result.filter((_, index) => index % step === 0);
+    }
+    
+    return result;
   };
 
   // Daily Trend Data for Charts (Current vs Comparison)
@@ -1129,20 +1210,44 @@ export default function App() {
   }, [fanHealthData]);
 
   if (!isLoggedIn) {
-      return <Login onLogin={() => setIsLoggedIn(true)} />;
+      return (
+        <Suspense fallback={<div className="flex justify-center items-center h-screen">加载中...</div>}>
+          <Login onLogin={() => setIsLoggedIn(true)} />
+        </Suspense>
+      );
   }
 
   // Chart Components with Memo
   const MonthlyViewsChart = React.memo(() => (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={monthViewsComparisonData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <defs>
+          <linearGradient id="colorAViews" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
+            <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.4}/>
+          </linearGradient>
+          <linearGradient id="colorBViews" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
+            <stop offset="100%" stopColor="#10b981" stopOpacity={0.4}/>
+          </linearGradient>
+        </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
         <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
         <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
-        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
-        <Legend />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
+        <Tooltip 
+          cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} 
+          contentStyle={{ 
+            borderRadius: '8px', 
+            border: 'none', 
+            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+            background: 'rgba(255, 255, 255, 0.95)',
+            padding: '12px',
+            fontSize: '14px'
+          }} 
+        />
+        <Legend wrapperStyle={{ paddingTop: '10px' }} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAViews)" radius={[8, 8, 0, 0]} animationDuration={1000} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBViews)" radius={[8, 8, 0, 0]} animationDuration={1000} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -1150,13 +1255,33 @@ export default function App() {
   const MonthlyOtherKPIsChart = React.memo(() => (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={monthComparisonChartData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <defs>
+          <linearGradient id="colorAKPIs" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#6366f1" stopOpacity={0.8}/>
+            <stop offset="100%" stopColor="#6366f1" stopOpacity={0.4}/>
+          </linearGradient>
+          <linearGradient id="colorBKPIs" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
+            <stop offset="100%" stopColor="#10b981" stopOpacity={0.4}/>
+          </linearGradient>
+        </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
         <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
         <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
-        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
-        <Legend />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#6366f1" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
+        <Tooltip 
+          cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} 
+          contentStyle={{ 
+            borderRadius: '8px', 
+            border: 'none', 
+            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+            background: 'rgba(255, 255, 255, 0.95)',
+            padding: '12px',
+            fontSize: '14px'
+          }} 
+        />
+        <Legend wrapperStyle={{ paddingTop: '10px' }} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAKPIs)" radius={[8, 8, 0, 0]} animationDuration={1000} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBKPIs)" radius={[8, 8, 0, 0]} animationDuration={1000} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -1164,13 +1289,33 @@ export default function App() {
   const MonthlyCommentChart = React.memo(() => (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={monthCommentComparisonData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <defs>
+          <linearGradient id="colorAComment" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#eab308" stopOpacity={0.8}/>
+            <stop offset="100%" stopColor="#eab308" stopOpacity={0.4}/>
+          </linearGradient>
+          <linearGradient id="colorBComment" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
+            <stop offset="100%" stopColor="#10b981" stopOpacity={0.4}/>
+          </linearGradient>
+        </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
         <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
         <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
-        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
-        <Legend />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#eab308" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
+        <Tooltip 
+          cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} 
+          contentStyle={{ 
+            borderRadius: '8px', 
+            border: 'none', 
+            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+            background: 'rgba(255, 255, 255, 0.95)',
+            padding: '12px',
+            fontSize: '14px'
+          }} 
+        />
+        <Legend wrapperStyle={{ paddingTop: '10px' }} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAComment)" radius={[8, 8, 0, 0]} animationDuration={1000} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBComment)" radius={[8, 8, 0, 0]} animationDuration={1000} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -1178,13 +1323,33 @@ export default function App() {
   const MonthlyRateChart = React.memo(() => (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={monthRateComparisonData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <defs>
+          <linearGradient id="colorARate" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ef4444" stopOpacity={0.8}/>
+            <stop offset="100%" stopColor="#ef4444" stopOpacity={0.4}/>
+          </linearGradient>
+          <linearGradient id="colorBRate" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
+            <stop offset="100%" stopColor="#10b981" stopOpacity={0.4}/>
+          </linearGradient>
+        </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
         <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
         <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
-        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
-        <Legend />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="#ef4444" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="#10b981" radius={[4, 4, 0, 0]} />
+        <Tooltip 
+          cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} 
+          contentStyle={{ 
+            borderRadius: '8px', 
+            border: 'none', 
+            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+            background: 'rgba(255, 255, 255, 0.95)',
+            padding: '12px',
+            fontSize: '14px'
+          }} 
+        />
+        <Legend wrapperStyle={{ paddingTop: '10px' }} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorARate)" radius={[8, 8, 0, 0]} animationDuration={1000} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBRate)" radius={[8, 8, 0, 0]} animationDuration={1000} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -1193,14 +1358,30 @@ export default function App() {
   const MonthlyViewsLikesChart = React.memo(() => (
     <ResponsiveContainer width="100%" height="100%">
       <ComposedChart data={monthlyData}>
+        <defs>
+          <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
+            <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.4}/>
+          </linearGradient>
+        </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
         <XAxis dataKey="month" fontSize={12} tickMargin={10} stroke="#94a3b8" />
         <YAxis yAxisId="left" fontSize={12} stroke="#3b82f6" label={{ value: '月播放量', angle: -90, position: 'insideLeft' }} domain={[0, 'dataMax * 1.2']} />
         <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f43f5e" label={{ value: '月点赞量', angle: 90, position: 'insideRight' }} domain={[0, 'dataMax * 1.2']} />
-        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
-        <Legend />
-        <Bar yAxisId="left" dataKey="views" name="月播放量" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-        <Line yAxisId="right" type="monotone" dataKey="likes" name="月点赞量" stroke="#f43f5e" strokeWidth={2} dot={{ r: 3 }} />
+        <Tooltip 
+          cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} 
+          contentStyle={{ 
+            borderRadius: '8px', 
+            border: 'none', 
+            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+            background: 'rgba(255, 255, 255, 0.95)',
+            padding: '12px',
+            fontSize: '14px'
+          }} 
+        />
+        <Legend wrapperStyle={{ paddingTop: '10px' }} />
+        <Bar yAxisId="left" dataKey="views" name="月播放量" fill="url(#colorViews)" radius={[8, 8, 0, 0]} animationDuration={1000} />
+        <Line yAxisId="right" type="monotone" dataKey="likes" name="月点赞量" stroke="#f43f5e" strokeWidth={3} dot={{ r: 4, fill: '#f43f5e', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f43f5e', stroke: '#fff', strokeWidth: 2 }} animationDuration={1000} />
       </ComposedChart>
     </ResponsiveContainer>
   ));
@@ -1208,31 +1389,50 @@ export default function App() {
   const MonthlyNetFansChart = React.memo(() => (
     <ResponsiveContainer width="100%" height="100%">
       <ComposedChart data={monthlyData}>
+        <defs>
+          <linearGradient id="colorNetFans" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
+            <stop offset="100%" stopColor="#10b981" stopOpacity={0.4}/>
+          </linearGradient>
+        </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
         <XAxis dataKey="month" fontSize={12} tickMargin={10} stroke="#94a3b8" />
         <YAxis fontSize={12} stroke="#10b981" label={{ value: '月净增粉', angle: -90, position: 'insideLeft' }} domain={['auto', 'auto']} />
-        <Tooltip cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
-        <Legend />
-        <Line type="monotone" dataKey="netFans" name="月净增粉" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+        <Tooltip 
+          cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} 
+          contentStyle={{ 
+            borderRadius: '8px', 
+            border: 'none', 
+            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+            background: 'rgba(255, 255, 255, 0.95)',
+            padding: '12px',
+            fontSize: '14px'
+          }} 
+        />
+        <Legend wrapperStyle={{ paddingTop: '10px' }} />
+        <Line type="monotone" dataKey="netFans" name="月净增粉" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={1000} />
+        <Bar dataKey="netFans" name="月净增粉" fill="url(#colorNetFans)" radius={[8, 8, 0, 0]} animationDuration={1000} />
       </ComposedChart>
     </ResponsiveContainer>
   ));
 
   return (
     <div className="min-h-screen relative font-sans text-slate-800 overflow-x-hidden">
-      <AnimatedBackground />
-      <div className="max-w-7xl mx-auto space-y-8 p-8 relative z-10">
+      <Suspense fallback={<div className="flex justify-center items-center h-screen">加载中...</div>}>
+        <AnimatedBackground />
+      </Suspense>
+      <div className="max-w-7xl mx-auto space-y-6 p-4 sm:p-6 lg:p-8 relative z-10">
         
         {/* Header */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col md:flex-row md:items-center justify-between gap-4"
+          className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-white/50"
         >
           <div>
             <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
               <FileSpreadsheet className="w-8 h-8 text-blue-600" />
-              多平台运营诊断 · 时间对比分析
+              多平台运营诊断
             </h1>
             <p className="text-slate-500 mt-2">支持 CSV/Excel 导入 · 自动识别日期范围</p>
             {dataDateRange && (
@@ -1247,65 +1447,68 @@ export default function App() {
             )}
           </div>
           
-          <div className="flex flex-col items-end gap-4">
-            <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm border border-white/50 rounded-lg p-1">
-              <button
-                onClick={() => setSelectedPlatform('douyin')}
-                className={cn(
-                  "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
-                  selectedPlatform === 'douyin'
-                    ? "bg-blue-600 text-white"
-                    : "text-gray-600 hover:bg-white/50"
-                )}
-              >
-                抖音
-              </button>
-              <button
-                onClick={() => setSelectedPlatform('kuaishou')}
-                className={cn(
-                  "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
-                  selectedPlatform === 'kuaishou'
-                    ? "bg-blue-600 text-white"
-                    : "text-gray-600 hover:bg-white/50"
-                )}
-              >
-                快手
-              </button>
-              <button
-                onClick={() => setSelectedPlatform('wechat')}
-                className={cn(
-                  "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
-                  selectedPlatform === 'wechat'
-                    ? "bg-blue-600 text-white"
-                    : "text-gray-600 hover:bg-white/50"
-                )}
-              >
-                视频号
-              </button>
-            </div>
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm border border-white/50 hover:bg-white/90 text-gray-700 rounded-lg cursor-pointer transition-all shadow-sm hover:shadow-md">
+          <div className="flex flex-col items-end gap-4 w-full md:w-auto">
+            <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+              <label className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg cursor-pointer transition-all shadow-md hover:shadow-lg w-full sm:w-auto">
                 <Upload className="w-4 h-4" />
-                <span className="text-sm font-medium">Drag and drop file here</span>
+                <span className="text-sm font-medium">上传文件</span>
                 <input type="file" className="hidden" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} multiple />
               </label>
-               <span className="text-xs text-gray-500">Limit 200MB per file • CSV, XLSX, XLS</span>
+               <span className="text-xs text-gray-500 text-center sm:text-right">Limit 200MB per file • CSV, XLSX, XLS</span>
             </div>
           </div>
         </motion.div>
 
-
-
-
+        {/* Tab Navigation */}
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white/80 backdrop-blur-md border border-white/50 rounded-xl shadow-lg p-2 overflow-x-auto mb-8"
+        >
+          <div className="flex items-center gap-2 min-w-max">
+            {[
+              { key: 'overview', label: '数据概览和ai诊断', icon: '📊' },
+              { key: 'monthly', label: '月度对比分析', icon: '📈' },
+              { key: 'range', label: '时段对比KPI', icon: '📅' },
+              { key: 'personal', label: '个人爆款视频', icon: '👤' },
+              { key: 'viral', label: '爆款视频', icon: '🔥' },
+              { key: 'rewrite', label: '文案创作', icon: '✍️' }
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key as any)}
+                className={cn(
+                  "relative px-6 py-3 text-sm font-bold rounded-lg transition-all flex items-center gap-2 whitespace-nowrap",
+                  activeTab === tab.key
+                    ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-800"
+                )}
+              >
+                <span>{tab.icon}</span>
+                <span>{tab.label}</span>
+                {activeTab === tab.key && (
+                  <motion.div 
+                    layoutId="activeTab"
+                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+        </motion.div>
 
         {data.length > 0 ? (
           <>
 
         {/* --- SECTION 0: OVERALL TREND --- */}
+        {activeTab === 'overview' && showAnalysis && (
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50 mb-8"
+          exit={{ opacity: 0, y: -20 }}
+          className="bg-white/80 backdrop-blur-md p-4 sm:p-6 rounded-xl shadow-lg border border-white/50"
         >
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -1313,6 +1516,41 @@ export default function App() {
                     整体数据趋势
                 </h3>
                 <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-2 bg-white/50 p-1 rounded-lg border border-gray-200">
+                        <button
+                            onClick={() => handlePlatformSelect('douyin')}
+                            className={cn(
+                                "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                                selectedPlatform === 'douyin'
+                                    ? "bg-blue-600 text-white"
+                                    : "text-gray-600 hover:bg-white/50"
+                            )}
+                        >
+                            抖音
+                        </button>
+                        <button
+                            onClick={() => handlePlatformSelect('kuaishou')}
+                            className={cn(
+                                "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                                selectedPlatform === 'kuaishou'
+                                    ? "bg-blue-600 text-white"
+                                    : "text-gray-600 hover:bg-white/50"
+                            )}
+                        >
+                            快手
+                        </button>
+                        <button
+                            onClick={() => handlePlatformSelect('wechat')}
+                            className={cn(
+                                "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                                selectedPlatform === 'wechat'
+                                    ? "bg-blue-600 text-white"
+                                    : "text-gray-600 hover:bg-white/50"
+                            )}
+                        >
+                            视频号
+                        </button>
+                    </div>
                     <div className="flex items-center gap-2 bg-white/50 p-1 rounded-lg border border-gray-200">
                         <input 
                             type="date" 
@@ -1615,39 +1853,100 @@ export default function App() {
 
             {/* AARRR Model Analysis */}
             <div className="mt-8">
-                <AARRRAnalysis data={currentData} />
+                <Suspense fallback={<div className="flex justify-center items-center h-64">加载中...</div>}>
+                    <AARRRAnalysis data={currentData} />
+                </Suspense>
+            </div>
+
+            {/* 整体数据深度诊断 */}
+            <div className="mt-8 pt-6 border-t border-gray-100">
+                <Suspense fallback={<div className="flex justify-center items-center h-64">加载中...</div>}>
+                    <AIAnalysisCard data={currentData} title="整体数据深度诊断 (Global Intelligent Diagnosis)" mode="aarrr-only" platform={selectedPlatform} />
+                </Suspense>
+            </div>
+
+            {/* AI 诊断分析范围 */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="mt-4 bg-white/80 backdrop-blur-md p-4 rounded-xl shadow-sm border border-white/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+            >
+               <div className="flex items-center gap-2 text-slate-700 font-medium">
+                  <Sparkles className="w-5 h-5 text-purple-600" />
+                  <span>AI 诊断分析范围</span>
+               </div>
+               <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <input 
+                    type="date" 
+                    value={aiDateRange.start} 
+                    onChange={e => setPlatformAiDateRange(prev => ({ ...prev, start: e.target.value }))}
+                    className="border border-gray-200 rounded px-3 py-1.5 text-sm w-full sm:w-auto bg-white/50 focus:ring-2 focus:ring-purple-500 outline-none transition-all"
+                  />
+                  <span className="text-gray-400">-</span>
+                  <input 
+                    type="date" 
+                    value={aiDateRange.end} 
+                    onChange={e => setPlatformAiDateRange(prev => ({ ...prev, end: e.target.value }))}
+                    className="border border-gray-200 rounded px-3 py-1.5 text-sm w-full sm:w-auto bg-white/50 focus:ring-2 focus:ring-purple-500 outline-none transition-all"
+                  />
+               </div>
+            </motion.div>
+
+            {/* AI 智能运营诊断 */}
+            <div className="mt-4">
+                <Suspense fallback={<div className="flex justify-center items-center h-64">加载中...</div>}>
+                    <AIAnalysisCard data={aiData} title="AI 智能运营诊断 (Intelligent Advisor)" mode="general-only" platform={selectedPlatform} />
+                </Suspense>
             </div>
         </motion.div>
+        )}
 
-        {/* --- GLOBAL AI DIAGNOSIS --- */}
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="mb-8"
-        >
-             <AIAnalysisCard data={currentData} title="整体数据深度诊断 (Global Intelligent Diagnosis)" mode="aarrr-only" platform={selectedPlatform} />
-        </motion.div>
+
 
 
 
 
         {/* --- SECTION 2: RANGE ANALYSIS --- */}
+        {activeTab === 'range' && (
         <motion.div 
             initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
             viewport={{ once: true }}
-            className="flex items-center gap-2 mb-4"
+            className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4"
         >
              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                 <span className="text-red-500">📌</span> 时间段对比 KPI
             </h2>
+            <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
+                <button 
+                    onClick={() => handlePlatformSelect('douyin')}
+                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'douyin' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500')}
+                >
+                    抖音
+                </button>
+                <button 
+                    onClick={() => handlePlatformSelect('kuaishou')}
+                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'kuaishou' ? 'bg-pink-500 text-white shadow-sm' : 'text-gray-500')}
+                >
+                    快手
+                </button>
+                <button 
+                    onClick={() => handlePlatformSelect('wechat')}
+                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'wechat' ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500')}
+                >
+                    视频号
+                </button>
+            </div>
         </motion.div>
-
+        )}
         {/* Date Filters */}
+        {activeTab === 'range' && (
         <motion.div 
             initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
             viewport={{ once: true }}
             className="bg-white/80 backdrop-blur-md p-4 rounded-xl shadow-lg border border-white/50 grid grid-cols-1 md:grid-cols-2 gap-6"
         >
@@ -1692,17 +1991,12 @@ export default function App() {
                             />
                         </div>
                     </div>
-                    <button 
-                        onClick={toggleAnalysis}
-                        className="h-[34px] px-6 bg-blue-600 text-white text-sm font-medium rounded shadow hover:bg-blue-700 transition-colors flex items-center gap-2"
-                    >
-                        <Activity className="w-4 h-4" />
-                        开始分析
-                    </button>
                 </div>
         </motion.div>
+        )}
 
         {/* KPI Cards */}
+        {activeTab === 'range' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <KPICard title="总播放量 (Views)" value={currentKPIs.views} compareValue={compareKPIs.views} icon={Play} />
           <KPICard title="总点赞量 (Likes)" value={currentKPIs.likes} compareValue={compareKPIs.likes} icon={Heart} />
@@ -1718,8 +2012,9 @@ export default function App() {
             <KPICard title="总推荐量 (Recommendations)" value={currentKPIs.recommendations} compareValue={compareKPIs.recommendations} icon={ThumbsUp} />
           ) : null}
         </div>
+        )}
 
-        {showAnalysis && (
+        {activeTab === 'range' && (
           <div id="analysis-content" className="space-y-6">
             
             {/* View Mode Toggle */}
@@ -2002,298 +2297,15 @@ export default function App() {
             </motion.div>
         </div>
 
-        {/* Data Table */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ delay: 0.3 }}
-          className="bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-white/50 overflow-hidden"
-        >
-          <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                <span className="text-red-500">🔥</span> 
-                {userNames[selectedPlatform] ? `${userNames[selectedPlatform]} ` : ''}
-                {selectedPlatform === 'douyin' ? '抖音' : selectedPlatform === 'kuaishou' ? '快手' : '视频号'}
-                {topVideosMode === 'range' ? '爆款视频数据明细 (Top 10)' : `月度爆款视频 (Top 10)`}
-            </h3>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
-                <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
-                    <button onClick={() => setTopVideosMode('range')} className={cn("px-3 py-1 rounded-md transition-all", topVideosMode === 'range' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500')}>按分析周期</button>
-                    <button onClick={() => setTopVideosMode('month')} className={cn("px-3 py-1 rounded-md transition-all", topVideosMode === 'month' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500')}>按月份</button>
-                </div>
-                {topVideosMode === 'month' && (
-                    <select  
-                        value={selectedMonthForVideos}
-                        onChange={(e) => setPlatformSelectedMonthForVideos(e.target.value)}
-                        className="bg-white border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                    >
-                         {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                )}
-                
-                {/* 平台搜索框 */}
-                <div className="relative w-full sm:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: selectedPlatform === 'douyin' ? '#ff0000' : selectedPlatform === 'kuaishou' ? '#fe2c55' : '#07C160' }} />
-                    <input
-                        type="text"
-                        placeholder={`${selectedPlatform === 'douyin' ? '抖音' : selectedPlatform === 'kuaishou' ? '快手' : '视频号'}搜索视频...`}
-                        className="w-full pl-10 pr-24 py-2 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl text-sm focus:ring-2 outline-none transition-all"
-                        style={{ boxShadow: selectedPlatform === 'douyin' ? '0 0 0 2px rgba(255, 0, 0, 0.2)' : selectedPlatform === 'kuaishou' ? '0 0 0 2px rgba(254, 44, 85, 0.2)' : '0 0 0 2px rgba(7, 193, 96, 0.2)' }}
-                        onKeyPress={(e) => {
-                            if (e.key === 'Enter') {
-                                const query = (e.target as HTMLInputElement).value;
-                                if (query) {
-                                    let searchUrl = '';
-                                    switch (selectedPlatform) {
-                                        case 'douyin':
-                                            searchUrl = `https://www.douyin.com/search/${encodeURIComponent(query)}`;
-                                            break;
-                                        case 'kuaishou':
-                                            searchUrl = `https://www.kuaishou.com/search/video?keyword=${encodeURIComponent(query)}`;
-                                            break;
-                                        case 'wechat':
-                                            searchUrl = `https://channels.weixin.qq.com/search?query=${encodeURIComponent(query)}`;
-                                            break;
-                                    }
-                                    window.open(searchUrl, '_blank');
-                                }
-                            }
-                        }}
-                    />
-                    <button
-                        className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 rounded-lg text-white text-xs font-bold transition-colors"
-                        style={{ backgroundColor: selectedPlatform === 'douyin' ? '#ff0000' : selectedPlatform === 'kuaishou' ? '#fe2c55' : '#07C160' }}
-                        onClick={(e) => {
-                            const input = (e.currentTarget.previousSibling as HTMLInputElement);
-                            const query = input.value;
-                            if (query) {
-                                let searchUrl = '';
-                                switch (selectedPlatform) {
-                                    case 'douyin':
-                                        searchUrl = `https://www.douyin.com/search/${encodeURIComponent(query)}`;
-                                        break;
-                                    case 'kuaishou':
-                                        searchUrl = `https://www.kuaishou.com/search/video?keyword=${encodeURIComponent(query)}`;
-                                        break;
-                                    case 'wechat':
-                                        searchUrl = `https://channels.weixin.qq.com/search?query=${encodeURIComponent(query)}`;
-                                        break;
-                                }
-                                window.open(searchUrl, '_blank');
-                            }
-                        }}
-                    >
-                        搜索
-                    </button>
-                </div>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left text-gray-500">
-              <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3">排名</th>
-                  <th className="px-6 py-3">日期</th>
-                  <th className="px-6 py-3">标题</th>
-                  <th className="px-6 py-3">播放量</th>
-                  <th className="px-6 py-3">点赞</th>
-                  <th className="px-6 py-3">互动率</th>
-                  <th className="px-6 py-3">评论</th>
-                  {hasFavorites ? <th className="px-6 py-3">收藏</th> : hasRecommendations ? <th className="px-6 py-3">推荐</th> : null}
-                  <th className="px-6 py-3">转发</th>
-                  <th className="px-6 py-3">完播率</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(topVideosMode === 'range' ? top10ExplosiveVideos : monthlyTop10Videos).map((item, index) => (
-                  <tr key={index} className="bg-white border-b hover:bg-gray-50">
-                    <td className="px-6 py-4 font-bold text-gray-900">#{index + 1}</td>
-                    <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{item.date}</td>
-                    <td className="px-6 py-4 max-w-xs truncate" title={item.title}>{item.title}</td>
-                    <td className="px-6 py-4 font-bold text-blue-600">{item.views.toLocaleString()}</td>
-                    <td className="px-6 py-4">{item.likes.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-purple-600 font-medium">{item.interactionRate.toFixed(2)}%</td>
-                    <td className="px-6 py-4">{item.comments}</td>
-                    {hasFavorites ? <td className="px-6 py-4">{item.favorites}</td> : hasRecommendations ? <td className="px-6 py-4">{item.recommendationsCount}</td> : null}
-                    <td className="px-6 py-4">{item.shares}</td>
-                    <td className="px-6 py-4">{item.completionRate}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {(topVideosMode === 'range' ? top10ExplosiveVideos.length === 0 : monthlyTop10Videos.length === 0) && (
-             <div className="p-8 text-center text-gray-400">当前所选日期范围内无数据</div>
-          )}
-        </motion.div>
-
-        {/* Charts Section 1: Monthly Comparison */}
-        <div className="mb-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <span className="text-blue-500">📊</span> 月度对比分析
-                </h2>
-                <div className="flex gap-4">
-                    <select 
-                        value={monthA}
-                        onChange={(e) => setPlatformMonthA(e.target.value)}
-                        className="bg-white/50 border border-gray-200 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    >
-                        {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                    <span className="text-gray-400 self-center">VS</span>
-                    <select 
-                        value={monthB}
-                        onChange={(e) => setPlatformMonthB(e.target.value)}
-                        className="bg-white/50 border border-gray-200 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                    >
-                        {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
-                </div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Monthly Views Comparison */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.1 }}
-            className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
-          >
-            <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <span className="text-blue-500">📊</span> 月度播放量对比
-            </h3>
-            <div className="h-80">
-                <MonthlyViewsChart />
-            </div>
-          </motion.div>
-
-          {/* Monthly Other KPIs Comparison */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.1 }}
-            className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
-          >
-            <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <span className="text-green-500">📊</span> 其他月度指标对比
-            </h3>
-            <div className="h-80">
-                <MonthlyOtherKPIsChart />
-            </div>
-          </motion.div>
-        </div>
-        </div>
-
-        {/* Charts Section 1.5: Additional Monthly Comparison */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Comment Monthly Comparison */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.1 }}
-            className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
-          >
-            <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <span className="text-yellow-500">💬</span> 月度评论量对比
-            </h3>
-            <div className="h-80">
-                <MonthlyCommentChart />
-            </div>
-          </motion.div>
-
-          {/* Rate Monthly Comparison */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.1 }}
-            className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
-          >
-            <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                <span className="text-red-500">📈</span> 月度完播率和互动率对比
-            </h3>
-            <div className="h-80">
-                <MonthlyRateChart />
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Charts Section 2: Monthly Trends Split Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Chart 1: Views & Likes */}
-            <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.2 }}
-                className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
-            >
-                <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-blue-500" />
-                    按月运营趋势 (播放量 & 点赞量)
-                </h3>
-                <div className="h-80">
-                    <MonthlyViewsLikesChart />
-                </div>
-            </motion.div>
-
-            {/* Chart 2: Net Fans */}
-            <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.3 }}
-                className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
-            >
-                <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-green-500" />
-                    按月运营趋势 (净增粉)
-                </h3>
-                <div className="h-80">
-                    <MonthlyNetFansChart />
-                </div>
-            </motion.div>
-        </div>
 
 
 
 
 
-        {/* AI Analysis Card */}
-        <div className="lg:col-span-2 space-y-4">
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="bg-white/80 backdrop-blur-md p-4 rounded-xl shadow-sm border border-white/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-            >
-               <div className="flex items-center gap-2 text-slate-700 font-medium">
-                  <Sparkles className="w-5 h-5 text-purple-600" />
-                  <span>AI 诊断分析范围</span>
-               </div>
-               <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <input 
-                    type="date" 
-                    value={aiDateRange.start} 
-                    onChange={e => setPlatformAiDateRange(prev => ({ ...prev, start: e.target.value }))}
-                    className="border border-gray-200 rounded px-3 py-1.5 text-sm w-full sm:w-auto bg-white/50 focus:ring-2 focus:ring-purple-500 outline-none transition-all"
-                  />
-                  <span className="text-gray-400">-</span>
-                  <input 
-                    type="date" 
-                    value={aiDateRange.end} 
-                    onChange={e => setPlatformAiDateRange(prev => ({ ...prev, end: e.target.value }))}
-                    className="border border-gray-200 rounded px-3 py-1.5 text-sm w-full sm:w-auto bg-white/50 focus:ring-2 focus:ring-purple-500 outline-none transition-all"
-                  />
-               </div>
-            </motion.div>
 
-            <AIAnalysisCard data={aiData} title="AI 智能运营诊断 (Intelligent Advisor)" mode="general-only" platform={selectedPlatform} />
-        </div>
+
+
+
 
 
       </div>
@@ -2326,32 +2338,467 @@ export default function App() {
           </motion.div>
         )}
 
-        {/* Toggle Button for Viral Videos Monitor - Always Visible */}
-        <div className="flex justify-center py-6">
-            <button 
-                onClick={() => setShowViralMonitor(!showViralMonitor)}
-                className="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center justify-center gap-2 hover:bg-blue-50 px-4 py-2 rounded-lg transition-colors"
-            >
-                <span className="relative flex h-3 w-3">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
-                </span>
-                {showViralMonitor 
-                    ? '收起全网律师爆款视频监控' 
-                    : (data.length > 0 ? '查看全网律师爆款视频监控' : '暂无数据？先看看全网律师爆款视频')
-                }
-            </button>
-        </div>
 
-        {/* Daily Viral Videos Monitor */}
-        {showViralMonitor && (
+
+        {/* 月度对比分析 */}
+        {activeTab === 'monthly' && showAnalysis && (
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
                 transition={{ delay: 0.1 }}
-                className="mb-8"
+                className="space-y-6"
             >
-              <ViralVideosSection />
+                {/* Charts Section 1: Monthly Comparison */}
+                <div className="mb-6">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+                        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                            <span className="text-blue-500">📊</span> 月度对比分析
+                        </h2>
+                        <div className="flex flex-wrap gap-4">
+                            <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
+                                <button 
+                                    onClick={() => handlePlatformSelect('douyin')}
+                                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'douyin' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500')}
+                                >
+                                    抖音
+                                </button>
+                                <button 
+                                    onClick={() => handlePlatformSelect('kuaishou')}
+                                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'kuaishou' ? 'bg-pink-500 text-white shadow-sm' : 'text-gray-500')}
+                                >
+                                    快手
+                                </button>
+                                <button 
+                                    onClick={() => handlePlatformSelect('wechat')}
+                                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'wechat' ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500')}
+                                >
+                                    视频号
+                                </button>
+                            </div>
+                            <div className="flex gap-4">
+                                <select 
+                                    value={monthA}
+                                    onChange={(e) => setPlatformMonthA(e.target.value)}
+                                    className="bg-white/50 border border-gray-200 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                >
+                                    {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
+                                </select>
+                                <span className="text-gray-400 self-center">VS</span>
+                                <select 
+                                    value={monthB}
+                                    onChange={(e) => setPlatformMonthB(e.target.value)}
+                                    className="bg-white/50 border border-gray-200 rounded px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                >
+                                    {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Monthly Views Comparison */}
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.1 }}
+                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                >
+                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span className="text-blue-500">📊</span> 月度播放量对比
+                    </h3>
+                    <div className="h-80">
+                        <MonthlyViewsChart />
+                    </div>
+                </motion.div>
+
+                {/* Monthly Other KPIs Comparison */}
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.1 }}
+                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                >
+                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span className="text-green-500">📊</span> 其他月度指标对比
+                    </h3>
+                    <div className="h-80">
+                        <MonthlyOtherKPIsChart />
+                    </div>
+                </motion.div>
+            </div>
+            </div>
+
+            {/* Charts Section 1.5: Additional Monthly Comparison */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Comment Monthly Comparison */}
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.1 }}
+                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                >
+                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span className="text-yellow-500">💬</span> 月度评论量对比
+                    </h3>
+                    <div className="h-80">
+                        <MonthlyCommentChart />
+                    </div>
+                </motion.div>
+
+                {/* Rate Monthly Comparison */}
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.1 }}
+                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                >
+                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span className="text-red-500">📈</span> 月度完播率和互动率对比
+                    </h3>
+                    <div className="h-80">
+                        <MonthlyRateChart />
+                    </div>
+                </motion.div>
+            </div>
+
+            {/* Charts Section 2: Monthly Trends Split Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                {/* Chart 1: Views & Likes */}
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.2 }}
+                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                >
+                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <Calendar className="w-5 h-5 text-blue-500" />
+                        按月运营趋势 (播放量 & 点赞量)
+                    </h3>
+                    <div className="h-80">
+                        <MonthlyViewsLikesChart />
+                    </div>
+                </motion.div>
+
+                {/* Chart 2: Net Fans */}
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.3 }}
+                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                >
+                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-green-500" />
+                        按月运营趋势 (净增粉)
+                    </h3>
+                    <div className="h-80">
+                        <MonthlyNetFansChart />
+                    </div>
+                </motion.div>
+            </div>
+        </motion.div>
+        )}
+
+        {/* 个人爆款视频 */}
+        {activeTab === 'personal' && showAnalysis && (
+            <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ delay: 0.1 }}
+                className="space-y-6"
+            >
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.3 }}
+                    className="bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-white/50 overflow-hidden"
+                >
+                    <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <span className="text-red-500">🔥</span> 
+                            {userNames[selectedPlatform] ? `${userNames[selectedPlatform]} ` : ''}
+                            {selectedPlatform === 'douyin' ? '抖音' : selectedPlatform === 'kuaishou' ? '快手' : '视频号'}
+                            {topVideosMode === 'range' ? '爆款视频数据明细 (Top 10)' : `月度爆款视频 (Top 10)`}
+                        </h3>
+                        <div className="flex flex-wrap gap-4 w-full sm:w-auto">
+                            <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
+                                <button 
+                                    onClick={() => handlePlatformSelect('douyin')}
+                                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'douyin' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500')}
+                                >
+                                    抖音
+                                </button>
+                                <button 
+                                    onClick={() => handlePlatformSelect('kuaishou')}
+                                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'kuaishou' ? 'bg-pink-500 text-white shadow-sm' : 'text-gray-500')}
+                                >
+                                    快手
+                                </button>
+                                <button 
+                                    onClick={() => handlePlatformSelect('wechat')}
+                                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'wechat' ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500')}
+                                >
+                                    视频号
+                                </button>
+                            </div>
+                            <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
+                                <button onClick={() => setTopVideosMode('range')} className={cn("px-3 py-1 rounded-md transition-all", topVideosMode === 'range' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500')}>按分析周期</button>
+                                <button onClick={() => setTopVideosMode('month')} className={cn("px-3 py-1 rounded-md transition-all", topVideosMode === 'month' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500')}>按月份</button>
+                            </div>
+                            {topVideosMode === 'month' && (
+                                <select  
+                                    value={selectedMonthForVideos}
+                                    onChange={(e) => setPlatformSelectedMonthForVideos(e.target.value)}
+                                    className="bg-white border border-gray-200 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                >
+                                    {uniqueMonths.map(m => <option key={m} value={m}>{m}</option>)}
+                                </select>
+                            )}
+                            
+                            {/* 平台搜索框 */}
+                            <div className="relative w-full sm:w-64">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: selectedPlatform === 'douyin' ? '#ff0000' : selectedPlatform === 'kuaishou' ? '#fe2c55' : '#07C160' }} />
+                                <input
+                                    type="text"
+                                    placeholder={`${selectedPlatform === 'douyin' ? '抖音' : selectedPlatform === 'kuaishou' ? '快手' : '视频号'}搜索视频...`}
+                                    className="w-full pl-10 pr-24 py-2 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl text-sm focus:ring-2 outline-none transition-all"
+                                    style={{ boxShadow: selectedPlatform === 'douyin' ? '0 0 0 2px rgba(255, 0, 0, 0.2)' : selectedPlatform === 'kuaishou' ? '0 0 0 2px rgba(254, 44, 85, 0.2)' : '0 0 0 2px rgba(7, 193, 96, 0.2)' }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            const query = (e.target as HTMLInputElement).value;
+                                            if (query) {
+                                                let searchUrl = '';
+                                                switch (selectedPlatform) {
+                                                    case 'douyin':
+                                                        searchUrl = `https://www.douyin.com/search/${encodeURIComponent(query)}`;
+                                                        break;
+                                                    case 'kuaishou':
+                                                        searchUrl = `https://www.kuaishou.com/search/video?keyword=${encodeURIComponent(query)}`;
+                                                        break;
+                                                    case 'wechat':
+                                                        searchUrl = `https://channels.weixin.qq.com/search?query=${encodeURIComponent(query)}`;
+                                                        break;
+                                                }
+                                                window.open(searchUrl, '_blank');
+                                            }
+                                        }
+                                    }}
+                                />
+                                <button
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 rounded-lg text-white text-xs font-bold transition-colors"
+                                    style={{ backgroundColor: selectedPlatform === 'douyin' ? '#ff0000' : selectedPlatform === 'kuaishou' ? '#fe2c55' : '#07C160' }}
+                                    onClick={(e) => {
+                                        const input = (e.currentTarget.previousSibling as HTMLInputElement);
+                                        const query = input.value;
+                                        if (query) {
+                                            let searchUrl = '';
+                                            switch (selectedPlatform) {
+                                                case 'douyin':
+                                                    searchUrl = `https://www.douyin.com/search/${encodeURIComponent(query)}`;
+                                                    break;
+                                                case 'kuaishou':
+                                                    searchUrl = `https://www.kuaishou.com/search/video?keyword=${encodeURIComponent(query)}`;
+                                                    break;
+                                                case 'wechat':
+                                                    searchUrl = `https://channels.weixin.qq.com/search?query=${encodeURIComponent(query)}`;
+                                                    break;
+                                            }
+                                            window.open(searchUrl, '_blank');
+                                        }
+                                    }}
+                                >
+                                    搜索
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left text-gray-500">
+                            <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                                <tr>
+                                    <th className="px-6 py-3">排名</th>
+                                    <th className="px-6 py-3">日期</th>
+                                    <th className="px-6 py-3">标题</th>
+                                    <th className="px-6 py-3">播放量</th>
+                                    <th className="px-6 py-3">点赞</th>
+                                    <th className="px-6 py-3">互动率</th>
+                                    <th className="px-6 py-3">评论</th>
+                                    {hasFavorites ? <th className="px-6 py-3">收藏</th> : hasRecommendations ? <th className="px-6 py-3">推荐</th> : null}
+                                    <th className="px-6 py-3">转发</th>
+                                    <th className="px-6 py-3">完播率</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(topVideosMode === 'range' ? top10ExplosiveVideos : monthlyTop10Videos).map((item, index) => (
+                                    <tr key={index} className="bg-white border-b hover:bg-gray-50">
+                                        <td className="px-6 py-4 font-bold text-gray-900">#{index + 1}</td>
+                                        <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{item.date}</td>
+                                        <td className="px-6 py-4 max-w-xs truncate" title={item.title}>{item.title}</td>
+                                        <td className="px-6 py-4 font-bold text-blue-600">{item.views.toLocaleString()}</td>
+                                        <td className="px-6 py-4">{item.likes.toLocaleString()}</td>
+                                        <td className="px-6 py-4 text-purple-600 font-medium">{item.interactionRate.toFixed(2)}%</td>
+                                        <td className="px-6 py-4">{item.comments}</td>
+                                        {hasFavorites ? <td className="px-6 py-4">{item.favorites}</td> : hasRecommendations ? <td className="px-6 py-4">{item.recommendationsCount}</td> : null}
+                                        <td className="px-6 py-4">{item.shares}</td>
+                                        <td className="px-6 py-4">{item.completionRate}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    {(topVideosMode === 'range' ? top10ExplosiveVideos.length === 0 : monthlyTop10Videos.length === 0) && (
+                        <div className="p-8 text-center text-gray-400">当前所选日期范围内无数据</div>
+                    )}
+                </motion.div>
+            </motion.div>
+        )}
+
+        {/* Daily Viral Videos Monitor */}
+        {activeTab === 'viral' && showAnalysis && (
+            <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ delay: 0.1 }}
+                className=""
+            >
+              <Suspense fallback={<div className="flex justify-center items-center h-64">加载中...</div>}>
+                <ViralVideosSection />
+              </Suspense>
+            </motion.div>
+        )}
+
+        {/* 文案创作 */}
+        {activeTab === 'rewrite' && showAnalysis && (
+            <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ delay: 0.1 }}
+                className="space-y-6"
+            >
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden"
+                >
+                    {/* Section Header */}
+                    <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-2 h-8 bg-green-500 rounded-full" />
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-800">文案创作</h3>
+                                <p className="text-xs text-gray-400 mt-1">创建专业的法律内容文案</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section Content */}
+                    <div className="p-6">
+                        <div className="bg-green-50/50 p-6 rounded-xl border border-green-100 min-h-[400px]">
+                            <div className="flex items-center justify-between mb-4">
+                                <h6 className="text-green-800 font-bold flex items-center gap-2">
+                                    <Sparkles className="w-4 h-4" /> 法律文案创作
+                                </h6>
+                            </div>
+
+                            <div className="space-y-4">
+                                {/* 平台选择 */}
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs text-green-600 bg-green-100/50 p-2 rounded flex-1">
+                                        提示：选择平台，AI 将根据平台特性生成适合的文案。
+                                    </p>
+                                    <div className="flex gap-2 ml-4">
+                                        <button
+                                            onClick={() => handlePlatformSelect('douyin')}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                                selectedPlatform === 'douyin'
+                                                    ? "bg-blue-600 text-white"
+                                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                            )}
+                                        >
+                                            抖音
+                                        </button>
+                                        <button
+                                            onClick={() => handlePlatformSelect('kuaishou')}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                                selectedPlatform === 'kuaishou'
+                                                    ? "bg-blue-600 text-white"
+                                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                            )}
+                                        >
+                                            快手
+                                        </button>
+                                        <button
+                                            onClick={() => handlePlatformSelect('wechat')}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                                selectedPlatform === 'wechat'
+                                                    ? "bg-blue-600 text-white"
+                                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                            )}
+                                        >
+                                            视频号
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* 风格选择 */}
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs text-green-600 bg-green-100/50 p-2 rounded flex-1">
+                                        提示：选择创作风格，AI 将生成专业的法律文案。
+                                    </p>
+                                    <div className="flex gap-2 ml-4">
+                                        {
+                                            [
+                                                { key: 'professional', name: '专业法律' },
+                                                { key: 'conversational', name: '口语化' },
+                                                { key: 'storytelling', name: '故事化' },
+                                                { key: 'authoritative', name: '权威专家' }
+                                            ].map((style) => (
+                                                <button
+                                                    key={style.key}
+                                                    className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                            >
+                                                {style.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* 文案输入区域 */}
+                                <div className="w-full h-64 overflow-y-auto rounded-xl border border-green-200 bg-white shadow-inner p-4">
+                                    <textarea
+                                        placeholder="请输入文案主题或关键词，AI 将生成专业的法律文案"
+                                        className="w-full h-full border-none outline-none resize-none text-sm text-gray-800"
+                                    />
+                                </div>
+
+                                <div className="py-10 flex flex-col items-center justify-center text-gray-400">
+                                    <Sparkles className="w-12 h-12 text-green-200 mb-4" />
+                                    <p className="text-lg font-medium text-gray-600">准备就绪</p>
+                                    <p className="text-sm mt-2 mb-6">请输入文案主题或关键词，然后点击'开始文案创作'</p>
+                                    <div className="flex justify-center">
+                                        <button
+                                            className="px-8 py-3 rounded-xl font-bold shadow-lg transition-all bg-green-600 text-white hover:bg-green-700 hover:scale-105"
+                                        >
+                                            开始文案创作
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
             </motion.div>
         )}
       </div>

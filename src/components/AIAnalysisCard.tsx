@@ -13,7 +13,7 @@ interface AIAnalysisCardProps {
   platform?: string;
 }
 
-export const AIAnalysisCard = ({ data, title, mode = 'all', platform = 'default' }: AIAnalysisCardProps) => {
+const AIAnalysisCard = ({ data, title, mode = 'all', platform = 'default' }: AIAnalysisCardProps) => {
   const [showConfig, setShowConfig] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<string | null>(() => {
@@ -555,3 +555,5 @@ export const AIAnalysisCard = ({ data, title, mode = 'all', platform = 'default'
     </motion.div>
   );
 };
+
+export default AIAnalysisCard;

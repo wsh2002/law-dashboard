@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, User, ChevronRight, ShieldCheck, Users } from 'lucide-react';
-import { AnimatedBackground } from './AnimatedBackground';
+import AnimatedBackground from './AnimatedBackground';
 
 interface LoginProps {
     onLogin: () => void;
 }
 
-export const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC<LoginProps> = ({ onLogin }) => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -115,3 +115,5 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </div>
     );
 };
+
+export default Login;

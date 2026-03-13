@@ -10,7 +10,7 @@ interface AARRRAnalysisProps {
 
 type TimeFilter = 'all' | 'quarterly' | 'monthly';
 
-export const AARRRAnalysis = ({ data }: AARRRAnalysisProps) => {
+const AARRRAnalysis = ({ data }: AARRRAnalysisProps) => {
   const [filterMode, setFilterMode] = useState<TimeFilter>('all');
   const [selectedQuarter, setSelectedQuarter] = useState<string>('');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
@@ -293,3 +293,5 @@ export const AARRRAnalysis = ({ data }: AARRRAnalysisProps) => {
     </div>
   );
 };
+
+export default AARRRAnalysis;
