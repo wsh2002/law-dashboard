@@ -300,15 +300,6 @@ export default function App() {
   // 文案历史和反馈状态
   const [copywritingHistory, setCopywritingHistory] = useState<CopywritingHistory[]>(savedState?.copywritingHistory || []);
   const [currentCopywritingId, setCurrentCopywritingId] = useState<string | null>(null);
-  // 文案版本库状态
-  const [copywritingVersionLibrary, setCopywritingVersionLibrary] = useState<CopywritingHistory[]>(savedState?.copywritingVersionLibrary || []);
-  // 版本库平台筛选状态
-  const [selectedVersionPlatform, setSelectedVersionPlatform] = useState<'all' | 'douyin' | 'kuaishou' | 'wechat'>('all');
-  // 版本库日期筛选状态
-  const [versionDateRange, setVersionDateRange] = useState<{ start: string; end: string }>({
-    start: format(subMonths(new Date(), 3), 'yyyy-MM-dd'),
-    end: format(new Date(), 'yyyy-MM-dd')
-  });
   // 爆款文案库状态
   const [viralCopywritingLibrary, setViralCopywritingLibrary] = useState<CopywritingHistory[]>([]);
   // 上传文案库状态
@@ -392,10 +383,9 @@ export default function App() {
       platformTimeRanges,
       tabPlatforms,
       copywritingHistory,
-      uploadedCopywritingLibrary,
-      copywritingVersionLibrary
+      uploadedCopywritingLibrary
     });
-  }, [dataDateRange, showAnalysis, platformTimeRanges, tabPlatforms, copywritingHistory, uploadedCopywritingLibrary, copywritingVersionLibrary]);
+  }, [dataDateRange, showAnalysis, platformTimeRanges, tabPlatforms, copywritingHistory, uploadedCopywritingLibrary]);
 
   // 当切换标签页时，更新 selectedPlatform 为该标签页的平台选择
   useEffect(() => {
@@ -409,10 +399,10 @@ export default function App() {
       [activeTab]: platform
     }));
     
-    // 如果已经有文案输入，自动重新生成对应平台的文案
-    if (copywritingInput.trim()) {
-      await handleStartCopywriting();
-    }
+    // 直接更新selectedPlatform，确保立即生效
+    setSelectedPlatform(platform);
+    
+    // 移除自动生成文案的逻辑，让用户点击开始文案创作按钮才生成
   };
 
   // 用户反馈处理函数
@@ -422,24 +412,10 @@ export default function App() {
         item.id === id ? { ...item, rating } : item
       )
     );
-    
-    // 同时更新版本库中的评分
-    setCopywritingVersionLibrary(prev => 
-      prev.map(item => 
-        item.id === id ? { ...item, rating } : item
-      )
-    );
   };
 
   const handleFeedback = (id: string, feedback: string) => {
     setCopywritingHistory(prev => 
-      prev.map(item => 
-        item.id === id ? { ...item, feedback } : item
-      )
-    );
-    
-    // 同时更新版本库中的反馈
-    setCopywritingVersionLibrary(prev => 
       prev.map(item => 
         item.id === id ? { ...item, feedback } : item
       )
@@ -464,13 +440,6 @@ export default function App() {
 
   const handlePerformance = (id: string, performance: CopywritingHistory['performance']) => {
     setCopywritingHistory(prev => 
-      prev.map(item => 
-        item.id === id ? { ...item, performance } : item
-      )
-    );
-    
-    // 同时更新版本库中的效果数据
-    setCopywritingVersionLibrary(prev => 
       prev.map(item => 
         item.id === id ? { ...item, performance } : item
       )
@@ -677,13 +646,27 @@ ${highRatingCopies.length > 0 ? `
         isAdopted: false
       }));
       
+      // 去重：过滤掉与现有历史记录中内容相同的版本
+      const uniqueVersionHistories = versionHistories.filter(newVersion => {
+        return !copywritingHistory.some(existingVersion => 
+          existingVersion.output === newVersion.output && 
+          existingVersion.platform === newVersion.platform
+        );
+      });
+      
       // 保存所有版本到历史记录
-      setCopywritingHistory(prev => [...versionHistories, ...prev]);
-      // 保存所有版本到版本库
-      setCopywritingVersionLibrary(prev => [...versionHistories, ...prev]);
+      // 只保留每个输入和平台的最新5个版本
+      setCopywritingHistory(prev => {
+        // 过滤掉与当前输入和平台相同的旧版本
+        const filteredHistory = prev.filter(item => 
+          !(item.input === copywritingInput && item.platform === selectedPlatform)
+        );
+        // 添加新生成的版本，并限制每个输入和平台最多5个版本
+        return [...uniqueVersionHistories, ...filteredHistory];
+      });
       // 设置当前文案ID为第一个版本
-      if (versionHistories.length > 0) {
-        setCurrentCopywritingId(versionHistories[0].id);
+      if (uniqueVersionHistories.length > 0) {
+        setCurrentCopywritingId(uniqueVersionHistories[0].id);
       }
     } catch (error) {
       console.error('生成文案失败:', error);
@@ -708,7 +691,7 @@ ${highRatingCopies.length > 0 ? `
       }));
     
     if (parsedVersions1.length > 0) {
-      return parsedVersions1;
+      return parsedVersions1.slice(0, 5); // 限制最多5个版本
     }
     
     // 格式2: 版本1: 内容
@@ -722,7 +705,7 @@ ${highRatingCopies.length > 0 ? `
       }));
     
     if (parsedVersions2.length > 0) {
-      return parsedVersions2;
+      return parsedVersions2.slice(0, 5); // 限制最多5个版本
     }
     
     // 格式3: # 版本1 内容
@@ -736,7 +719,7 @@ ${highRatingCopies.length > 0 ? `
       }));
     
     if (parsedVersions3.length > 0) {
-      return parsedVersions3;
+      return parsedVersions3.slice(0, 5); // 限制最多5个版本
     }
     
     // 如果没有解析到版本，使用原始文案作为一个版本
@@ -793,6 +776,7 @@ ${highRatingCopies.length > 0 ? `
   // 从文案库选择文案
   const handleSelectFromLibrary = (copywriting: CopywritingHistory) => {
     setCopywritingInput(copywriting.input);
+    setSelectedPlatform(copywriting.platform as 'douyin' | 'kuaishou' | 'wechat');
     setShowCopywritingLibrary(false);
     alert('已选择文案，可进行二创');
   };
@@ -2804,7 +2788,7 @@ ${highRatingCopies.length > 0 ? `
 
 
         {/* 月度对比分析 */}
-        {activeTab === 'monthly' && showAnalysis && (
+        {activeTab === 'monthly' && showAnalysis && platformData[selectedPlatform]?.length > 0 && (
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -2860,99 +2844,110 @@ ${highRatingCopies.length > 0 ? `
                     </div>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Monthly Views Comparison */}
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.1 }}
-                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
-                >
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <span className="text-blue-500">📊</span> 月度播放量对比
-                    </h3>
-                    <div className="h-80">
-                        <MonthlyViewsChart />
-                    </div>
-                </motion.div>
+                {platformData[selectedPlatform]?.length > 0 && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.1 }}
+                        className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                    >
+                        <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                            <span className="text-blue-500">📊</span> 月度播放量对比
+                        </h3>
+                        <div className="h-80">
+                            <MonthlyViewsChart />
+                        </div>
+                    </motion.div>
+                )}
 
                 {/* Monthly Other KPIs Comparison */}
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.1 }}
-                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
-                >
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <span className="text-green-500">📊</span> 其他月度指标对比
-                    </h3>
-                    <div className="h-80">
-                        <MonthlyOtherKPIsChart />
-                    </div>
-                </motion.div>
+                {platformData[selectedPlatform]?.length > 0 && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.1 }}
+                        className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                    >
+                        <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                            <span className="text-green-500">📊</span> 其他月度指标对比
+                        </h3>
+                        <div className="h-80">
+                            <MonthlyOtherKPIsChart />
+                        </div>
+                    </motion.div>
+                )}
             </div>
             </div>
 
             {/* Charts Section 1.5: Additional Monthly Comparison */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Comment Monthly Comparison */}
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.1 }}
-                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
-                >
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <span className="text-yellow-500">💬</span> 月度评论量对比
-                    </h3>
-                    <div className="h-80">
-                        <MonthlyCommentChart />
-                    </div>
-                </motion.div>
+                {platformData[selectedPlatform]?.length > 0 && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.1 }}
+                        className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                    >
+                        <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                            <span className="text-yellow-500">💬</span> 月度评论量对比
+                        </h3>
+                        <div className="h-80">
+                            <MonthlyCommentChart />
+                        </div>
+                    </motion.div>
+                )}
 
                 {/* Rate Monthly Comparison */}
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.1 }}
-                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
-                >
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <span className="text-red-500">📈</span> 月度完播率和互动率对比
-                    </h3>
-                    <div className="h-80">
-                        <MonthlyRateChart />
-                    </div>
-                </motion.div>
+                {platformData[selectedPlatform]?.length > 0 && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.1 }}
+                        className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                    >
+                        <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                            <span className="text-red-500">📈</span> 月度完播率和互动率对比
+                        </h3>
+                        <div className="h-80">
+                            <MonthlyRateChart />
+                        </div>
+                    </motion.div>
+                )}
             </div>
 
             {/* Charts Section 2: Monthly Trends Split Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                 {/* Chart 1: Views & Likes */}
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.2 }}
-                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
-                >
-                    <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <Calendar className="w-5 h-5 text-blue-500" />
-                        按月运营趋势 (播放量 & 点赞量)
-                    </h3>
-                    <div className="h-80">
-                        <MonthlyViewsLikesChart />
-                    </div>
-                </motion.div>
+                {platformData[selectedPlatform]?.length > 0 && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.2 }}
+                        className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                    >
+                        <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                            <Calendar className="w-5 h-5 text-blue-500" />
+                            按月运营趋势 (播放量 & 点赞量)
+                        </h3>
+                        <div className="h-80">
+                            <MonthlyViewsLikesChart />
+                        </div>
+                    </motion.div>
+                )}
 
                 {/* Chart 2: Net Fans */}
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.3 }}
+                {platformData[selectedPlatform]?.length > 0 && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.3 }}
                     className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
                 >
                     <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
@@ -2963,12 +2958,13 @@ ${highRatingCopies.length > 0 ? `
                         <MonthlyNetFansChart />
                     </div>
                 </motion.div>
+                )}
             </div>
         </motion.div>
         )}
 
         {/* 个人爆款视频 */}
-        {activeTab === 'personal' && showAnalysis && (
+        {activeTab === 'personal' && showAnalysis && platformData[selectedPlatform]?.length > 0 && (
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -3124,7 +3120,7 @@ ${highRatingCopies.length > 0 ? `
         )}
 
         {/* Daily Viral Videos Monitor */}
-        {activeTab === 'viral' && showAnalysis && (
+        {activeTab === 'viral' && showAnalysis && platformData[selectedPlatform]?.length > 0 && (
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -3139,7 +3135,7 @@ ${highRatingCopies.length > 0 ? `
         )}
 
         {/* 文案创作 */}
-        {activeTab === 'rewrite' && showAnalysis && (
+        {activeTab === 'rewrite' && showAnalysis && platformData[selectedPlatform]?.length > 0 && (
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -3482,12 +3478,42 @@ ${highRatingCopies.length > 0 ? `
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {viralCopywritingLibrary.map((item) => (
-                                        <div key={item.id} className="p-4 bg-white rounded-xl border border-purple-200 shadow-inner">
+                                        <div 
+                                            key={item.id} 
+                                            className="p-4 bg-white rounded-xl border border-purple-200 shadow-inner hover:shadow-lg transition-all"
+                                        >
                                             <div className="flex justify-between items-start mb-2">
                                                 <span className="text-xs font-bold text-purple-600">{item.platform === 'douyin' ? '抖音' : item.platform === 'kuaishou' ? '快手' : '视频号'}</span>
-                                                <span className="text-xs text-gray-500">{new Date(item.createdAt).toLocaleDateString()}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-gray-500">{new Date(item.createdAt).toLocaleDateString()}</span>
+                                                    <button
+                                                        className="text-xs text-red-600 hover:text-red-800"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            // 删除文案
+                                                            setCopywritingHistory(prev => prev.filter(historyItem => historyItem.id !== item.id));
+                                                        }}
+                                                    >
+                                                        删除
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <h5 className="text-sm font-bold text-gray-800 mb-2">{item.input}</h5>
+                                            <h5 
+                                                className="text-sm font-bold text-gray-800 mb-2 cursor-pointer"
+                                                onClick={() => {
+                                                    // 找到对应的版本并显示
+                                                    const versions = copywritingHistory.filter(v => v.input === item.input && v.platform === item.platform);
+                                                    if (versions.length > 0) {
+                                                        setCopywritingVersions(versions.map((v, index) => ({
+                                                            id: index + 1,
+                                                            content: v.output
+                                                        })));
+                                                        setCurrentVersionIndex(0);
+                                                        setCopywritingInput(item.input);
+                                                        setSelectedPlatform(item.platform as 'douyin' | 'kuaishou' | 'wechat');
+                                                    }
+                                                }}
+                                            >{item.input}</h5>
                                             <p className="text-xs text-gray-600 mb-2 line-clamp-2">{item.output}</p>
                                             <div className="flex justify-between items-center">
                                                 <div className="flex gap-1">
@@ -3540,7 +3566,18 @@ ${highRatingCopies.length > 0 ? `
                                             <div key={item.id} className="p-4 bg-white rounded-xl border border-blue-200 shadow-inner">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <span className="text-xs font-bold text-blue-600">{item.platform === 'douyin' ? '抖音' : item.platform === 'kuaishou' ? '快手' : '视频号'}</span>
-                                                    <span className="text-xs text-gray-500">{new Date(item.createdAt).toISOString().split('T')[0]}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs text-gray-500">{new Date(item.createdAt).toISOString().split('T')[0]}</span>
+                                                        <button
+                                                            className="text-xs text-red-600 hover:text-red-800"
+                                                            onClick={() => {
+                                                                // 删除上传的文案
+                                                                setUploadedCopywritingLibrary(prev => prev.filter(uploadedItem => uploadedItem.id !== item.id));
+                                                            }}
+                                                        >
+                                                            删除
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 <p className="text-sm text-gray-800 mb-4 line-clamp-3">{item.input}</p>
                                                 <button
@@ -3563,121 +3600,6 @@ ${highRatingCopies.length > 0 ? `
                     </div>
                 )}
                 
-                {/* 文案版本库 */}
-                {copywritingVersionLibrary.length > 0 && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden"
-                    >
-                        <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-2 h-8 bg-indigo-500 rounded-full" />
-                                <div>
-                                    <h3 className="text-lg font-bold text-gray-800">文案版本库</h3>
-                                    <p className="text-xs text-gray-400 mt-1">所有生成的文案版本</p>
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap gap-4 items-center">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-sm text-gray-600">选择平台：</span>
-                                    <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
-                                        <button 
-                                            onClick={() => setSelectedVersionPlatform('all')}
-                                            className={cn("px-3 py-1 rounded-md transition-all", selectedVersionPlatform === 'all' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500')}
-                                        >
-                                            全部
-                                        </button>
-                                        <button 
-                                            onClick={() => setSelectedVersionPlatform('douyin')}
-                                            className={cn("px-3 py-1 rounded-md transition-all", selectedVersionPlatform === 'douyin' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500')}
-                                        >
-                                            抖音
-                                        </button>
-                                        <button 
-                                            onClick={() => setSelectedVersionPlatform('kuaishou')}
-                                            className={cn("px-3 py-1 rounded-md transition-all", selectedVersionPlatform === 'kuaishou' ? 'bg-pink-500 text-white shadow-sm' : 'text-gray-500')}
-                                        >
-                                            快手
-                                        </button>
-                                        <button 
-                                            onClick={() => setSelectedVersionPlatform('wechat')}
-                                            className={cn("px-3 py-1 rounded-md transition-all", selectedVersionPlatform === 'wechat' ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500')}
-                                        >
-                                            视频号
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-sm text-gray-600">日期范围：</span>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="date"
-                                            value={versionDateRange.start}
-                                            onChange={(e) => setVersionDateRange(prev => ({ ...prev, start: e.target.value }))}
-                                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                        />
-                                        <span className="text-gray-500">至</span>
-                                        <input
-                                            type="date"
-                                            value={versionDateRange.end}
-                                            onChange={(e) => setVersionDateRange(prev => ({ ...prev, end: e.target.value }))}
-                                            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-6">
-                            <div className="grid grid-cols-1 gap-4">
-                                {Array.from(new Set(copywritingVersionLibrary.map(item => item.input))).map(input => {
-                                    const firstVersion = copywritingVersionLibrary.find(item => item.input === input);
-                                    if (!firstVersion) return null;
-                                    
-                                    // 平台筛选
-                                    if (selectedVersionPlatform !== 'all' && firstVersion.platform !== selectedVersionPlatform) {
-                                        return null;
-                                    }
-                                    
-                                    // 日期筛选
-                                    const itemDate = new Date(firstVersion.createdAt);
-                                    const startDate = new Date(versionDateRange.start);
-                                    const endDate = new Date(versionDateRange.end);
-                                    if (itemDate < startDate || itemDate > endDate) {
-                                        return null;
-                                    }
-                                    
-                                    return (
-                                        <div key={input} className="p-4 bg-white rounded-xl border border-indigo-200 shadow-inner">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <span className="text-xs font-bold text-indigo-600">{firstVersion.platform === 'douyin' ? '抖音' : firstVersion.platform === 'kuaishou' ? '快手' : '视频号'}</span>
-                                                <span className="text-xs text-gray-500">{new Date(firstVersion.createdAt).toISOString().split('T')[0]}</span>
-                                            </div>
-                                            <h5 className="text-sm font-bold text-gray-800 mb-2">{firstVersion.input}</h5>
-                                            <p className="text-xs text-gray-600 mb-3 line-clamp-2">{firstVersion.output}</p>
-                                            <button
-                                                className="px-4 py-2 rounded-lg text-xs font-bold transition-all bg-indigo-600 text-white hover:bg-indigo-700"
-                                                onClick={() => {
-                                                    // 找到对应的版本并显示
-                                                    const versions = copywritingVersionLibrary.filter(v => v.input === input && v.platform === firstVersion.platform);
-                                                    setCopywritingVersions(versions.map((v, index) => ({
-                                                        id: index + 1,
-                                                        content: v.output
-                                                    })));
-                                                    setCurrentVersionIndex(0);
-                                                    setCopywritingInput(input);
-                                                    setSelectedPlatform(firstVersion.platform as 'douyin' | 'kuaishou' | 'wechat');
-                                                }}
-                                            >
-                                                查看版本
-                                            </button>
-                                        </div>
-                                    );
-                                }).filter(Boolean)}
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
             </motion.div>
         )}
       </div>
