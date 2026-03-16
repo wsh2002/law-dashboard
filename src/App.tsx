@@ -3120,19 +3120,17 @@ ${highRatingCopies.length > 0 ? `
         )}
 
         {/* Daily Viral Videos Monitor */}
-        {activeTab === 'viral' && showAnalysis && platformData[selectedPlatform]?.length > 0 && (
-            <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ delay: 0.1 }}
-                className=""
-            >
-              <Suspense fallback={<div className="flex justify-center items-center h-64">加载中...</div>}>
-                <ViralVideosSection />
-              </Suspense>
-            </motion.div>
-        )}
+        <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: activeTab === 'viral' && showAnalysis && platformData[selectedPlatform]?.length > 0 ? 1 : 0, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ delay: 0.1 }}
+            className=""
+        >
+          <Suspense fallback={<div className="flex justify-center items-center h-64">加载中...</div>}>
+            <ViralVideosSection />
+          </Suspense>
+        </motion.div>
 
         {/* 文案创作 */}
         {activeTab === 'rewrite' && showAnalysis && platformData[selectedPlatform]?.length > 0 && (
