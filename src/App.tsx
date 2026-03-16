@@ -422,10 +422,24 @@ export default function App() {
         item.id === id ? { ...item, rating } : item
       )
     );
+    
+    // 同时更新版本库中的评分
+    setCopywritingVersionLibrary(prev => 
+      prev.map(item => 
+        item.id === id ? { ...item, rating } : item
+      )
+    );
   };
 
   const handleFeedback = (id: string, feedback: string) => {
     setCopywritingHistory(prev => 
+      prev.map(item => 
+        item.id === id ? { ...item, feedback } : item
+      )
+    );
+    
+    // 同时更新版本库中的反馈
+    setCopywritingVersionLibrary(prev => 
       prev.map(item => 
         item.id === id ? { ...item, feedback } : item
       )
@@ -450,6 +464,13 @@ export default function App() {
 
   const handlePerformance = (id: string, performance: CopywritingHistory['performance']) => {
     setCopywritingHistory(prev => 
+      prev.map(item => 
+        item.id === id ? { ...item, performance } : item
+      )
+    );
+    
+    // 同时更新版本库中的效果数据
+    setCopywritingVersionLibrary(prev => 
       prev.map(item => 
         item.id === id ? { ...item, performance } : item
       )
@@ -503,9 +524,52 @@ export default function App() {
 
 ## 生成要求
 - 每次生成 3-5 个版本
-- 明确标注【开头】、【中间】、【结尾】部分
+- 明确标注[开头]、[中间]、[结尾]部分
 - 给出推荐理由
 - 语言要清晰易懂，让运营人员能快速理解
+- 为每个版本提供详细的运营建议，包括以下几个方面：
+  1. **视频呈现**：详细说明背景音乐选择、视觉元素设计、画面布局等
+  2. **发布文案**：详细说明发布文案的结构、关键词、话题标签等
+  3. **互动引导**：详细说明如何引导用户互动、如何回复评论等
+  4. **风格统一**：详细说明主播形象、语速、语调等
+  5. **平台特点**：根据所选平台的特点，提供针对性的运营建议
+- 请严格按照以下格式生成多个版本：
+  
+  ## 版本1:
+  [开头]
+  开头内容
+  [中间]
+  中间内容
+  [结尾]
+  结尾内容
+  [推荐理由]
+  推荐理由
+  [运营建议]
+  运营建议
+  
+  ## 版本2:
+  [开头]
+  开头内容
+  [中间]
+  中间内容
+  [结尾]
+  结尾内容
+  [推荐理由]
+  推荐理由
+  [运营建议]
+  运营建议
+  
+  ## 版本3:
+  [开头]
+  开头内容
+  [中间]
+  中间内容
+  [结尾]
+  结尾内容
+  [推荐理由]
+  推荐理由
+  [运营建议]
+  运营建议
 
 ## 历史成功经验
 ${highRatingCopies.length > 0 ? `
@@ -515,14 +579,14 @@ ${highRatingCopies.length > 0 ? `
 - 高播放量案例数: ${highPerformanceCopies.length}
 ` : ''}
 
-【主题】: ${copywritingInput}
+[主题]: ${copywritingInput}
 
-【风格要求】: 专业法律
+[风格要求]: 专业法律
 
-【平台要求】: ${selectedPlatform === 'douyin' ? '抖音' : selectedPlatform === 'kuaishou' ? '快手' : '视频号'}
+[平台要求]: ${selectedPlatform === 'douyin' ? '抖音' : selectedPlatform === 'kuaishou' ? '快手' : '视频号'}
 
 请根据以上要求，生成高转化率的法律短视频文案，确保结构清晰，运营人员能一目了然。
-      `;
+    `;
     
     return optimizedPrompt;
   };
@@ -631,17 +695,55 @@ ${highRatingCopies.length > 0 ? `
 
   // 解析文案版本
   const parseCopywritingVersions = (output: string): {id: number, content: string}[] => {
-    // 按版本分隔文案
-    const versionRegex = /## 版本\s*[\d一二三四五]+[:：]/g;
-    const versions = output.split(versionRegex);
+    // 尝试多种格式解析版本
     
-    // 过滤空版本并添加版本号
-    return versions
+    // 格式1: ## 版本1: 内容
+    const versionRegex1 = /## 版本\s*[\d一二三四五]+[:：]/g;
+    const versions1 = output.split(versionRegex1);
+    const parsedVersions1 = versions1
       .filter((version, index) => index > 0 && version.trim())
       .map((version, index) => ({
         id: index + 1,
         content: version.trim()
       }));
+    
+    if (parsedVersions1.length > 0) {
+      return parsedVersions1;
+    }
+    
+    // 格式2: 版本1: 内容
+    const versionRegex2 = /版本\s*[\d一二三四五]+[:：]/g;
+    const versions2 = output.split(versionRegex2);
+    const parsedVersions2 = versions2
+      .filter((version, index) => index > 0 && version.trim())
+      .map((version, index) => ({
+        id: index + 1,
+        content: version.trim()
+      }));
+    
+    if (parsedVersions2.length > 0) {
+      return parsedVersions2;
+    }
+    
+    // 格式3: # 版本1 内容
+    const versionRegex3 = /# 版本\s*[\d一二三四五]+/g;
+    const versions3 = output.split(versionRegex3);
+    const parsedVersions3 = versions3
+      .filter((version, index) => index > 0 && version.trim())
+      .map((version, index) => ({
+        id: index + 1,
+        content: version.trim()
+      }));
+    
+    if (parsedVersions3.length > 0) {
+      return parsedVersions3;
+    }
+    
+    // 如果没有解析到版本，使用原始文案作为一个版本
+    return [{
+      id: 1,
+      content: output.trim()
+    }];
   };
 
   // 切换文案版本
@@ -3198,6 +3300,7 @@ ${highRatingCopies.length > 0 ? `
                                                 )}
                                                 
                                                 <div className="prose prose-sm max-w-none">
+                                                    <h5 className="text-blue-600 font-bold mb-2">版本 {copywritingVersions[currentVersionIndex].id}</h5>
                                                     <p className="text-gray-700 whitespace-pre-wrap">
                                                         {copywritingVersions.length > 0 
                                                             ? copywritingVersions[currentVersionIndex].content 
