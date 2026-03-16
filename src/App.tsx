@@ -1850,7 +1850,7 @@ ${highRatingCopies.length > 0 ? `
       <Suspense fallback={<div className="flex justify-center items-center h-screen">加载中...</div>}>
         <AnimatedBackground />
       </Suspense>
-      <div className="max-w-7xl mx-auto space-y-6 p-4 sm:p-6 lg:p-8 relative z-10">
+      <div className="max-w-7xl mx-auto space-y-4 p-4 sm:p-6 lg:p-8 relative z-10">
         
         {/* Header */}
         <motion.div 
@@ -1892,7 +1892,7 @@ ${highRatingCopies.length > 0 ? `
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white/80 backdrop-blur-md border border-white/50 rounded-xl shadow-lg p-2 overflow-x-auto mb-8"
+          className="bg-white/80 backdrop-blur-md border border-white/50 rounded-xl shadow-lg p-2 overflow-x-auto mb-4"
         >
           <div className="flex items-center gap-2 min-w-max">
             {[
@@ -3120,17 +3120,19 @@ ${highRatingCopies.length > 0 ? `
         )}
 
         {/* Daily Viral Videos Monitor */}
-        <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: activeTab === 'viral' && showAnalysis && platformData[selectedPlatform]?.length > 0 ? 1 : 0, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ delay: 0.1 }}
-            className=""
-        >
-          <Suspense fallback={<div className="flex justify-center items-center h-64">加载中...</div>}>
-            <ViralVideosSection />
-          </Suspense>
-        </motion.div>
+        {activeTab === 'viral' && showAnalysis && platformData[selectedPlatform]?.length > 0 && (
+            <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ delay: 0.1 }}
+                className=""
+            >
+              <Suspense fallback={<div className="flex justify-center items-center h-64">加载中...</div>}>
+                <ViralVideosSection />
+              </Suspense>
+            </motion.div>
+        )}
 
         {/* 文案创作 */}
         {activeTab === 'rewrite' && showAnalysis && platformData[selectedPlatform]?.length > 0 && (
@@ -3248,7 +3250,7 @@ ${highRatingCopies.length > 0 ? `
                                     </div>
                                 </div>
 
-                                <div className="py-10 flex flex-col items-center justify-center text-gray-400">
+                                <div className="py-4 flex flex-col items-center justify-center text-gray-400">
                                     {isGenerating ? (
                                         <>
                                             <div className="w-12 h-12 border-4 border-t-green-600 border-green-200 rounded-full animate-spin mb-4"></div>
