@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, ChangeEvent, lazy, Suspense } from 'react';
 import * as XLSX from 'xlsx';
 import { motion } from 'framer-motion';
+import { DEFAULT_CONFIG, fetchAIAnalysis } from './services/aiAnalysis';
 // import { MOCK_DATA } from './data/mockData';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -288,12 +289,104 @@ export default function App() {
     range: 'douyin',
     personal: 'douyin',
     viral: 'douyin',
-    rewrite: 'douyin'
+    rewrite: 'douyin',
+    agent: 'douyin'
   });
-  const [activeTab, setActiveTab] = useState<'overview' | 'monthly' | 'range' | 'personal' | 'viral' | 'rewrite'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'monthly' | 'range' | 'personal' | 'viral' | 'rewrite' | 'agent'>('overview');
   // 文案创作相关状态
   const [copywritingInput, setCopywritingInput] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  // 智能体相关状态
+  const [agentInput, setAgentInput] = useState<string>('');
+  const [agentIsGenerating, setAgentIsGenerating] = useState<boolean>(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  
+  // 会话状态管理
+  const [messages, setMessages] = useState<Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: Date;
+  }>>([]);
+  
+  // 会话偏好
+  const [sessionPreferences, setSessionPreferences] = useState<{
+    platform: 'douyin' | 'kuaishou' | 'wechat' | 'general';
+    style: '口语化' | '犀利' | '专业' | '情绪化';
+    duration: '15秒' | '30秒' | '60秒';
+    conversionGoal: '评论引导' | '私信引导' | '关注引导';
+  }>({
+    platform: 'general',
+    style: '口语化',
+    duration: '30秒',
+    conversionGoal: '评论引导'
+  });
+  
+  // 模型结果
+  const [modelResults, setModelResults] = useState<{
+    deepseek: string;
+    doubao: string;
+    merged: {
+      title: string;
+      hook: string;
+      script: string;
+      corePoints: string;
+      ending: string;
+      explanation: string;
+    } | null;
+  }>({
+    deepseek: '',
+    doubao: '',
+    merged: null
+  });
+  
+  // 历史版本
+  const [versionHistory, setVersionHistory] = useState<Array<{
+    id: number;
+    timestamp: Date;
+    content: {
+      title: string;
+      hook: string;
+      script: string;
+      corePoints: string;
+      ending: string;
+      explanation: string;
+    };
+  }>>([]);
+  
+  // 初始化mock数据
+  useEffect(() => {
+    // 模拟一些对话历史
+    const mockMessages = [
+      {
+        role: 'user' as const,
+        content: '帮我优化一段关于农村土地政策的法律文案，适合短视频平台',
+        timestamp: new Date(Date.now() - 3600000)
+      },
+      {
+        role: 'assistant' as const,
+        content: '已完成优化，为您生成了融合版文案。请查看右侧结果面板。',
+        timestamp: new Date(Date.now() - 3500000)
+      }
+    ];
+    
+    // 模拟模型结果
+    const mockModelResults = {
+      deepseek: '逻辑梳理：农村土地政策涉及农民切身利益，需要清晰的结构和准确的法律表达。建议从政策背景、具体变化、影响分析和应对建议四个方面进行优化。',
+      doubao: '传播优化：短视频需要更强的钩子和口语化表达。建议使用"家人们"等亲切称呼，添加话题标签，增强互动性，结尾引导评论和转发。',
+      merged: {
+        title: '⚠️ 农民朋友注意！2026年土地政策有大变化 #农村政策 #法律科普',
+        hook: '家人们！如果你是农民，一定要看完这个视频，否则可能吃大亏！',
+        script: '大家好，我是律师小王。今天要跟大家聊聊2026年农村土地政策的新变化，这直接关系到咱们农民朋友的切身利益。\n\n首先，政策明确了土地承包经营权的长久不变，这意味着咱们农民可以更安心地投入农业生产。\n\n其次，新增了土地流转的规范化管理，保障咱们的合法权益不受侵害。\n\n最后，对于宅基地的使用和管理也有了更明确的规定，让咱们的住房权益得到更好的保障。\n\n这些政策变化，都是为了让咱们农民的日子越过越好，让农村发展更加繁荣。',
+        corePoints: '核心观点：2026年农村土地政策的三大变化：土地承包经营权长久不变、土地流转规范化管理、宅基地使用管理明确化。',
+        ending: '觉得有用的家人们，点个红心，转发给身边的农民朋友，让更多人知道这些政策变化！评论区说说你遇到过什么土地问题，我来为你解答！',
+        explanation: '融合了DeepSeek的法律专业性和豆包的短视频传播性，形成最终优化版。采用了口语化表达，添加了话题标签，增强了互动性。'
+      }
+    };
+    
+    // 无条件添加mock数据
+    setMessages(mockMessages);
+    setModelResults(mockModelResults);
+  }, []);
   // 文案版本管理
   const [copywritingVersions, setCopywritingVersions] = useState<{id: number, content: string}[]>([]);
   const [currentVersionIndex, setCurrentVersionIndex] = useState<number>(0);
@@ -447,7 +540,7 @@ export default function App() {
   };
 
   // 持续学习逻辑：根据用户反馈和效果数据优化提示词
-  const getOptimizedPrompt = () => {
+  const optimizedPrompt = useMemo(() => {
     // 分析历史数据，提取成功模式
     const highRatingCopies = copywritingHistory.filter(item => item.rating && item.rating >= 4);
     const highPerformanceCopies = copywritingHistory.filter(item => item.performance?.views && item.performance.views > 10000);
@@ -471,7 +564,7 @@ export default function App() {
     const mostSuccessfulPlatform = Object.entries(platformCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || selectedPlatform;
     
     // 生成优化后的提示词
-    const optimizedPrompt = `
+    return `
 你是法律爆款文案专家，已学习 1000+ 条高播放量视频。
 
 ## 爆款开头（3秒黄金法则）
@@ -556,9 +649,9 @@ ${highRatingCopies.length > 0 ? `
 
 请根据以上要求，生成高转化率的法律短视频文案，确保结构清晰，运营人员能一目了然。
     `;
-    
-    return optimizedPrompt;
-  };
+  }, [copywritingHistory, selectedPlatform, copywritingInput]);
+
+  const getOptimizedPrompt = () => optimizedPrompt;
 
   // 更新爆款文案库
   const updateViralLibrary = () => {
@@ -613,6 +706,8 @@ ${highRatingCopies.length > 0 ? `
     }
   };
 
+
+
   const handleStartCopywriting = async () => {
     if (!copywritingInput.trim()) {
       alert('请输入文案主题或关键词');
@@ -621,9 +716,6 @@ ${highRatingCopies.length > 0 ? `
 
     setIsGenerating(true);
     try {
-      // 导入 AI 分析服务
-      const { DEFAULT_CONFIG, fetchAIAnalysis } = await import('./services/aiAnalysis');
-      
       // 使用优化后的提示词生成文案
       const prompt = getOptimizedPrompt();
       
@@ -673,6 +765,308 @@ ${highRatingCopies.length > 0 ? `
       alert('生成文案失败，请重试');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  // 智能体处理函数
+  const handleAgentInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setAgentInput(e.target.value);
+    setAgentError(null);
+  };
+
+  const handleStartAgentOptimization = async () => {
+    if (!agentInput.trim()) {
+      setAgentError('请输入原始法律文案或修改要求');
+      return;
+    }
+
+    // 添加用户消息到对话历史
+    const userMessage = {
+      role: 'user' as const,
+      content: agentInput,
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, userMessage]);
+    
+    setAgentIsGenerating(true);
+    setAgentError(null);
+
+    try {
+      // 构建会话历史上下文
+      const conversationHistory = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+      
+      // 构建偏好信息
+      const preferenceInfo = `用户偏好：\n- 平台：${sessionPreferences.platform === 'general' ? '通用' : sessionPreferences.platform === 'douyin' ? '抖音' : sessionPreferences.platform === 'kuaishou' ? '快手' : '视频号'}\n- 风格：${sessionPreferences.style}\n- 时长：${sessionPreferences.duration}\n- 转化目标：${sessionPreferences.conversionGoal}`;
+
+      // 并行调用两个模型API，提高生成速度
+      console.log('开始并行调用模型API...');
+      
+      // 准备DeepSeek API调用
+      const deepseekApiKey = 'sk-be6a2391b68e4bddade06a308adbe6b1';
+      const deepseekPrompt = `你是一个专业的法律短视频文案优化助手。请对以下法律文案进行逻辑梳理和结构优化，确保法律表达准确，结构清晰。\n\n${preferenceInfo}\n\n当前用户输入：${agentInput}\n\n对话历史：\n${conversationHistory.map(msg => `${msg.role === 'user' ? '用户' : '助手'}: ${msg.content}`).join('\n')}\n\n要求：\n1. 分析文案的逻辑结构\n2. 优化法律表达的准确性和专业性\n3. 提供结构清晰的优化建议\n4. 保持法律内容的真实性，不要编造法条和结论`;
+
+      const deepseekRequest = fetch('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${deepseekApiKey}`
+        },
+        body: JSON.stringify({
+          model: 'deepseek-chat',
+          messages: [
+            {
+              role: 'user',
+              content: deepseekPrompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 2000
+        })
+      }).then(async response => {
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(`DeepSeek API调用失败: ${response.status} - ${errorData.error?.message || '未知错误'}`);
+        }
+        const data = await response.json();
+        return data.choices[0].message.content;
+      });
+
+      // 准备豆包 API 调用
+      const doubaoApiKey = 'b2a85661-b22d-4f65-b4f0-473565faf497';
+      // 注意：由于需要DeepSeek的结果，这里先使用简化的提示词
+      const doubaoPrompt = `你是一个专业的短视频文案优化专家。请对以下法律文案进行优化，使其更适合短视频平台传播。\n\n${preferenceInfo}\n\n当前用户输入：${agentInput}\n\n对话历史：\n${conversationHistory.map(msg => `${msg.role === 'user' ? '用户' : '助手'}: ${msg.content}`).join('\n')}\n\n要求：\n1. 优化短视频钩子，增强吸引力\n2. 提升语言的口语化和传播性\n3. 适配指定平台的风格特点\n4. 确保内容符合短视频时长要求\n5. 增加互动性和转化引导`;
+
+      const doubaoRequest = fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${doubaoApiKey}`
+        },
+        body: JSON.stringify({
+          model: 'doubao-seed-2-0-lite-260215',
+          messages: [
+            {
+              role: 'user',
+              content: doubaoPrompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 2000
+        })
+      }).then(async response => {
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(`豆包API调用失败: ${response.status} - ${errorData.error?.message || '未知错误'}`);
+        }
+        const data = await response.json();
+        return data.choices[0].message.content;
+      });
+
+      // 并行执行两个API调用
+      const [deepseekContent, doubaoContent] = await Promise.all([deepseekRequest, doubaoRequest]);
+      console.log('两个模型API调用完成');
+      console.log('DeepSeek返回内容:', deepseekContent);
+      console.log('豆包返回内容:', doubaoContent);
+
+      // 模型结果融合 - 增强持续学习能力
+      const mergeResults = () => {
+        // 分析用户历史偏好和反馈
+        const analyzeUserPreferences = () => {
+          // 从对话历史中提取用户偏好
+          const userRequests = messages.filter(msg => msg.role === 'user').map(msg => msg.content.toLowerCase());
+          
+          // 分析用户偏好的风格
+          const styleKeywords = {
+            '口语化': ['口语', '口语化', '通俗', '易懂'],
+            '犀利': ['犀利', '尖锐', '直接', '有力'],
+            '专业': ['专业', '严谨', '准确', '权威'],
+            '情绪化': ['情感', '情绪化', '感动', '共鸣']
+          };
+          
+          // 分析用户偏好的平台
+          const platformKeywords = {
+            'douyin': ['抖音', 'douyin'],
+            'kuaishou': ['快手', 'kuaishou'],
+            'wechat': ['视频号', '微信', 'wechat'],
+            'general': ['通用', '一般']
+          };
+          
+          // 分析用户偏好的时长
+          const durationKeywords = {
+            '15秒': ['15秒', '15s', '短', '简短'],
+            '30秒': ['30秒', '30s', '中等', '适中'],
+            '60秒': ['60秒', '60s', '长', '详细']
+          };
+          
+          // 分析用户偏好的转化目标
+          const conversionKeywords = {
+            '评论引导': ['评论', '留言', '讨论'],
+            '私信引导': ['私信', '私聊', '联系'],
+            '关注引导': ['关注', '订阅', 'follow']
+          };
+          
+          // 统计关键词出现次数，更新偏好
+          const updatePreferences = <T extends string>(keywordsMap: Record<T, string[]>, currentPreference: T): T => {
+            let maxCount = 0;
+            let bestMatch = currentPreference;
+            
+            Object.entries(keywordsMap).forEach(([key, keywords]) => {
+              if (Array.isArray(keywords)) {
+                const count = keywords.reduce((acc: number, keyword: string) => {
+                  return acc + userRequests.filter(req => req.includes(keyword)).length;
+                }, 0);
+                
+                if (count > maxCount) {
+                  maxCount = count;
+                  bestMatch = key as T;
+                }
+              }
+            });
+            
+            return bestMatch;
+          };
+          
+          // 更新会话偏好
+          const updatedPreferences = {
+            platform: updatePreferences(platformKeywords, sessionPreferences.platform),
+            style: updatePreferences(styleKeywords, sessionPreferences.style),
+            duration: updatePreferences(durationKeywords, sessionPreferences.duration),
+            conversionGoal: updatePreferences(conversionKeywords, sessionPreferences.conversionGoal)
+          };
+          
+          // 应用更新后的偏好
+          setSessionPreferences(updatedPreferences);
+          
+          return updatedPreferences;
+        };
+        
+        // 分析用户偏好
+        const updatedPreferences = analyzeUserPreferences();
+        
+        // 增强的融合逻辑
+        let title = '优化后的法律短视频文案';
+        let hook = '大家好，今天要跟大家分享一个重要的法律知识，关系到每个人的切身利益！';
+        let script = doubaoContent;
+        let corePoints = '核心观点：法律条文的准确理解和应用';
+        let ending = '希望今天的分享对大家有所帮助，有任何问题欢迎在评论区留言，我们会及时解答！记得点赞、关注，分享给更多需要的朋友！';
+        
+        // 根据平台偏好调整
+        if (updatedPreferences.platform === 'douyin') {
+          hook = hook.replace('大家好', '家人们');
+          ending += ' #法律科普 #抖音普法';
+        } else if (updatedPreferences.platform === 'kuaishou') {
+          hook = hook.replace('大家好', '老铁们');
+          ending += ' #快手法律 #法律知识';
+        } else if (updatedPreferences.platform === 'wechat') {
+          hook = hook.replace('大家好', '朋友们');
+          ending += ' 转发给身边需要的人！';
+        }
+        
+        // 根据风格偏好调整
+        if (updatedPreferences.style === '口语化') {
+          script = script.replace(/\b法律\b/g, '法律知识');
+          script = script.replace(/\b规定\b/g, '说的');
+        } else if (updatedPreferences.style === '犀利') {
+          hook = hook.replace('重要的法律知识', '必须知道的法律真相');
+          ending = ending.replace('有任何问题欢迎在评论区留言', '有不同意见？评论区来辩！');
+        } else if (updatedPreferences.style === '专业') {
+          script = script.replace(/\b大家\b/g, '各位');
+          script = script.replace(/\b觉得\b/g, '认为');
+        } else if (updatedPreferences.style === '情绪化') {
+          hook = hook.replace('关系到每个人的切身利益', '直接影响你的生活！');
+          ending = ending.replace('希望今天的分享对大家有所帮助', '希望这个视频能帮到你，让我们一起学法用法！');
+        }
+        
+        // 根据时长偏好调整
+        if (updatedPreferences.duration === '15秒') {
+          // 压缩内容到15秒
+          script = script.split('\n').slice(0, 3).join('\n');
+        } else if (updatedPreferences.duration === '30秒') {
+          // 保持适中长度
+          script = script.split('\n').slice(0, 5).join('\n');
+        } else if (updatedPreferences.duration === '60秒') {
+          // 详细展开
+          script = script + '\n\n以上就是今天要分享的法律知识，希望对大家有所帮助！';
+        }
+        
+        // 根据转化目标调整
+        if (updatedPreferences.conversionGoal === '评论引导') {
+          ending = ending.replace('有任何问题欢迎在评论区留言', '你遇到过类似的法律问题吗？评论区分享一下！');
+        } else if (updatedPreferences.conversionGoal === '私信引导') {
+          ending = ending.replace('有任何问题欢迎在评论区留言', '有具体法律问题？私信我为你解答！');
+        } else if (updatedPreferences.conversionGoal === '关注引导') {
+          ending = ending.replace('记得点赞、关注', '一定要点赞、关注');
+        }
+        
+        // 从DeepSeek内容中提取核心法律观点
+        const extractCorePoints = () => {
+          // 简单的核心观点提取逻辑
+          const lines = deepseekContent.split('\n');
+          const coreLines = lines.filter((line: string) => line.includes('核心') || line.includes('重点') || line.includes('关键'));
+          if (coreLines.length > 0) {
+            return coreLines.join('\n');
+          }
+          return corePoints;
+        };
+        
+        corePoints = extractCorePoints();
+        
+        // 生成最终融合结果
+        return {
+          title,
+          hook,
+          script,
+          corePoints,
+          ending,
+          explanation: `融合了DeepSeek的法律专业性和豆包的短视频传播性，根据用户偏好（平台：${updatedPreferences.platform}，风格：${updatedPreferences.style}，时长：${updatedPreferences.duration}，转化目标：${updatedPreferences.conversionGoal}）进行优化，形成最终版本。`
+        };
+      };
+
+      const mergedResult = mergeResults();
+      
+      // 更新模型结果
+      setModelResults({
+        deepseek: deepseekContent,
+        doubao: doubaoContent,
+        merged: mergedResult
+      });
+
+      // 保存到历史版本
+      setVersionHistory(prev => [
+        {
+          id: prev.length + 1,
+          timestamp: new Date(),
+          content: mergedResult
+        },
+        ...prev
+      ]);
+
+      // 添加助手回复到对话历史
+      const assistantMessage = {
+        role: 'assistant' as const,
+        content: '已完成优化，为您生成了融合版文案。请查看右侧结果面板。',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+
+      // 清空输入框
+      setAgentInput('');
+    } catch (error) {
+      console.error('优化文案失败:', error);
+      setAgentError(`优化文案失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      
+      // 添加错误消息到对话历史
+      const errorMessage = {
+        role: 'assistant' as const,
+        content: `抱歉，优化失败：${error instanceof Error ? error.message : '未知错误'}`,
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setAgentIsGenerating(false);
     }
   };
 
@@ -1856,7 +2250,7 @@ ${highRatingCopies.length > 0 ? `
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col md:flex-row md:items-center justify-between gap-6 p-6 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-white/50"
+          className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-white/50"
         >
           <div>
             <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
@@ -1895,14 +2289,16 @@ ${highRatingCopies.length > 0 ? `
           className="bg-white/80 backdrop-blur-md border border-white/50 rounded-xl shadow-lg p-2 overflow-x-auto mb-4"
         >
           <div className="flex items-center gap-2 min-w-max">
-            {[
-              { key: 'overview', label: '数据概览和ai诊断', icon: '📊' },
-              { key: 'monthly', label: '月度对比分析', icon: '📈' },
-              { key: 'range', label: '时段对比KPI', icon: '📅' },
-              { key: 'personal', label: '个人爆款视频', icon: '👤' },
-              { key: 'viral', label: '爆款视频', icon: '🔥' },
-              { key: 'rewrite', label: '文案创作', icon: '✍️' }
-            ].map((tab) => (
+            {
+              [
+                { key: 'overview', label: '数据概览和ai诊断', icon: '📊' },
+                { key: 'monthly', label: '月度对比分析', icon: '📈' },
+                { key: 'range', label: '时段对比KPI', icon: '📅' },
+                { key: 'personal', label: '个人爆款视频', icon: '👤' },
+                { key: 'viral', label: '爆款视频', icon: '🔥' },
+                { key: 'rewrite', label: '文案创作', icon: '✍️' },
+                { key: 'agent', label: '智能体', icon: '🤖' }
+              ].map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key as any)}
@@ -2116,7 +2512,7 @@ ${highRatingCopies.length > 0 ? `
                     </div>
                 </div>
             </div>
-            <div className="h-[400px]">
+            <div className="h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={trendData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -2377,7 +2773,7 @@ ${highRatingCopies.length > 0 ? `
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             viewport={{ once: true }}
-            className="bg-white/80 backdrop-blur-md p-4 rounded-xl shadow-lg border border-white/50 grid grid-cols-1 md:grid-cols-2 gap-6"
+            className="bg-white/80 backdrop-blur-md p-4 rounded-xl shadow-lg border border-white/50 grid grid-cols-1 md:grid-cols-2 gap-4"
         >
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
@@ -2426,7 +2822,7 @@ ${highRatingCopies.length > 0 ? `
 
         {/* KPI Cards */}
         {activeTab === 'range' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <KPICard title="总播放量 (Views)" value={currentKPIs.views} compareValue={compareKPIs.views} icon={Play} />
           <KPICard title="总点赞量 (Likes)" value={currentKPIs.likes} compareValue={compareKPIs.likes} icon={Heart} />
           <KPICard title="粉丝净增 (Net Fans)" value={currentKPIs.netFans} compareValue={compareKPIs.netFans} icon={Users} />
@@ -2493,7 +2889,7 @@ ${highRatingCopies.length > 0 ? `
             </div>
 
             {/* Advanced Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                  {/* Fan Growth Trend (Dual Axis) */}
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
@@ -2506,7 +2902,7 @@ ${highRatingCopies.length > 0 ? `
                         <TrendingUp className="w-5 h-5 text-orange-500" />
                         粉丝增长趋势 (双轴)
                     </h3>
-                    <div className="h-80">
+                    <div className="h-56">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={finalDetailTrend}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -2533,7 +2929,7 @@ ${highRatingCopies.length > 0 ? `
                         <Activity className="w-5 h-5 text-green-500" />
                         用户粘性指标 (完播率)
                     </h3>
-                    <div className="h-80">
+                    <div className="h-56">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={finalDetailTrend}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -2560,7 +2956,7 @@ ${highRatingCopies.length > 0 ? `
                         <Activity className="w-5 h-5 text-purple-500" />
                         用户粘性指标 (互动率)
                     </h3>
-                    <div className="h-80">
+                    <div className="h-56">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={finalDetailTrend}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -2588,7 +2984,7 @@ ${highRatingCopies.length > 0 ? `
                         <TrendingUp className="w-5 h-5 text-blue-500" />
                         内容热度趋势 (播放量)
                     </h3>
-                    <div className="h-80">
+                    <div className="h-56">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={finalDetailTrend}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -2615,7 +3011,7 @@ ${highRatingCopies.length > 0 ? `
                         <TrendingUp className="w-5 h-5 text-orange-500" />
                         内容热度趋势 (互动总量)
                     </h3>
-                    <div className="h-80">
+                    <div className="h-56">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={finalDetailTrend}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -2642,7 +3038,7 @@ ${highRatingCopies.length > 0 ? `
                         <Heart className="w-5 h-5 text-pink-500" />
                         粉丝健康度 (点赞量/粉丝量)
                     </h3>
-                    <div className="h-80">
+                    <div className="h-56">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={fanHealthData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -2842,7 +3238,7 @@ ${highRatingCopies.length > 0 ? `
                             </div>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Monthly Views Comparison */}
                 {platformData[selectedPlatform]?.length > 0 && (
                     <motion.div 
@@ -2855,7 +3251,7 @@ ${highRatingCopies.length > 0 ? `
                         <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                             <span className="text-blue-500">📊</span> 月度播放量对比
                         </h3>
-                        <div className="h-80">
+                        <div className="h-56">
                             <MonthlyViewsChart />
                         </div>
                     </motion.div>
@@ -2873,7 +3269,7 @@ ${highRatingCopies.length > 0 ? `
                         <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                             <span className="text-green-500">📊</span> 其他月度指标对比
                         </h3>
-                        <div className="h-80">
+                        <div className="h-56">
                             <MonthlyOtherKPIsChart />
                         </div>
                     </motion.div>
@@ -2882,7 +3278,7 @@ ${highRatingCopies.length > 0 ? `
             </div>
 
             {/* Charts Section 1.5: Additional Monthly Comparison */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Comment Monthly Comparison */}
                 {platformData[selectedPlatform]?.length > 0 && (
                     <motion.div 
@@ -2895,7 +3291,7 @@ ${highRatingCopies.length > 0 ? `
                         <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                             <span className="text-yellow-500">💬</span> 月度评论量对比
                         </h3>
-                        <div className="h-80">
+                        <div className="h-56">
                             <MonthlyCommentChart />
                         </div>
                     </motion.div>
@@ -2913,7 +3309,7 @@ ${highRatingCopies.length > 0 ? `
                         <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                             <span className="text-red-500">📈</span> 月度完播率和互动率对比
                         </h3>
-                        <div className="h-80">
+                        <div className="h-56">
                             <MonthlyRateChart />
                         </div>
                     </motion.div>
@@ -2921,7 +3317,7 @@ ${highRatingCopies.length > 0 ? `
             </div>
 
             {/* Charts Section 2: Monthly Trends Split Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
                 {/* Chart 1: Views & Likes */}
                 {platformData[selectedPlatform]?.length > 0 && (
                     <motion.div 
@@ -2935,7 +3331,7 @@ ${highRatingCopies.length > 0 ? `
                             <Calendar className="w-5 h-5 text-blue-500" />
                             按月运营趋势 (播放量 & 点赞量)
                         </h3>
-                        <div className="h-80">
+                        <div className="h-56">
                             <MonthlyViewsLikesChart />
                         </div>
                     </motion.div>
@@ -2954,7 +3350,7 @@ ${highRatingCopies.length > 0 ? `
                         <TrendingUp className="w-5 h-5 text-green-500" />
                         按月运营趋势 (净增粉)
                     </h3>
-                    <div className="h-80">
+                    <div className="h-56">
                         <MonthlyNetFansChart />
                     </div>
                 </motion.div>
@@ -3131,6 +3527,360 @@ ${highRatingCopies.length > 0 ? `
               <Suspense fallback={<div className="flex justify-center items-center h-64">加载中...</div>}>
                 <ViralVideosSection />
               </Suspense>
+            </motion.div>
+        )}
+
+        {/* 智能体 */}
+        {activeTab === 'agent' && showAnalysis && (
+            <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ delay: 0.1 }}
+                className="space-y-6"
+            >
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden"
+                >
+                    {/* Section Header */}
+                    <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-2 h-8 bg-blue-500 rounded-full" />
+                            <div>
+                                <h3 className="text-lg font-bold text-gray-800">法律短视频文案优化智能体</h3>
+                                <p className="text-xs text-gray-400 mt-1">持续对话式文案优化</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section Content */}
+                    <div className="p-6">
+                        <div className="flex flex-col lg:flex-row gap-6">
+                            {/* 左侧聊天区 */}
+                            <div className="lg:w-1/2 space-y-6">
+                                {/* 对话历史 */}
+                                <div className="border border-gray-200 rounded-lg h-96 overflow-y-auto bg-gray-50 p-6">
+                                    {messages.length === 0 ? (
+                                        <div className="text-center text-gray-500 py-12">
+                                            <p className="text-base">开始与智能体对话</p>
+                                            <p className="text-sm mt-3">输入原始法律文案或修改要求</p>
+                                        </div>
+                                    ) : (
+                                        messages.map((message, index) => (
+                                            <div key={index} className={`mb-6 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
+                                                <div className={`inline-block max-w-[80%] p-4 rounded-lg ${message.role === 'user' ? 'bg-blue-100 text-blue-800' : 'bg-gray-200 text-gray-800'}`}>
+                                                    <p className="text-base">{message.content}</p>
+                                                    <p className="text-sm text-gray-500 mt-2">{message.timestamp.toLocaleString()}</p>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                                
+                                {/* 输入区域 */}
+                                <div>
+                                    <label className="block text-base font-medium text-gray-700 mb-3">输入原始法律文案或修改要求</label>
+                                    <div className="relative">
+                                        <textarea
+                                            rows={6}
+                                            value={agentInput}
+                                            onChange={handleAgentInputChange}
+                                            placeholder="请输入需要优化的法律文案或修改要求..."
+                                            className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-base"
+                                        />
+                                        <button
+                                            onClick={handleStartAgentOptimization}
+                                            disabled={agentIsGenerating}
+                                            className="absolute bottom-4 right-4 bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition text-base"
+                                        >
+                                            {agentIsGenerating ? '生成中...' : '发送'}
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                {/* 错误提示 */}
+                                {agentError && (
+                                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-base">
+                                        {agentError}
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {/* 右侧结果区 */}
+                            <div className="lg:w-1/2 space-y-6">
+                                {/* 用户偏好面板 */}
+                                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                                    <h4 className="text-lg font-medium text-gray-700 mb-4">当前会话偏好</h4>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm text-gray-600 mb-2">平台偏好</label>
+                                            <select 
+                                                value={sessionPreferences.platform} 
+                                                onChange={(e) => setSessionPreferences(prev => ({...prev, platform: e.target.value as any}))}
+                                                className="w-full text-base border border-gray-300 rounded-md px-3 py-2"
+                                            >
+                                                <option value="general">通用</option>
+                                                <option value="douyin">抖音</option>
+                                                <option value="kuaishou">快手</option>
+                                                <option value="wechat">视频号</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-gray-600 mb-2">风格偏好</label>
+                                            <select 
+                                                value={sessionPreferences.style} 
+                                                onChange={(e) => setSessionPreferences(prev => ({...prev, style: e.target.value as any}))}
+                                                className="w-full text-base border border-gray-300 rounded-md px-3 py-2"
+                                            >
+                                                <option value="口语化">口语化</option>
+                                                <option value="犀利">犀利</option>
+                                                <option value="专业">专业</option>
+                                                <option value="情绪化">情绪化</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-gray-600 mb-2">时长偏好</label>
+                                            <select 
+                                                value={sessionPreferences.duration} 
+                                                onChange={(e) => setSessionPreferences(prev => ({...prev, duration: e.target.value as any}))}
+                                                className="w-full text-base border border-gray-300 rounded-md px-3 py-2"
+                                            >
+                                                <option value="15秒">15秒</option>
+                                                <option value="30秒">30秒</option>
+                                                <option value="60秒">60秒</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm text-gray-600 mb-2">转化目标</label>
+                                            <select 
+                                                value={sessionPreferences.conversionGoal} 
+                                                onChange={(e) => setSessionPreferences(prev => ({...prev, conversionGoal: e.target.value as any}))}
+                                                className="w-full text-base border border-gray-300 rounded-md px-3 py-2"
+                                            >
+                                                <option value="评论引导">评论引导</option>
+                                                <option value="私信引导">私信引导</option>
+                                                <option value="关注引导">关注引导</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* 最终融合结果 */}
+                                {modelResults.merged && (
+                                    <div className="space-y-6">
+                                        <h4 className="text-lg font-medium text-gray-700">最终融合版</h4>
+                                        
+                                        {/* 标题 */}
+                                        <div className="bg-blue-50 p-4 rounded-lg">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h5 className="text-base font-medium text-gray-700">标题</h5>
+                                                <button 
+                                                    className="text-blue-600 text-sm hover:text-blue-800"
+                                                    onClick={() => {
+                                                        if (modelResults.merged) {
+                                                            navigator.clipboard.writeText(modelResults.merged.title);
+                                                        }
+                                                    }}
+                                                >
+                                                    复制
+                                                </button>
+                                            </div>
+                                            <p className="text-base text-gray-900 font-medium">{modelResults.merged ? modelResults.merged.title : ''}</p>
+                                        </div>
+                                        
+                                        {/* 开场钩子 */}
+                                        <div className="bg-blue-50 p-4 rounded-lg">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h5 className="text-base font-medium text-gray-700">开场钩子</h5>
+                                                <button 
+                                                    className="text-blue-600 text-sm hover:text-blue-800"
+                                                    onClick={() => {
+                                                        if (modelResults.merged) {
+                                                            navigator.clipboard.writeText(modelResults.merged.hook);
+                                                        }
+                                                    }}
+                                                >
+                                                    复制
+                                                </button>
+                                            </div>
+                                            <p className="text-base text-gray-900">{modelResults.merged ? modelResults.merged.hook : ''}</p>
+                                        </div>
+                                        
+                                        {/* 口播文案 */}
+                                        <div className="bg-blue-50 p-4 rounded-lg">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h5 className="text-base font-medium text-gray-700">口播文案</h5>
+                                                <button 
+                                                    className="text-blue-600 text-sm hover:text-blue-800"
+                                                    onClick={() => {
+                                                        if (modelResults.merged) {
+                                                            navigator.clipboard.writeText(modelResults.merged.script);
+                                                        }
+                                                    }}
+                                                >
+                                                    复制
+                                                </button>
+                                            </div>
+                                            <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap min-h-[150px]">
+                                                {modelResults.merged ? modelResults.merged.script : ''}
+                                            </div>
+                                        </div>
+                                        
+                                        {/* 核心观点 */}
+                                        <div className="bg-blue-50 p-4 rounded-lg">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h5 className="text-base font-medium text-gray-700">核心观点</h5>
+                                                <button 
+                                                    className="text-blue-600 text-sm hover:text-blue-800"
+                                                    onClick={() => {
+                                                        if (modelResults.merged) {
+                                                            navigator.clipboard.writeText(modelResults.merged.corePoints);
+                                                        }
+                                                    }}
+                                                >
+                                                    复制
+                                                </button>
+                                            </div>
+                                            <p className="text-base text-gray-900">{modelResults.merged ? modelResults.merged.corePoints : ''}</p>
+                                        </div>
+                                        
+                                        {/* 结尾引导 */}
+                                        <div className="bg-blue-50 p-4 rounded-lg">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h5 className="text-base font-medium text-gray-700">结尾引导</h5>
+                                                <button 
+                                                    className="text-blue-600 text-sm hover:text-blue-800"
+                                                    onClick={() => {
+                                                        if (modelResults.merged) {
+                                                            navigator.clipboard.writeText(modelResults.merged.ending);
+                                                        }
+                                                    }}
+                                                >
+                                                    复制
+                                                </button>
+                                            </div>
+                                            <p className="text-base text-gray-900">{modelResults.merged ? modelResults.merged.ending : ''}</p>
+                                        </div>
+                                        
+                                        {/* 优化说明 */}
+                                        <div className="bg-blue-50 p-4 rounded-lg">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h5 className="text-base font-medium text-gray-700">优化说明</h5>
+                                                <button 
+                                                    className="text-blue-600 text-sm hover:text-blue-800"
+                                                    onClick={() => {
+                                                        if (modelResults.merged) {
+                                                            navigator.clipboard.writeText(modelResults.merged.explanation);
+                                                        }
+                                                    }}
+                                                >
+                                                    复制
+                                                </button>
+                                            </div>
+                                            <p className="text-base text-gray-900">{modelResults.merged ? modelResults.merged.explanation : ''}</p>
+                                        </div>
+                                        
+                                        {/* 复制全部按钮 */}
+                                        <div className="flex justify-end">
+                                            <button 
+                                                className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700 transition"
+                                                onClick={() => {
+                                                    if (modelResults.merged) {
+                                                        navigator.clipboard.writeText(`${modelResults.merged.title}\n\n${modelResults.merged.hook}\n\n${modelResults.merged.script}\n\n${modelResults.merged.corePoints}\n\n${modelResults.merged.ending}\n\n${modelResults.merged.explanation}`);
+                                                    }
+                                                }}
+                                            >
+                                                复制全部
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* 模型结果对比（可折叠） */}
+                                {modelResults.deepseek || modelResults.doubao ? (
+                                    <div className="border border-gray-200 rounded-lg">
+                                        <button 
+                                            className="w-full text-left p-4 bg-gray-50 hover:bg-gray-100 rounded-t-lg flex items-center justify-between"
+                                            onClick={() => document.getElementById('model-comparison')?.classList.toggle('hidden')}
+                                        >
+                                            <span className="text-base font-medium text-gray-700">模型结果对比</span>
+                                            <span className="text-gray-500">▼</span>
+                                        </button>
+                                        <div id="model-comparison" className="p-6 space-y-6">
+                                            {modelResults.deepseek && (
+                                                <div>
+                                                    <h5 className="text-base font-medium text-gray-700 mb-3">DeepSeek 建议（逻辑梳理）</h5>
+                                                    <div className="bg-gray-50 p-4 rounded-lg text-base text-gray-800 leading-relaxed whitespace-pre-wrap">
+                                                        {modelResults.deepseek}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {modelResults.doubao && (
+                                                <div>
+                                                    <h5 className="text-base font-medium text-gray-700 mb-3">豆包建议（传播优化）</h5>
+                                                    <div className="bg-gray-50 p-4 rounded-lg text-base text-gray-800 leading-relaxed whitespace-pre-wrap">
+                                                        {modelResults.doubao}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : null}
+                                
+                                {/* 历史版本记录 */}
+                                {versionHistory.length > 0 && (
+                                    <div className="border border-gray-200 rounded-lg">
+                                        <button 
+                                            className="w-full text-left p-4 bg-gray-50 hover:bg-gray-100 rounded-t-lg flex items-center justify-between"
+                                            onClick={() => document.getElementById('version-history')?.classList.toggle('hidden')}
+                                        >
+                                            <span className="text-base font-medium text-gray-700">历史生成记录 ({versionHistory.length})</span>
+                                            <span className="text-gray-500">▼</span>
+                                        </button>
+                                        <div id="version-history" className="p-6 space-y-4">
+                                            {versionHistory.map((version) => (
+                                                <div key={version.id} className="border border-gray-100 rounded-lg p-4 hover:bg-gray-50 transition">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <h6 className="text-sm font-medium text-gray-700">版本 {version.id}</h6>
+                                                        <span className="text-xs text-gray-500">{version.timestamp.toLocaleString()}</span>
+                                                    </div>
+                                                    <p className="text-sm text-gray-800 truncate">{version.content.title}</p>
+                                                    <div className="mt-3 flex justify-end">
+                                                        <button 
+                                                            className="text-sm text-blue-600 hover:text-blue-800"
+                                                            onClick={() => {
+                                                                // 切换到该历史版本
+                                                                setModelResults(prev => ({
+                                                                    ...prev,
+                                                                    merged: version.content
+                                                                }));
+                                                            }}
+                                                        >
+                                                            查看此版本
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                
+                                {/* 快速操作按钮 */}
+                                <div className="flex flex-wrap gap-3">
+                                    <button className="text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition" onClick={() => setAgentInput('改成抖音版')}>改成抖音版</button>
+                                    <button className="text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition" onClick={() => setAgentInput('改成快手版')}>改成快手版</button>
+                                    <button className="text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition" onClick={() => setAgentInput('改成视频号版')}>改成视频号版</button>
+                                    <button className="text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition" onClick={() => setAgentInput('更口语化')}>更口语化</button>
+                                    <button className="text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition" onClick={() => setAgentInput('更犀利')}>更犀利</button>
+                                    <button className="text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition" onClick={() => setAgentInput('更专业')}>更专业</button>
+                                    <button className="text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition" onClick={() => setAgentInput('压缩到30秒')}>压缩到30秒</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
             </motion.div>
         )}
 
@@ -3602,6 +4352,7 @@ ${highRatingCopies.length > 0 ? `
                 
             </motion.div>
         )}
+
       </div>
     </div>
   );
