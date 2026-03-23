@@ -5,6 +5,103 @@ import { cn } from '../lib/utils';
 import { DEFAULT_CONFIG, analyzeDocument } from '../services/aiAnalysis';
 import ReactMarkdown from 'react-markdown';
 
+// 模拟Firebase实时数据库
+class MockFirebase {
+  private data: any = {};
+  private listeners: any = {};
+
+  constructor() {
+    const saved = localStorage.getItem('mock_firebase_data');
+    if (saved) {
+      try {
+        this.data = JSON.parse(saved);
+      } catch (e) {
+        this.data = {};
+      }
+    }
+  }
+
+  private saveData() {
+    localStorage.setItem('mock_firebase_data', JSON.stringify(this.data));
+  }
+
+  on(path: string, callback: (data: any) => void) {
+    if (!this.listeners[path]) {
+      this.listeners[path] = [];
+    }
+    this.listeners[path].push(callback);
+    const data = this.getData(path);
+    callback(data);
+    return () => {
+      this.listeners[path] = this.listeners[path].filter((cb: any) => cb !== callback);
+    };
+  }
+
+  getData(path: string) {
+    const parts = path.split('/').filter(p => p);
+    let current = this.data;
+    for (const part of parts) {
+      if (!current[part]) {
+        return null;
+      }
+      current = current[part];
+    }
+    return current;
+  }
+
+  setData(path: string, data: any) {
+    const parts = path.split('/').filter(p => p);
+    let current = this.data;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i];
+      if (!current[part]) {
+        current[part] = {};
+      }
+      current = current[part];
+    }
+    current[parts[parts.length - 1]] = data;
+    this.saveData();
+    this.triggerListeners(path, data);
+  }
+
+  private triggerListeners(path: string, data: any) {
+    if (this.listeners[path]) {
+      this.listeners[path].forEach((callback: any) => {
+        callback(data);
+      });
+    }
+    const parentPath = path.split('/').slice(0, -1).join('/');
+    if (parentPath) {
+      const parentData = this.getData(parentPath);
+      this.triggerListeners(parentPath, parentData);
+    }
+  }
+
+  push(path: string, data: any) {
+    const id = Date.now().toString();
+    const newPath = `${path}/${id}`;
+    this.setData(newPath, { ...data, id });
+    return id;
+  }
+
+  remove(path: string) {
+    const parts = path.split('/').filter(p => p);
+    let current = this.data;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i];
+      if (!current[part]) {
+        return;
+      }
+      current = current[part];
+    }
+    delete current[parts[parts.length - 1]];
+    this.saveData();
+    this.triggerListeners(path, null);
+  }
+}
+
+const firebase = new MockFirebase();
+
 // Types for the viral video data
 export interface ViralVideo {
   id: string;
@@ -133,6 +230,7 @@ const ViralVideosSection = () => {
   const [scriptViewMode, setScriptViewMode] = useState<'timestamp' | 'plain'>('timestamp');
   const [showScriptLibrary, setShowScriptLibrary] = useState(false);
   const [scriptLibrary, setScriptLibrary] = useState<any[]>([]);
+  const [expandedScriptId, setExpandedScriptId] = useState<string | null>(null);
   // 分析结果缓存
   const [analysisCache, setAnalysisCache] = useState<Record<string, string>>(() => {
     const saved = localStorage.getItem('analysis_cache');
@@ -148,14 +246,19 @@ const ViralVideosSection = () => {
 
   // 文案库数据
   useEffect(() => {
-    const savedScriptLibrary = localStorage.getItem('script_library');
-    if (savedScriptLibrary) {
-      try {
-        setScriptLibrary(JSON.parse(savedScriptLibrary));
-      } catch (e) {
-        console.error('Failed to load script library:', e);
+    // 使用Firebase监听文案库数据变化
+    const unsubscribe = firebase.on('script_library', (data: any) => {
+      if (data) {
+        // 将对象转换为数组
+        const scriptArray = Object.values(data);
+        setScriptLibrary(scriptArray);
+      } else {
+        setScriptLibrary([]);
       }
-    }
+    });
+
+    // 组件卸载时取消监听
+    return () => unsubscribe();
   }, []);
 
 
@@ -261,11 +364,8 @@ const ViralVideosSection = () => {
                   timestamp: new Date().toISOString()
                 };
                 
-                setScriptLibrary(prev => {
-                  const updatedLibrary = [scriptItem, ...prev];
-                  localStorage.setItem('script_library', JSON.stringify(updatedLibrary));
-                  return updatedLibrary;
-                });
+                // 使用Firebase保存数据
+                firebase.push('script_library', scriptItem);
               }
             } else if (eventType === 'error') {
               if (data.message === 'COOKIE_EXPIRED') {
@@ -392,6 +492,21 @@ const ViralVideosSection = () => {
                 
                 return updatedVideos;
               });
+              
+              // 保存到文案库
+              const scriptItem = {
+                id: Date.now().toString(),
+                videoId: video.id,
+                title: video.title,
+                author: video.author,
+                platform: video.platform || 'douyin',
+                content: text,
+                subtitles: subtitles,
+                timestamp: new Date().toISOString()
+              };
+              
+              // 使用Firebase保存数据
+              firebase.push('script_library', scriptItem);
             }
           } catch (error) {
             // 忽略取消操作的错误
@@ -1218,51 +1333,68 @@ ${analysisResult}
                     <p className="text-sm mt-2">使用"一键识别台词"功能后，文案会自动保存到这里</p>
                   </div>
                 ) : (
-                  scriptLibrary.map((item) => (
-                    <div key={item.id} className="bg-gray-50 rounded-xl border border-gray-100 p-4 hover:shadow-md transition-all">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <h5 className="font-bold text-gray-900 text-sm line-clamp-1">{item.title}</h5>
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-bold rounded uppercase">
-                              {item.platform === 'douyin' ? '抖音' : item.platform === 'kuaishou' ? '快手' : '视频号'}
-                            </span>
-                          </div>
-                          <div className="text-xs text-gray-500 mb-3">
-                            <span className="flex items-center gap-1"><User className="w-3 h-3" /> {item.author}</span>
-                            <span className="mx-2">•</span>
-                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(item.timestamp).toLocaleString()}</span>
-                          </div>
-                          <div className="text-sm text-gray-700 line-clamp-3 mb-3">
-                            {item.content}
+                  scriptLibrary.map((item) => {
+                    const expanded = expandedScriptId === item.id;
+                    return (
+                      <div 
+                        key={item.id} 
+                        className="bg-gray-50 rounded-xl border border-gray-100 p-4 hover:shadow-md transition-all cursor-pointer"
+                        onClick={() => setExpandedScriptId(expanded ? null : item.id)}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h5 className="font-bold text-gray-900 text-sm line-clamp-1">{item.title}</h5>
+                              <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-bold rounded uppercase">
+                                {item.platform === 'douyin' ? '抖音' : item.platform === 'kuaishou' ? '快手' : '视频号'}
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-500 mb-3">
+                              <span className="flex items-center gap-1"><User className="w-3 h-3" /> {item.author}</span>
+                              <span className="mx-2">•</span>
+                              <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(item.timestamp).toLocaleString()}</span>
+                            </div>
+                            <div className={`text-sm text-gray-700 mb-3 ${expanded ? '' : 'line-clamp-3'}`}>
+                              {item.content}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setManualTranscript(item.content);
+                                  setSubtitles(item.subtitles);
+                                  setShowScriptLibrary(false);
+                                }}
+                                className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-bold transition-colors border border-blue-100"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                                复制到编辑区
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedScriptId(expanded ? null : item.id);
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-lg text-xs font-bold transition-colors"
+                              >
+                                {expanded ? '收起' : '展开'}
+                              </button>
+                            </div>
                           </div>
                           <button
-                            onClick={() => {
-                              setManualTranscript(item.content);
-                              setSubtitles(item.subtitles);
-                              setShowScriptLibrary(false);
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // 使用Firebase删除数据
+                              firebase.remove(`script_library/${item.id}`);
                             }}
-                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-bold transition-colors border border-blue-100"
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           >
-                            <Copy className="w-3.5 h-3.5" />
-                            复制到编辑区
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
-                        <button
-                          onClick={() => {
-                            setScriptLibrary(prev => {
-                              const updatedLibrary = prev.filter(script => script.id !== item.id);
-                              localStorage.setItem('script_library', JSON.stringify(updatedLibrary));
-                              return updatedLibrary;
-                            });
-                          }}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
