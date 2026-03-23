@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertCircle, Settings, Play, ThumbsUp, Clock, User, MessageCircle, X, Sparkles, Loader2, BarChart2 } from 'lucide-react';
+import { AlertCircle, Settings, Play, ThumbsUp, Clock, User, MessageCircle, X, Sparkles, Loader2, BarChart2, Book, Copy, Trash2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { DEFAULT_CONFIG, analyzeDocument } from '../services/aiAnalysis';
 import ReactMarkdown from 'react-markdown';
@@ -131,6 +131,8 @@ const ViralVideosSection = () => {
   const [analysisStep, setAnalysisStep] = useState<'idle' | 'analyzing'>('idle');
   const [activeTab, setActiveTab] = useState<'analysis' | 'document'>('document');
   const [scriptViewMode, setScriptViewMode] = useState<'timestamp' | 'plain'>('timestamp');
+  const [showScriptLibrary, setShowScriptLibrary] = useState(false);
+  const [scriptLibrary, setScriptLibrary] = useState<any[]>([]);
   // 分析结果缓存
   const [analysisCache, setAnalysisCache] = useState<Record<string, string>>(() => {
     const saved = localStorage.getItem('analysis_cache');
@@ -143,6 +145,18 @@ const ViralVideosSection = () => {
     }
     return {};
   });
+
+  // 文案库数据
+  useEffect(() => {
+    const savedScriptLibrary = localStorage.getItem('script_library');
+    if (savedScriptLibrary) {
+      try {
+        setScriptLibrary(JSON.parse(savedScriptLibrary));
+      } catch (e) {
+        console.error('Failed to load script library:', e);
+      }
+    }
+  }, []);
 
 
   // ✅ 自动识别状态
@@ -233,6 +247,26 @@ const ViralVideosSection = () => {
               setSubtitles(data.subtitles);
               const text = data.subtitles.map((s: { text: string }) => s.text).join('\n');
               setManualTranscript(text);
+              
+              // 保存到文案库
+              if (analyzingVideo) {
+                const scriptItem = {
+                  id: Date.now().toString(),
+                  videoId: analyzingVideo.id,
+                  title: analyzingVideo.title,
+                  author: analyzingVideo.author,
+                  platform: analyzingVideo.platform || 'douyin',
+                  content: text,
+                  subtitles: data.subtitles,
+                  timestamp: new Date().toISOString()
+                };
+                
+                setScriptLibrary(prev => {
+                  const updatedLibrary = [scriptItem, ...prev];
+                  localStorage.setItem('script_library', JSON.stringify(updatedLibrary));
+                  return updatedLibrary;
+                });
+              }
             } else if (eventType === 'error') {
               if (data.message === 'COOKIE_EXPIRED') {
                 setTranscribeError('Cookie 已过期,请更新 cookies.txt 后重启服务');
@@ -568,7 +602,14 @@ ${analysisResult}
           ))}
         </div>
 
-
+        {/* 文案库按钮 */}
+        <button
+          onClick={() => setShowScriptLibrary(!showScriptLibrary)}
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+        >
+          <Book className="w-4 h-4" />
+          文案库
+        </button>
       </div>
 
       <motion.div
@@ -1138,6 +1179,111 @@ ${analysisResult}
       )}
     </AnimatePresence>
 
+    {/* 文案库弹窗 */}
+    <AnimatePresence>
+      {showScriptLibrary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm text-gray-800">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+          >
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                  <Book className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-lg">文案库</h4>
+                  <p className="text-xs text-blue-100 opacity-80">已保存的视频文案集合</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowScriptLibrary(false)}
+                className="p-2 hover:bg-white/10 rounded-full transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+              <div className="space-y-4">
+                {scriptLibrary.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                    <Book className="w-16 h-16 text-gray-200 mb-4" />
+                    <p className="text-lg font-medium text-gray-600">文案库为空</p>
+                    <p className="text-sm mt-2">使用"一键识别台词"功能后，文案会自动保存到这里</p>
+                  </div>
+                ) : (
+                  scriptLibrary.map((item) => (
+                    <div key={item.id} className="bg-gray-50 rounded-xl border border-gray-100 p-4 hover:shadow-md transition-all">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h5 className="font-bold text-gray-900 text-sm line-clamp-1">{item.title}</h5>
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-bold rounded uppercase">
+                              {item.platform === 'douyin' ? '抖音' : item.platform === 'kuaishou' ? '快手' : '视频号'}
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500 mb-3">
+                            <span className="flex items-center gap-1"><User className="w-3 h-3" /> {item.author}</span>
+                            <span className="mx-2">•</span>
+                            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(item.timestamp).toLocaleString()}</span>
+                          </div>
+                          <div className="text-sm text-gray-700 line-clamp-3 mb-3">
+                            {item.content}
+                          </div>
+                          <button
+                            onClick={() => {
+                              setManualTranscript(item.content);
+                              setSubtitles(item.subtitles);
+                              setShowScriptLibrary(false);
+                            }}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-xs font-bold transition-colors border border-blue-100"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            复制到编辑区
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setScriptLibrary(prev => {
+                              const updatedLibrary = prev.filter(script => script.id !== item.id);
+                              localStorage.setItem('script_library', JSON.stringify(updatedLibrary));
+                              return updatedLibrary;
+                            });
+                          }}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <div className="text-xs text-gray-400 flex items-center gap-2">
+                <Book className="w-3.5 h-3.5 text-blue-400" />
+                共 {scriptLibrary.length} 个文案
+              </div>
+              <button
+                onClick={() => setShowScriptLibrary(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-bold hover:bg-gray-200 transition-all"
+              >
+                关闭
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
 
   </div>
 );

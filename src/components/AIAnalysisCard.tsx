@@ -196,7 +196,7 @@ const AIAnalysisCard = ({ data, title, mode = 'all', platform = 'default' }: AIA
             detail: `${format(peakFanDay.parsedDate, 'MM-dd')} 单日涨粉 ${peakFanDay.netFans}，远超平均水平。`,
             video: sortedData.find(d => d.date === peakFanDay.date), // Assuming the video that day contributed
             suggestions: [
-                "检查当日是否有爆款视频或直播，总结成功经验",
+                "检查当日是否有行业表款视频或直播，总结成功经验",
                 "利用热度持续更新相关话题"
             ]
         });

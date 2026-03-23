@@ -2247,82 +2247,117 @@ ${highRatingCopies.length > 0 ? `
       <div className="max-w-7xl mx-auto space-y-4 p-4 sm:p-6 lg:p-8 relative z-10">
         
         {/* Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-white/50"
-        >
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-              <FileSpreadsheet className="w-8 h-8 text-blue-600" />
-              多平台运营诊断
-            </h1>
-            <p className="text-slate-500 mt-2">支持 CSV/Excel 导入 · 自动识别日期范围</p>
-            {data.length > 0 && dataDateRange && (
-              <motion.div 
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="mt-3 inline-flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-100 text-blue-700 rounded-full text-sm font-medium"
-              >
-                <Calendar className="w-4 h-4" />
-                <span>数据统计范围: {dataDateRange.start} 至 {dataDateRange.end}</span>
-              </motion.div>
-            )}
-          </div>
+        <div className="relative max-w-3xl mx-auto">
+          {/* 触发区域 */}
+          <div className="absolute top-0 left-0 right-0 h-12 cursor-pointer"></div>
           
-          <div className="flex flex-col items-end gap-4 w-full md:w-auto">
-            <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-              <label className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg cursor-pointer transition-all shadow-md hover:shadow-lg w-full sm:w-auto">
-                <Upload className="w-4 h-4" />
-                <span className="text-sm font-medium">上传文件</span>
-                <input type="file" className="hidden" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} multiple />
-              </label>
-               <span className="text-xs text-gray-500 text-center sm:text-right">Limit 200MB per file • CSV, XLSX, XLS</span>
+          {/* 头部内容 */}
+          <motion.div 
+            initial={{ opacity: 0, y: -20, height: 0 }}
+            whileHover={{ opacity: 1, y: 0, height: 'auto' }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-white/50 overflow-hidden"
+          >
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                <FileSpreadsheet className="w-6 h-6 text-blue-600" />
+                多平台运营诊断
+              </h1>
+              <p className="text-slate-500 mt-1 text-sm">支持 CSV/Excel 导入 · 自动识别日期范围</p>
+              {data.length > 0 && dataDateRange && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 border border-blue-100 text-blue-700 rounded-full text-xs font-medium"
+                >
+                  <Calendar className="w-3 h-3" />
+                  <span>数据统计范围: {dataDateRange.start} 至 {dataDateRange.end}</span>
+                </motion.div>
+              )}
             </div>
-          </div>
-        </motion.div>
+            
+            <div className="flex flex-col items-end gap-1 w-full md:w-auto">
+              <div className="flex flex-col sm:flex-row items-center gap-1 w-full md:w-auto">
+                <motion.label 
+                  whileHover={{ scale: 1.03, y: -1 }}
+                  whileTap={{ scale: 0.97 }}
+                  className="flex items-center gap-1 px-1.5 py-0.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-sm cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md w-full sm:w-auto"
+                >
+                  <Upload className="w-2 h-2" />
+                  <span className="text-[10px] font-medium">上传</span>
+                  <input type="file" className="hidden" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} multiple />
+                </motion.label>
+                 <motion.span 
+                   initial={{ opacity: 0, y: 5 }}
+                   animate={{ opacity: 1, y: 0 }}
+                   transition={{ delay: 0.2 }}
+                   className="text-[9px] text-gray-500 text-center sm:text-right"
+                 >
+                   200MB • CSV, XLSX, XLS
+                 </motion.span>
+              </div>
+            </div>
+          </motion.div>
+        </div>
 
         {/* Tab Navigation */}
-        <motion.div 
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white/80 backdrop-blur-md border border-white/50 rounded-xl shadow-lg p-2 overflow-x-auto mb-4"
-        >
-          <div className="flex items-center gap-2 min-w-max">
-            {
-              [
-                { key: 'overview', label: '数据概览和ai诊断', icon: '📊' },
-                { key: 'monthly', label: '月度对比分析', icon: '📈' },
-                { key: 'range', label: '时段对比KPI', icon: '📅' },
-                { key: 'personal', label: '个人爆款视频', icon: '👤' },
-                { key: 'viral', label: '爆款视频', icon: '🔥' },
-                { key: 'rewrite', label: '文案创作', icon: '✍️' },
-                { key: 'agent', label: '智能体', icon: '🤖' }
-              ].map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key as any)}
-                className={cn(
-                  "relative px-6 py-3 text-sm font-bold rounded-lg transition-all flex items-center gap-2 whitespace-nowrap",
-                  activeTab === tab.key
-                    ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md"
-                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-800"
-                )}
-              >
-                <span>{tab.icon}</span>
-                <span>{tab.label}</span>
-                {activeTab === tab.key && (
-                  <motion.div 
-                    layoutId="activeTab"
-                    className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                  />
-                )}
-              </button>
-            ))}
+        <div className="fixed left-4 top-20 z-50">
+          <div 
+            className="relative group"
+          >
+            {/* 触发区域 */}
+            <div className="bg-white/80 backdrop-blur-md border border-white/50 rounded-xl shadow-lg p-2 cursor-pointer hover:shadow-xl transition-all duration-300">
+              <span className="text-xl">📊</span>
+            </div>
+            
+            {/* 导航菜单 */}
+            <motion.div 
+              initial={{ opacity: 0, x: -10, width: 0 }}
+              whileHover={{ 
+                opacity: 1, 
+                x: 0, 
+                width: 'auto' 
+              }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              className="absolute left-full top-0 ml-2 bg-white/90 backdrop-blur-md border border-white/50 rounded-xl shadow-lg p-2 min-w-[180px] overflow-hidden z-50"
+            >
+              <div className="flex flex-col items-start gap-1 min-w-[180px]">
+                {
+                  [
+                    { key: 'overview', label: '数据概览和AI诊断', icon: '📊' },
+                    { key: 'monthly', label: '月度对比分析', icon: '📈' },
+                    { key: 'range', label: '时段对比KPI', icon: '📅' },
+                    { key: 'personal', label: '个人行业爆款视频', icon: '👤' },
+                    { key: 'viral', label: '行业爆款视频', icon: '🔥' },
+                    { key: 'rewrite', label: '文案创作', icon: '✍️' },
+                    { key: 'agent', label: '智能体', icon: '🤖' }
+                  ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key as any)}
+                    className={cn(
+                      "relative w-full px-3 py-1.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2",
+                      activeTab === tab.key
+                        ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md"
+                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-800"
+                    )}
+                  >
+                    <span>{tab.icon}</span>
+                    <span>{tab.label}</span>
+                    {activeTab === tab.key && (
+                      <motion.div 
+                        layoutId="activeTab"
+                        className="absolute right-0 top-0 bottom-0 w-0.5 bg-white"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                      />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
           </div>
-        </motion.div>
+        </div>
 
         {data.length > 0 ? (
           <>
@@ -3359,7 +3394,7 @@ ${highRatingCopies.length > 0 ? `
         </motion.div>
         )}
 
-        {/* 个人爆款视频 */}
+        {/* 个人行业爆款视频 */}
         {activeTab === 'personal' && showAnalysis && platformData[selectedPlatform]?.length > 0 && (
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
@@ -3380,7 +3415,7 @@ ${highRatingCopies.length > 0 ? `
                             <span className="text-red-500">🔥</span> 
                             {userNames[selectedPlatform] ? `${userNames[selectedPlatform]} ` : ''}
                             {selectedPlatform === 'douyin' ? '抖音' : selectedPlatform === 'kuaishou' ? '快手' : '视频号'}
-                            {topVideosMode === 'range' ? '爆款视频数据明细 (Top 10)' : `月度爆款视频 (Top 10)`}
+                            {topVideosMode === 'range' ? '行业爆款视频数据明细 (Top 10)' : `月度行业爆款视频 (Top 10)`}
                         </h3>
                         <div className="flex flex-wrap gap-4 w-full sm:w-auto">
                             <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
