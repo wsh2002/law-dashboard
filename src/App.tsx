@@ -1324,8 +1324,13 @@ ${highRatingCopies.length > 0 ? `
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    // 收集所有文件的数据
+    const allParsedData: DataItem[] = [];
+    const allUserNames: Record<string, string> = {};
+    let firstPlatform: 'douyin' | 'kuaishou' | 'wechat' | undefined;
+
     // Process each file
-    Array.from(files).forEach((file: File) => {
+    Array.from(files).forEach((file: File, index) => {
         // Extract name from filename
         // Logic: Take part before "的", or filename without extension if "的" not present
         const filename = file.name;
@@ -1345,15 +1350,12 @@ ${highRatingCopies.length > 0 ? `
         
         // Store user name for each platform
         if (platform) {
-            setUserNames(prev => ({
-                ...prev,
-                [platform]: name
-            }));
+            allUserNames[platform] = name;
         }
         
         // Set the first extracted platform as the current selected platform
-        if (platform && files[0] === file) {
-            handlePlatformSelect(platform);
+        if (platform && index === 0) {
+            firstPlatform = platform;
         }
 
         const reader = new FileReader();
@@ -1366,11 +1368,10 @@ ${highRatingCopies.length > 0 ? `
           const parsedData = parseData(rawData, platform);
           
           if (parsedData.length > 0) {
-              // 合并新数据到现有数据中，而不是替换
-              setData(prevData => {
-                  // 合并数据
-                  const mergedData = [...prevData, ...parsedData];
-                  
+              allParsedData.push(...parsedData);
+              
+              // 如果是最后一个文件，处理所有数据
+              if (index === files.length - 1) {
                   // 按平台分组数据
                   const groupedData: Record<string, DataItem[]> = {
                       douyin: [],
@@ -1378,60 +1379,66 @@ ${highRatingCopies.length > 0 ? `
                       wechat: []
                   };
                   
-                  mergedData.forEach(item => {
+                  allParsedData.forEach(item => {
                       if (item.platform) {
                           groupedData[item.platform].push(item);
                       }
                   });
                   
-                  // 更新platformData
+                  // 更新用户名称
+                  setUserNames(allUserNames);
+                  
+                  // 更新数据
+                  setData(allParsedData);
                   setPlatformData(groupedData);
                   
-                  // 自动调整日期范围 - 只针对当前上传的平台
-              if (platform) {
-                  // 过滤出当前平台的数据
-                  const platformData = groupedData[platform];
-                  if (platformData.length > 0) {
-                      const dates = platformData.map(d => d.parsedDate.getTime()).sort((a, b) => a - b);
-                      const minDate = new Date(dates[0]);
-                      const maxDate = new Date(dates[dates.length - 1]);
-                      const midDate = new Date(dates[Math.floor(dates.length / 2)]);
+                  // 设置默认平台
+                  if (firstPlatform) {
+                      handlePlatformSelect(firstPlatform);
+                  }
+                  
+                  // 自动调整日期范围 - 针对所有平台
+                  const allDates = allParsedData.map(d => d.parsedDate.getTime()).sort((a, b) => a - b);
+                  if (allDates.length > 0) {
+                      const minDate = new Date(allDates[0]);
+                      const maxDate = new Date(allDates[allDates.length - 1]);
+                      const midDate = new Date(allDates[Math.floor(allDates.length / 2)]);
                       
                       const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
                       
-                      // 更新日期范围
-                      setPlatformAiDateRange({ start: fmt(minDate), end: fmt(maxDate) });
-                      setPlatformTrendRange({ start: fmt(minDate), end: fmt(maxDate) });
-                      setPlatformViewsTrendRange({ start: fmt(minDate), end: fmt(maxDate) });
+                      // 更新整体数据日期范围
+                      setDataDateRange({ start: fmt(minDate), end: fmt(maxDate) });
+                      
+                      // 更新平台日期范围
+                      if (firstPlatform) {
+                          const platformData = groupedData[firstPlatform];
+                          if (platformData.length > 0) {
+                              // 更新日期范围
+                              setPlatformAiDateRange({ start: fmt(minDate), end: fmt(maxDate) });
+                              setPlatformTrendRange({ start: fmt(minDate), end: fmt(maxDate) });
+                              setPlatformViewsTrendRange({ start: fmt(minDate), end: fmt(maxDate) });
 
-                      // 更新月度比较默认值
-                      const months = Array.from(new Set(platformData.map(d => format(d.parsedDate, 'yyyy-MM')))).sort();
-                      if (months.length > 0) {
-                          setPlatformMonthA(months[0]);
-                          setPlatformMonthB(months.length > 1 ? months[months.length - 1] : months[0]);
-                          setPlatformSelectedMonthForVideos(months[0]);
+                              // 更新月度比较默认值
+                              const months = Array.from(new Set(platformData.map(d => format(d.parsedDate, 'yyyy-MM')))).sort();
+                              if (months.length > 0) {
+                                  setPlatformMonthA(months[0]);
+                                  setPlatformMonthB(months.length > 1 ? months[months.length - 1] : months[0]);
+                                  setPlatformSelectedMonthForVideos(months[0]);
+                              }
+
+                              // 设置默认日期范围
+                              setPlatformDateRange({ start: fmt(minDate), end: fmt(midDate) });
+                              setPlatformCompareRange({ start: fmt(addDays(midDate, 1)), end: fmt(maxDate) });
+                          }
                       }
-
-                      // 设置默认日期范围
-                      setPlatformDateRange({ start: fmt(minDate), end: fmt(midDate) });
-                      setPlatformCompareRange({ start: fmt(addDays(midDate, 1)), end: fmt(maxDate) });
                   }
+                  
+                  // 上传数据后自动显示分析内容
+                  setShowAnalysis(true);
               }
-              
-              // 更新整体数据日期范围
-              const allDates = mergedData.map(d => d.parsedDate.getTime()).sort((a, b) => a - b);
-              const allMinDate = new Date(allDates[0]);
-              const allMaxDate = new Date(allDates[allDates.length - 1]);
-              setDataDateRange({ start: format(allMinDate, 'yyyy-MM-dd'), end: format(allMaxDate, 'yyyy-MM-dd') });
-              
-              // 上传数据后自动显示分析内容
-              setShowAnalysis(true);
-              
-              return mergedData;
-          });
-      }
-    };
-    reader.readAsBinaryString(file as Blob);
+          }
+        };
+        reader.readAsBinaryString(file as Blob);
     });
   };
 
@@ -2377,39 +2384,45 @@ ${highRatingCopies.length > 0 ? `
                 </h3>
                 <div className="flex flex-wrap items-center gap-2">
                     <div className="flex items-center gap-2 bg-white/50 p-1 rounded-lg border border-gray-200">
-                        <button
-                            onClick={() => handlePlatformSelect('douyin')}
-                            className={cn(
-                                "px-3 py-1 text-xs font-medium rounded-md transition-all",
-                                selectedPlatform === 'douyin'
-                                    ? "bg-blue-600 text-white"
-                                    : "text-gray-600 hover:bg-white/50"
-                            )}
-                        >
-                            抖音
-                        </button>
-                        <button
-                            onClick={() => handlePlatformSelect('kuaishou')}
-                            className={cn(
-                                "px-3 py-1 text-xs font-medium rounded-md transition-all",
-                                selectedPlatform === 'kuaishou'
-                                    ? "bg-blue-600 text-white"
-                                    : "text-gray-600 hover:bg-white/50"
-                            )}
-                        >
-                            快手
-                        </button>
-                        <button
-                            onClick={() => handlePlatformSelect('wechat')}
-                            className={cn(
-                                "px-3 py-1 text-xs font-medium rounded-md transition-all",
-                                selectedPlatform === 'wechat'
-                                    ? "bg-blue-600 text-white"
-                                    : "text-gray-600 hover:bg-white/50"
-                            )}
-                        >
-                            视频号
-                        </button>
+                        {platformData.douyin?.length > 0 && (
+                            <button
+                                onClick={() => handlePlatformSelect('douyin')}
+                                className={cn(
+                                    "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                                    selectedPlatform === 'douyin'
+                                        ? "bg-blue-600 text-white"
+                                        : "text-gray-600 hover:bg-white/50"
+                                )}
+                            >
+                                抖音
+                            </button>
+                        )}
+                        {platformData.kuaishou?.length > 0 && (
+                            <button
+                                onClick={() => handlePlatformSelect('kuaishou')}
+                                className={cn(
+                                    "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                                    selectedPlatform === 'kuaishou'
+                                        ? "bg-blue-600 text-white"
+                                        : "text-gray-600 hover:bg-white/50"
+                                )}
+                            >
+                                快手
+                            </button>
+                        )}
+                        {platformData.wechat?.length > 0 && (
+                            <button
+                                onClick={() => handlePlatformSelect('wechat')}
+                                className={cn(
+                                    "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                                    selectedPlatform === 'wechat'
+                                        ? "bg-blue-600 text-white"
+                                        : "text-gray-600 hover:bg-white/50"
+                                )}
+                            >
+                                视频号
+                            </button>
+                        )}
                     </div>
                     <div className="flex items-center gap-2 bg-white/50 p-1 rounded-lg border border-gray-200">
                         <input 
@@ -2780,24 +2793,30 @@ ${highRatingCopies.length > 0 ? `
                 <span className="text-red-500">📌</span> 时间段对比 KPI
             </h2>
             <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
-                <button 
-                    onClick={() => handlePlatformSelect('douyin')}
-                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'douyin' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500')}
-                >
-                    抖音
-                </button>
-                <button 
-                    onClick={() => handlePlatformSelect('kuaishou')}
-                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'kuaishou' ? 'bg-pink-500 text-white shadow-sm' : 'text-gray-500')}
-                >
-                    快手
-                </button>
-                <button 
-                    onClick={() => handlePlatformSelect('wechat')}
-                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'wechat' ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500')}
-                >
-                    视频号
-                </button>
+                {platformData.douyin?.length > 0 && (
+                    <button 
+                        onClick={() => handlePlatformSelect('douyin')}
+                        className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'douyin' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500')}
+                    >
+                        抖音
+                    </button>
+                )}
+                {platformData.kuaishou?.length > 0 && (
+                    <button 
+                        onClick={() => handlePlatformSelect('kuaishou')}
+                        className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'kuaishou' ? 'bg-pink-500 text-white shadow-sm' : 'text-gray-500')}
+                    >
+                        快手
+                    </button>
+                )}
+                {platformData.wechat?.length > 0 && (
+                    <button 
+                        onClick={() => handlePlatformSelect('wechat')}
+                        className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'wechat' ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500')}
+                    >
+                        视频号
+                    </button>
+                )}
             </div>
         </motion.div>
         )}
@@ -3235,24 +3254,30 @@ ${highRatingCopies.length > 0 ? `
                         </h2>
                         <div className="flex flex-wrap gap-4">
                             <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
-                                <button 
-                                    onClick={() => handlePlatformSelect('douyin')}
-                                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'douyin' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500')}
-                                >
-                                    抖音
-                                </button>
-                                <button 
-                                    onClick={() => handlePlatformSelect('kuaishou')}
-                                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'kuaishou' ? 'bg-pink-500 text-white shadow-sm' : 'text-gray-500')}
-                                >
-                                    快手
-                                </button>
-                                <button 
-                                    onClick={() => handlePlatformSelect('wechat')}
-                                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'wechat' ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500')}
-                                >
-                                    视频号
-                                </button>
+                                {platformData.douyin?.length > 0 && (
+                                    <button 
+                                        onClick={() => handlePlatformSelect('douyin')}
+                                        className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'douyin' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500')}
+                                    >
+                                        抖音
+                                    </button>
+                                )}
+                                {platformData.kuaishou?.length > 0 && (
+                                    <button 
+                                        onClick={() => handlePlatformSelect('kuaishou')}
+                                        className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'kuaishou' ? 'bg-pink-500 text-white shadow-sm' : 'text-gray-500')}
+                                    >
+                                        快手
+                                    </button>
+                                )}
+                                {platformData.wechat?.length > 0 && (
+                                    <button 
+                                        onClick={() => handlePlatformSelect('wechat')}
+                                        className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'wechat' ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500')}
+                                    >
+                                        视频号
+                                    </button>
+                                )}
                             </div>
                             <div className="flex gap-4">
                                 <select 
@@ -3419,24 +3444,30 @@ ${highRatingCopies.length > 0 ? `
                         </h3>
                         <div className="flex flex-wrap gap-4 w-full sm:w-auto">
                             <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
-                                <button 
-                                    onClick={() => handlePlatformSelect('douyin')}
-                                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'douyin' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500')}
-                                >
-                                    抖音
-                                </button>
-                                <button 
-                                    onClick={() => handlePlatformSelect('kuaishou')}
-                                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'kuaishou' ? 'bg-pink-500 text-white shadow-sm' : 'text-gray-500')}
-                                >
-                                    快手
-                                </button>
-                                <button 
-                                    onClick={() => handlePlatformSelect('wechat')}
-                                    className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'wechat' ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500')}
-                                >
-                                    视频号
-                                </button>
+                                {platformData.douyin?.length > 0 && (
+                                    <button 
+                                        onClick={() => handlePlatformSelect('douyin')}
+                                        className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'douyin' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500')}
+                                    >
+                                        抖音
+                                    </button>
+                                )}
+                                {platformData.kuaishou?.length > 0 && (
+                                    <button 
+                                        onClick={() => handlePlatformSelect('kuaishou')}
+                                        className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'kuaishou' ? 'bg-pink-500 text-white shadow-sm' : 'text-gray-500')}
+                                    >
+                                        快手
+                                    </button>
+                                )}
+                                {platformData.wechat?.length > 0 && (
+                                    <button 
+                                        onClick={() => handlePlatformSelect('wechat')}
+                                        className={cn("px-3 py-1 rounded-md transition-all", selectedPlatform === 'wechat' ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500')}
+                                    >
+                                        视频号
+                                    </button>
+                                )}
                             </div>
                             <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
                                 <button onClick={() => setTopVideosMode('range')} className={cn("px-3 py-1 rounded-md transition-all", topVideosMode === 'range' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500')}>按分析周期</button>
