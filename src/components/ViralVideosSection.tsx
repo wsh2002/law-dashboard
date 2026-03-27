@@ -717,14 +717,154 @@ ${analysisResult}
           ))}
         </div>
 
-        {/* 文案库按钮 */}
-        <button
-          onClick={() => setShowScriptLibrary(!showScriptLibrary)}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
-        >
-          <Book className="w-4 h-4" />
-          文案库
-        </button>
+        {/* 抖音链接识别 */}
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 w-full md:w-auto">
+          <div className="flex gap-2 w-full md:w-auto">
+            <input
+              type="text"
+              placeholder="输入抖音链接进行文案识别..."
+              className="flex-1 px-4 py-2 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+              id="douyin-link-input"
+            />
+            <button
+              onClick={async () => {
+                const input = document.getElementById('douyin-link-input') as HTMLInputElement;
+                const link = input.value.trim();
+                if (link) {
+                  setIsTranscribing(true);
+                  setTranscribeError('');
+                  
+                  try {
+                    const resp = await fetch(`${WHISPER_API}/api/process`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ url: link })
+                    });
+
+                    if (!resp.ok) {
+                      throw new Error(`HTTP ${resp.status}`);
+                    }
+
+                    const reader = resp.body!.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+                    let subtitles: { start: string; end: string; text: string }[] = [];
+                    let done = false;
+
+                    while (!done) {
+                      const { done: readerDone, value } = await reader.read();
+                      done = readerDone;
+                      if (done) break;
+                      
+                      buffer += decoder.decode(value, { stream: true });
+                      const lines = buffer.split('\n\n');
+                      buffer = lines.pop() || '';
+
+                      for (const chunk of lines) {
+                        const eventLines = chunk.split('\n');
+                        let eventType = '';
+                        let eventData = '';
+
+                        for (const line of eventLines) {
+                          if (line.startsWith('event: ')) {
+                            eventType = line.slice(7).trim();
+                          } else if (line.startsWith('data: ')) {
+                            eventData = line.slice(6);
+                          }
+                        }
+
+                        if (eventType && eventData) {
+                          try {
+                            const data = JSON.parse(eventData);
+                            
+                            if (eventType === 'result' && data.subtitles) {
+                              subtitles = data.subtitles;
+                              const text = data.subtitles.map((s: { text: string }) => s.text).join('\n');
+                               
+                              // 保存到文案库
+                              const scriptItem = {
+                                id: Date.now().toString(),
+                                videoId: `link-${Date.now()}`,
+                                title: '抖音链接识别',
+                                author: '抖音用户',
+                                platform: 'douyin',
+                                content: text,
+                                subtitles: data.subtitles,
+                                timestamp: new Date().toISOString()
+                              };
+                              
+                              // 使用Firebase保存数据
+                              firebase.push('script_library', scriptItem);
+                              
+                              // 显示成功提示
+                              alert('文案识别成功，已保存到文案库！');
+                              input.value = '';
+                            } else if (eventType === 'error') {
+                              if (data.message === 'COOKIE_EXPIRED') {
+                                setTranscribeError('Cookie 已过期,请更新 cookies.txt 后重启服务');
+                              } else {
+                                setTranscribeError(`识别失败:${data.message}`);
+                              }
+                            } else if (eventType === 'queued') {
+                              setTranscribeError(`⏳ ${data.hint}`);
+                            } else if (eventType === 'progress') {
+                              setTranscribeError(`⏳ 识别进度: ${data.progress}%`);
+                            }
+                          } catch (e) {
+                            console.error('解析 SSE 数据失败:', e);
+                          }
+                        }
+                      }
+                    }
+                  } catch (e) {
+                    setTranscribeError('无法连接到识别服务,请确认 Whisper 服务已启动');
+                    console.error('识别错误:', e);
+                  } finally {
+                    setIsTranscribing(false);
+                  }
+                }
+              }}
+              className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg text-sm font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+            >
+              {isTranscribing ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  识别中...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  识别文案
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* 文案库按钮 */}
+          <button
+            onClick={() => setShowScriptLibrary(!showScriptLibrary)}
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+          >
+            <Book className="w-4 h-4" />
+            文案库
+          </button>
+        </div>
+        
+        {/* 识别状态提示 */}
+        {transcribeError && (
+          <div className="w-full bg-red-50 border border-red-100 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-red-600">识别状态：</p>
+                <p className="text-[10px] text-red-500 mt-1">{transcribeError}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <motion.div

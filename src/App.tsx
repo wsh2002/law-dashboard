@@ -1320,7 +1320,7 @@ ${highRatingCopies.length > 0 ? `
 
 
   // File Upload Handler
-  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -1329,117 +1329,123 @@ ${highRatingCopies.length > 0 ? `
     const allUserNames: Record<string, string> = {};
     let firstPlatform: 'douyin' | 'kuaishou' | 'wechat' | undefined;
 
-    // Process each file
-    Array.from(files).forEach((file: File, index) => {
-        // Extract name from filename
-        // Logic: Take part before "的", or filename without extension if "的" not present
-        const filename = file.name;
-        let name = filename.substring(0, filename.lastIndexOf('.')); // Remove extension
-        if (name.includes('的')) {
-            name = name.split('的')[0];
-        }
-        // Extract platform from filename
-        let platform: 'douyin' | 'kuaishou' | 'wechat' | undefined;
-        if (filename.includes('抖音')) {
-            platform = 'douyin';
-        } else if (filename.includes('快手')) {
-            platform = 'kuaishou';
-        } else if (filename.includes('视频号')) {
-            platform = 'wechat';
-        }
-        
-        // Store user name for each platform
-        if (platform) {
-            allUserNames[platform] = name;
-        }
-        
-        // Set the first extracted platform as the current selected platform
-        if (platform && index === 0) {
-            firstPlatform = platform;
-        }
+    // 处理单个文件的函数
+    const processFile = (file: File, index: number): Promise<void> => {
+        return new Promise((resolve) => {
+            // Extract name from filename
+            // Logic: Take part before "的", or filename without extension if "的" not present
+            const filename = file.name;
+            let name = filename.substring(0, filename.lastIndexOf('.')); // Remove extension
+            if (name.includes('的')) {
+                name = name.split('的')[0];
+            }
+            // Extract platform from filename
+            let platform: 'douyin' | 'kuaishou' | 'wechat' | undefined;
+            if (filename.includes('抖音')) {
+                platform = 'douyin';
+            } else if (filename.includes('快手')) {
+                platform = 'kuaishou';
+            } else if (filename.includes('视频号')) {
+                platform = 'wechat';
+            }
+            
+            // Store user name for each platform
+            if (platform) {
+                allUserNames[platform] = name;
+            }
+            
+            // Set the first extracted platform as the current selected platform
+            if (platform && index === 0) {
+                firstPlatform = platform;
+            }
 
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          const bstr = evt.target?.result;
-          const wb = XLSX.read(bstr, { type: 'binary' });
-          const wsname = wb.SheetNames[0];
-          const ws = wb.Sheets[wsname];
-          const rawData = XLSX.utils.sheet_to_json(ws);
-          const parsedData = parseData(rawData, platform);
-          
-          if (parsedData.length > 0) {
-              allParsedData.push(...parsedData);
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+              const arrayBuffer = evt.target?.result as ArrayBuffer;
+              const wb = XLSX.read(arrayBuffer, { type: 'array' });
+              const wsname = wb.SheetNames[0];
+              const ws = wb.Sheets[wsname];
+              const rawData = XLSX.utils.sheet_to_json(ws);
+              const parsedData = parseData(rawData, platform);
               
-              // 如果是最后一个文件，处理所有数据
-              if (index === files.length - 1) {
-                  // 按平台分组数据
-                  const groupedData: Record<string, DataItem[]> = {
-                      douyin: [],
-                      kuaishou: [],
-                      wechat: []
-                  };
-                  
-                  allParsedData.forEach(item => {
-                      if (item.platform) {
-                          groupedData[item.platform].push(item);
-                      }
-                  });
-                  
-                  // 更新用户名称
-                  setUserNames(allUserNames);
-                  
-                  // 更新数据
-                  setData(allParsedData);
-                  setPlatformData(groupedData);
-                  
-                  // 设置默认平台
-                  if (firstPlatform) {
-                      handlePlatformSelect(firstPlatform);
-                  }
-                  
-                  // 自动调整日期范围 - 针对所有平台
-                  const allDates = allParsedData.map(d => d.parsedDate.getTime()).sort((a, b) => a - b);
-                  if (allDates.length > 0) {
-                      const minDate = new Date(allDates[0]);
-                      const maxDate = new Date(allDates[allDates.length - 1]);
-                      const midDate = new Date(allDates[Math.floor(allDates.length / 2)]);
-                      
-                      const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
-                      
-                      // 更新整体数据日期范围
-                      setDataDateRange({ start: fmt(minDate), end: fmt(maxDate) });
-                      
-                      // 更新平台日期范围
-                      if (firstPlatform) {
-                          const platformData = groupedData[firstPlatform];
-                          if (platformData.length > 0) {
-                              // 更新日期范围
-                              setPlatformAiDateRange({ start: fmt(minDate), end: fmt(maxDate) });
-                              setPlatformTrendRange({ start: fmt(minDate), end: fmt(maxDate) });
-                              setPlatformViewsTrendRange({ start: fmt(minDate), end: fmt(maxDate) });
-
-                              // 更新月度比较默认值
-                              const months = Array.from(new Set(platformData.map(d => format(d.parsedDate, 'yyyy-MM')))).sort();
-                              if (months.length > 0) {
-                                  setPlatformMonthA(months[0]);
-                                  setPlatformMonthB(months.length > 1 ? months[months.length - 1] : months[0]);
-                                  setPlatformSelectedMonthForVideos(months[0]);
-                              }
-
-                              // 设置默认日期范围
-                              setPlatformDateRange({ start: fmt(minDate), end: fmt(midDate) });
-                              setPlatformCompareRange({ start: fmt(addDays(midDate, 1)), end: fmt(maxDate) });
-                          }
-                      }
-                  }
-                  
-                  // 上传数据后自动显示分析内容
-                  setShowAnalysis(true);
+              if (parsedData.length > 0) {
+                  allParsedData.push(...parsedData);
               }
-          }
+              resolve();
+            };
+            reader.readAsArrayBuffer(file as Blob);
+        });
+    };
+
+    // 处理所有文件
+    await Promise.all(Array.from(files).map((file, index) => processFile(file, index)));
+
+    // 处理所有数据
+    if (allParsedData.length > 0) {
+        // 按平台分组数据
+        const groupedData: Record<string, DataItem[]> = {
+            douyin: [],
+            kuaishou: [],
+            wechat: []
         };
-        reader.readAsBinaryString(file as Blob);
-    });
+        
+        allParsedData.forEach(item => {
+            if (item.platform) {
+                groupedData[item.platform].push(item);
+            }
+        });
+        
+        // 更新用户名称
+        setUserNames(allUserNames);
+        
+        // 更新数据
+        setData(allParsedData);
+        setPlatformData(groupedData);
+        
+        // 设置默认平台
+        if (firstPlatform) {
+            handlePlatformSelect(firstPlatform);
+        }
+        
+        // 自动调整日期范围 - 针对所有平台
+        const allDates = allParsedData.map(d => d.parsedDate.getTime()).sort((a, b) => a - b);
+        if (allDates.length > 0) {
+            const minDate = new Date(allDates[0]);
+            const maxDate = new Date(allDates[allDates.length - 1]);
+            const midDate = new Date(allDates[Math.floor(allDates.length / 2)]);
+            
+            const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
+            
+            // 更新整体数据日期范围
+            setDataDateRange({ start: fmt(minDate), end: fmt(maxDate) });
+            
+            // 更新平台日期范围
+            if (firstPlatform) {
+                const platformData = groupedData[firstPlatform];
+                if (platformData.length > 0) {
+                    // 更新日期范围
+                    setPlatformAiDateRange({ start: fmt(minDate), end: fmt(maxDate) });
+                    setPlatformTrendRange({ start: fmt(minDate), end: fmt(maxDate) });
+                    setPlatformViewsTrendRange({ start: fmt(minDate), end: fmt(maxDate) });
+
+                    // 更新月度比较默认值
+                    const months = Array.from(new Set(platformData.map(d => format(d.parsedDate, 'yyyy-MM')))).sort();
+                    if (months.length > 0) {
+                        setPlatformMonthA(months[0]);
+                        setPlatformMonthB(months.length > 1 ? months[months.length - 1] : months[0]);
+                        setPlatformSelectedMonthForVideos(months[0]);
+                    }
+
+                    // 设置默认日期范围
+                    setPlatformDateRange({ start: fmt(minDate), end: fmt(midDate) });
+                    setPlatformCompareRange({ start: fmt(addDays(midDate, 1)), end: fmt(maxDate) });
+                }
+            }
+        }
+        
+        // 上传数据后自动显示分析内容
+        setShowAnalysis(true);
+    }
   };
 
   // --- Range Analysis Logic ---  
@@ -2329,16 +2335,15 @@ ${highRatingCopies.length > 0 ? `
               className="absolute left-full top-0 ml-2 bg-white/90 backdrop-blur-md border border-white/50 rounded-xl shadow-lg p-2 min-w-[180px] overflow-hidden z-50"
             >
               <div className="flex flex-col items-start gap-1 min-w-[180px]">
-                {
-                  [
-                    { key: 'overview', label: '数据概览和AI诊断', icon: '📊' },
-                    { key: 'monthly', label: '月度对比分析', icon: '📈' },
-                    { key: 'range', label: '时段对比KPI', icon: '📅' },
-                    { key: 'personal', label: '个人行业爆款视频', icon: '👤' },
-                    { key: 'viral', label: '行业爆款视频', icon: '🔥' },
-                    { key: 'rewrite', label: '文案创作', icon: '✍️' },
-                    { key: 'agent', label: '智能体', icon: '🤖' }
-                  ].map((tab) => (
+                {[
+              { key: 'overview', label: '数据概览和AI诊断', icon: '📊' },
+              { key: 'monthly', label: '月度对比分析', icon: '📈' },
+              { key: 'range', label: '时段对比KPI', icon: '📅' },
+              { key: 'personal', label: '个人行业爆款视频', icon: '👤' },
+              { key: 'viral', label: '行业爆款视频', icon: '🔥' },
+              { key: 'rewrite', label: '文案创作', icon: '✍️' },
+              { key: 'agent', label: '智能体', icon: '🤖' }
+            ].map((tab) => (
                   <button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key as any)}
@@ -3595,6 +3600,8 @@ ${highRatingCopies.length > 0 ? `
               </Suspense>
             </motion.div>
         )}
+
+
 
         {/* 智能体 */}
         {activeTab === 'agent' && showAnalysis && (
