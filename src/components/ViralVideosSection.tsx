@@ -748,7 +748,6 @@ ${analysisResult}
                     const reader = resp.body!.getReader();
                     const decoder = new TextDecoder();
                     let buffer = '';
-                    let subtitles: { start: string; end: string; text: string }[] = [];
                     let done = false;
 
                     while (!done) {
@@ -778,7 +777,6 @@ ${analysisResult}
                             const data = JSON.parse(eventData);
                             
                             if (eventType === 'result' && data.subtitles) {
-                              subtitles = data.subtitles;
                               const text = data.subtitles.map((s: { text: string }) => s.text).join('\n');
                                
                               // 保存到文案库
