@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, ChangeEvent, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, ChangeEvent, lazy, Suspense } from 'react';
 import * as XLSX from 'xlsx';
 import { motion } from 'framer-motion';
 import { DEFAULT_CONFIG, fetchAIAnalysis } from './services/aiAnalysis';
@@ -8,7 +8,8 @@ import {
   BarChart, Bar, ComposedChart, ScatterChart, Scatter, ZAxis, ReferenceLine
 } from 'recharts';
 import { Upload, Calendar, ArrowUp, ArrowDown, FileSpreadsheet, TrendingUp, Activity, Heart, GitMerge, Sparkles, Play, MessageCircle, Share2, Users, Star, ThumbsUp, Search } from 'lucide-react';
-import { format, parse, addDays, isValid, startOfDay, subDays, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, eachWeekOfInterval } from 'date-fns';
+import ReactWordcloud from 'react-wordcloud';
+import { format, parse, addDays, isValid, startOfDay, subDays, startOfMonth, subMonths, startOfWeek, endOfWeek, eachWeekOfInterval } from 'date-fns';
 import { cn } from './lib/utils';
 
 // 懒加载组件
@@ -212,42 +213,7 @@ const parseData = (raw: any[], platform?: 'douyin' | 'kuaishou' | 'wechat'): Dat
   }).filter(item => isValid(item.parsedDate)); // Filter invalid dates
 };
 
-const KPICard = ({ title, value, compareValue, unit = '', icon: Icon }: { title: string, value: number, compareValue?: number, unit?: string, icon?: any }) => {
-  const delta = compareValue !== undefined ? value - compareValue : 0;
-  const percent = compareValue ? ((delta / compareValue) * 100).toFixed(1) : 0;
-  const isPositive = delta >= 0;
 
-  return (
-    <motion.div 
-      whileHover={{ scale: 1.05, translateY: -5 }}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
-    >
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-gray-500 text-sm font-medium">{title}</h3>
-        {Icon && <Icon className="w-5 h-5 text-gray-400" />}
-      </div>
-      <div className="flex items-end justify-between">
-        <div className="text-2xl font-bold text-gray-900">
-          {value.toLocaleString()} <span className="text-sm font-normal text-gray-400">{unit}</span>
-        </div>
-        {compareValue !== undefined && (
-          <div className={cn("flex items-center text-sm font-medium", isPositive ? "text-red-600" : "text-green-600")}>
-            {isPositive ? <ArrowUp className="w-4 h-4 mr-1" /> : <ArrowDown className="w-4 h-4 mr-1" />}
-            {Math.abs(Number(percent))}%
-          </div>
-        )}
-      </div>
-      {compareValue !== undefined && (
-        <div className="text-xs text-gray-400 mt-2">
-          对比: {compareValue.toLocaleString()}
-        </div>
-      )}
-    </motion.div>
-  );
-};
 
 
 
@@ -486,7 +452,7 @@ export default function App() {
   }, [activeTab, tabPlatforms]);
 
   // 平台选择处理函数
-  const handlePlatformSelect = async (platform: 'douyin' | 'kuaishou' | 'wechat') => {
+  const handlePlatformSelect = useCallback(async (platform: 'douyin' | 'kuaishou' | 'wechat') => {
     setTabPlatforms(prev => ({
       ...prev,
       [activeTab]: platform
@@ -496,48 +462,48 @@ export default function App() {
     setSelectedPlatform(platform);
     
     // 移除自动生成文案的逻辑，让用户点击开始文案创作按钮才生成
-  };
+  }, [activeTab]);
 
   // 用户反馈处理函数
-  const handleRating = (id: string, rating: number) => {
+  const handleRating = useCallback((id: string, rating: number) => {
     setCopywritingHistory(prev => 
       prev.map(item => 
         item.id === id ? { ...item, rating } : item
       )
     );
-  };
+  }, []);
 
-  const handleFeedback = (id: string, feedback: string) => {
+  const handleFeedback = useCallback((id: string, feedback: string) => {
     setCopywritingHistory(prev => 
       prev.map(item => 
         item.id === id ? { ...item, feedback } : item
       )
     );
-  };
+  }, []);
 
-  const handleModifiedContent = (id: string, modifiedContent: string) => {
+  const handleModifiedContent = useCallback((id: string, modifiedContent: string) => {
     setCopywritingHistory(prev => 
       prev.map(item => 
         item.id === id ? { ...item, modifiedContent } : item
       )
     );
-  };
+  }, []);
 
-  const handleAdopted = (id: string, isAdopted: boolean) => {
+  const handleAdopted = useCallback((id: string, isAdopted: boolean) => {
     setCopywritingHistory(prev => 
       prev.map(item => 
         item.id === id ? { ...item, isAdopted } : item
       )
     );
-  };
+  }, []);
 
-  const handlePerformance = (id: string, performance: CopywritingHistory['performance']) => {
+  const handlePerformance = useCallback((id: string, performance: CopywritingHistory['performance']) => {
     setCopywritingHistory(prev => 
       prev.map(item => 
         item.id === id ? { ...item, performance } : item
       )
     );
-  };
+  }, []);
 
   // 持续学习逻辑：根据用户反馈和效果数据优化提示词
   const optimizedPrompt = useMemo(() => {
@@ -1919,6 +1885,8 @@ ${highRatingCopies.length > 0 ? `
         .sort((a, b) => a.month.localeCompare(b.month));
   }, [platformData, selectedPlatform]);
 
+
+
   // Unique Months for Dropdowns
   const uniqueMonths = useMemo(() => {
       return monthlyData.map(m => m.month);
@@ -2005,6 +1973,54 @@ ${highRatingCopies.length > 0 ? `
     return denom === 0 ? 0 : num / denom;
   };
 
+  // 词云图配置
+  const wordcloudOptions = {
+    rotations: 2,
+    rotationAngles: [0, 90] as [number, number],
+    fontSizes: [12, 60] as [number, number],
+    fontStyle: 'normal' as const,
+    fontWeight: 'bold' as const,
+    padding: 5,
+    randomSeed: "42",
+    deterministic: true,
+    enableTooltip: true,
+    tooltipOptions: {
+      theme: 'light' as const,
+    },
+  };
+
+  // 提取标题关键词并计算频率
+  const getWordcloudData = (videos: DataItem[]) => {
+    const wordFrequency: Record<string, number> = {};
+    const stopWords = new Set([
+      '的', '了', '是', '在', '我', '有', '和', '就', '不', '人', '都', '一', '一个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这', '还', '那', '他', '她', '它', '们', '我们', '你们', '他们', '她们', '它们', '然后', '但是', '因为', '所以', '如果', '虽然', '然而', '可是', '不过', '而且', '并且', '或者', '要么', '除非', '尽管', '不管', '无论', '不仅', '还', '不仅', '而且', '既', '又', '一边', '一边', '与其', '不如', '宁可', '也不', '即使', '也', '只要', '就', '只有', '才', '无论', '都', '不管', '总', '不管', '也', '只要', '就', '只有', '才', '无论', '都', '不管', '总', '不管', '也'
+    ]);
+
+    videos.forEach(video => {
+      const title = video.title;
+      // 简单的中文分词（按空格和常见标点分割）
+      const words = title
+        .split(/[\s，。！？；：、"'()（）【】\[\]{}]/)
+        .filter(word => word.length > 1 && !stopWords.has(word));
+      
+      words.forEach(word => {
+        wordFrequency[word] = (wordFrequency[word] || 0) + 1;
+      });
+    });
+
+    // 转换为词云需要的格式
+    return Object.entries(wordFrequency)
+      .map(([text, value]) => ({ text, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 50); // 只取前50个词
+  };
+
+  // 词云数据
+  const wordcloudData = useMemo(() => {
+    const videos = topVideosMode === 'range' ? top10ExplosiveVideos : monthlyTop10Videos;
+    return getWordcloudData(videos);
+  }, [top10ExplosiveVideos, monthlyTop10Videos, topVideosMode]);
+
   const getHeatColor = (v: number) => {
     const t = Math.max(-1, Math.min(1, v));
     const hue = 240 * (1 - (t + 1) / 2); // -1->240(blue), 0->120, +1->0(red)
@@ -2060,18 +2076,17 @@ ${highRatingCopies.length > 0 ? `
         <defs>
           <linearGradient id="colorAViews" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.4}/>
+            <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.1}/>
           </linearGradient>
           <linearGradient id="colorBViews" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#10b981" stopOpacity={0.4}/>
+            <stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/>
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
         <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
         <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
         <Tooltip 
-          cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} 
           contentStyle={{ 
             borderRadius: '8px', 
             border: 'none', 
@@ -2082,8 +2097,8 @@ ${highRatingCopies.length > 0 ? `
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAViews)" radius={[8, 8, 0, 0]} animationDuration={1000} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBViews)" radius={[8, 8, 0, 0]} animationDuration={1000} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAViews)" radius={[8, 8, 0, 0]} animationDuration={1500} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBViews)" radius={[8, 8, 0, 0]} animationDuration={1500} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -2094,18 +2109,17 @@ ${highRatingCopies.length > 0 ? `
         <defs>
           <linearGradient id="colorAKPIs" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#6366f1" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#6366f1" stopOpacity={0.4}/>
+            <stop offset="100%" stopColor="#6366f1" stopOpacity={0.1}/>
           </linearGradient>
           <linearGradient id="colorBKPIs" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#10b981" stopOpacity={0.4}/>
+            <stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/>
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
         <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
         <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
         <Tooltip 
-          cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} 
           contentStyle={{ 
             borderRadius: '8px', 
             border: 'none', 
@@ -2116,8 +2130,8 @@ ${highRatingCopies.length > 0 ? `
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAKPIs)" radius={[8, 8, 0, 0]} animationDuration={1000} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBKPIs)" radius={[8, 8, 0, 0]} animationDuration={1000} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAKPIs)" radius={[8, 8, 0, 0]} animationDuration={1500} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBKPIs)" radius={[8, 8, 0, 0]} animationDuration={1500} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -2128,18 +2142,17 @@ ${highRatingCopies.length > 0 ? `
         <defs>
           <linearGradient id="colorAComment" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#eab308" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#eab308" stopOpacity={0.4}/>
+            <stop offset="100%" stopColor="#eab308" stopOpacity={0.1}/>
           </linearGradient>
           <linearGradient id="colorBComment" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#10b981" stopOpacity={0.4}/>
+            <stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/>
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
         <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
         <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
         <Tooltip 
-          cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} 
           contentStyle={{ 
             borderRadius: '8px', 
             border: 'none', 
@@ -2150,8 +2163,8 @@ ${highRatingCopies.length > 0 ? `
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAComment)" radius={[8, 8, 0, 0]} animationDuration={1000} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBComment)" radius={[8, 8, 0, 0]} animationDuration={1000} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAComment)" radius={[8, 8, 0, 0]} animationDuration={1500} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBComment)" radius={[8, 8, 0, 0]} animationDuration={1500} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -2162,18 +2175,17 @@ ${highRatingCopies.length > 0 ? `
         <defs>
           <linearGradient id="colorARate" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#ef4444" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#ef4444" stopOpacity={0.4}/>
+            <stop offset="100%" stopColor="#ef4444" stopOpacity={0.1}/>
           </linearGradient>
           <linearGradient id="colorBRate" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#10b981" stopOpacity={0.4}/>
+            <stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/>
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
         <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
         <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
         <Tooltip 
-          cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} 
           contentStyle={{ 
             borderRadius: '8px', 
             border: 'none', 
@@ -2184,8 +2196,8 @@ ${highRatingCopies.length > 0 ? `
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorARate)" radius={[8, 8, 0, 0]} animationDuration={1000} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBRate)" radius={[8, 8, 0, 0]} animationDuration={1000} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorARate)" radius={[8, 8, 0, 0]} animationDuration={1500} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBRate)" radius={[8, 8, 0, 0]} animationDuration={1500} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -2197,7 +2209,7 @@ ${highRatingCopies.length > 0 ? `
         <defs>
           <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.4}/>
+            <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.1}/>
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -2205,7 +2217,6 @@ ${highRatingCopies.length > 0 ? `
         <YAxis yAxisId="left" fontSize={12} stroke="#3b82f6" label={{ value: '月播放量', angle: -90, position: 'insideLeft' }} domain={[0, 'dataMax * 1.2']} />
         <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f43f5e" label={{ value: '月点赞量', angle: 90, position: 'insideRight' }} domain={[0, 'dataMax * 1.2']} />
         <Tooltip 
-          cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} 
           contentStyle={{ 
             borderRadius: '8px', 
             border: 'none', 
@@ -2216,8 +2227,8 @@ ${highRatingCopies.length > 0 ? `
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar yAxisId="left" dataKey="views" name="月播放量" fill="url(#colorViews)" radius={[8, 8, 0, 0]} animationDuration={1000} />
-        <Line yAxisId="right" type="monotone" dataKey="likes" name="月点赞量" stroke="#f43f5e" strokeWidth={3} dot={{ r: 4, fill: '#f43f5e', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f43f5e', stroke: '#fff', strokeWidth: 2 }} animationDuration={1000} />
+        <Bar yAxisId="left" dataKey="views" name="月播放量" fill="url(#colorViews)" radius={[8, 8, 0, 0]} animationDuration={1500} />
+        <Line yAxisId="right" type="monotone" dataKey="likes" name="月点赞量" stroke="#f43f5e" strokeWidth={3} dot={{ r: 4, fill: '#f43f5e', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f43f5e', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
       </ComposedChart>
     </ResponsiveContainer>
   ));
@@ -2228,14 +2239,13 @@ ${highRatingCopies.length > 0 ? `
         <defs>
           <linearGradient id="colorNetFans" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#10b981" stopOpacity={0.4}/>
+            <stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/>
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
         <XAxis dataKey="month" fontSize={12} tickMargin={10} stroke="#94a3b8" />
         <YAxis fontSize={12} stroke="#10b981" label={{ value: '月净增粉', angle: -90, position: 'insideLeft' }} domain={['auto', 'auto']} />
         <Tooltip 
-          cursor={{ fill: 'rgba(248, 250, 252, 0.5)' }} 
           contentStyle={{ 
             borderRadius: '8px', 
             border: 'none', 
@@ -2246,8 +2256,8 @@ ${highRatingCopies.length > 0 ? `
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Line type="monotone" dataKey="netFans" name="月净增粉" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={1000} />
-        <Bar dataKey="netFans" name="月净增粉" fill="url(#colorNetFans)" radius={[8, 8, 0, 0]} animationDuration={1000} />
+        <Line type="monotone" dataKey="netFans" name="月净增粉" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+        <Bar dataKey="netFans" name="月净增粉" fill="url(#colorNetFans)" radius={[8, 8, 0, 0]} animationDuration={1500} />
       </ComposedChart>
     </ResponsiveContainer>
   ));
@@ -2380,223 +2390,398 @@ ${highRatingCopies.length > 0 ? `
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
-          className="bg-white/80 backdrop-blur-md p-4 sm:p-6 rounded-xl shadow-lg border border-white/50"
+          className="space-y-6"
         >
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-blue-600" />
-                    整体数据趋势
-                </h3>
-                <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-2 bg-white/50 p-1 rounded-lg border border-gray-200">
-                        {platformData.douyin?.length > 0 && (
-                            <button
-                                onClick={() => handlePlatformSelect('douyin')}
-                                className={cn(
-                                    "px-3 py-1 text-xs font-medium rounded-md transition-all",
-                                    selectedPlatform === 'douyin'
-                                        ? "bg-blue-600 text-white"
-                                        : "text-gray-600 hover:bg-white/50"
-                                )}
-                            >
-                                抖音
-                            </button>
-                        )}
-                        {platformData.kuaishou?.length > 0 && (
-                            <button
-                                onClick={() => handlePlatformSelect('kuaishou')}
-                                className={cn(
-                                    "px-3 py-1 text-xs font-medium rounded-md transition-all",
-                                    selectedPlatform === 'kuaishou'
-                                        ? "bg-blue-600 text-white"
-                                        : "text-gray-600 hover:bg-white/50"
-                                )}
-                            >
-                                快手
-                            </button>
-                        )}
-                        {platformData.wechat?.length > 0 && (
-                            <button
-                                onClick={() => handlePlatformSelect('wechat')}
-                                className={cn(
-                                    "px-3 py-1 text-xs font-medium rounded-md transition-all",
-                                    selectedPlatform === 'wechat'
-                                        ? "bg-blue-600 text-white"
-                                        : "text-gray-600 hover:bg-white/50"
-                                )}
-                            >
-                                视频号
-                            </button>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2 bg-white/50 p-1 rounded-lg border border-gray-200">
-                        <input 
-                            type="date" 
-                            value={trendRange.start} 
-                            onChange={e => {
-                                setPlatformTrendRange(prev => ({ ...prev, start: e.target.value }));
-                                setPlatformTrendMode('daily');
-                            }}
-                            className="bg-transparent text-sm px-2 py-1 outline-none text-gray-600 w-32"
-                        />
-                        <span className="text-gray-400">-</span>
-                        <input 
-                            type="date" 
-                            value={trendRange.end} 
-                            onChange={e => {
-                                setPlatformTrendRange(prev => ({ ...prev, end: e.target.value }));
-                                setPlatformTrendMode('daily');
-                            }}
-                            className="bg-transparent text-sm px-2 py-1 outline-none text-gray-600 w-32"
-                        />
-                    </div>
-                    <div className="flex gap-1">
-                        <button 
-                            onClick={() => {
-                                if (!dataDateRange) return;
-                                setPlatformTrendRange(dataDateRange);
-                                setPlatformTrendMode('quarterly');
-                            }}
-                            className={cn(
-                                "px-3 py-1 text-xs font-medium rounded-md transition-colors",
-                                trendMode === 'quarterly'
-                                    ? "text-white bg-blue-600 hover:bg-blue-700"
-                                    : "text-gray-600 bg-gray-100 hover:bg-gray-200"
-                            )}
-                        >
-                            全部(季)
-                        </button>
-                        <button 
-                            onClick={() => {
-                                if (!dataDateRange) return;
-                                const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
-                                const start = subDays(end, 7);
-                                setPlatformTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setPlatformTrendMode('daily');
-                            }}
-                            className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                        >
-                            近7天
-                        </button>
-                        <button 
-                            onClick={() => {
-                                if (!dataDateRange) return;
-                                const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
-                                const start = subDays(end, 30);
-                                setPlatformTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setPlatformTrendMode('daily');
-                            }}
-                            className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                        >
-                            近30天
-                        </button>
-                         <button 
-                            onClick={() => {
-                                if (!dataDateRange) return;
-                                const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
-                                const start = startOfMonth(end);
-                                setPlatformTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setPlatformTrendMode('daily');
-                            }}
-                            className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                        >
-                            本月
-                        </button>
-                         <button 
-                            onClick={() => {
-                                if (!dataDateRange) return;
-                                const today = parse(dataDateRange.end, 'yyyy-MM-dd', new Date()); // Use data end as anchor
-                                const start = startOfMonth(subMonths(today, 1));
-                                const end = endOfMonth(subMonths(today, 1));
-                                setPlatformTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setPlatformTrendMode('daily');
-                            }}
-                            className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                        >
-                            上月
-                        </button>
-                        <button 
-                            onClick={() => {
-                                if (!dataDateRange) return;
-                                setPlatformTrendRange(dataDateRange);
-                                setPlatformTrendMode('daily');
-                            }}
-                            className={cn(
-                                "px-3 py-1 text-xs font-medium rounded-md transition-colors",
-                                trendMode === 'daily' && trendRange.start === dataDateRange?.start && trendRange.end === dataDateRange?.end
-                                    ? "text-white bg-blue-600 hover:bg-blue-700"
-                                    : "text-gray-600 bg-gray-100 hover:bg-gray-200"
-                            )}
-                        >
-                            全部(日)
-                        </button>
-                        <button 
-                            onClick={() => {
-                                if (!dataDateRange) return;
-                                // Use the data range but switch mode
-                                setPlatformTrendRange(dataDateRange); 
-                                setPlatformTrendMode('weekly');
-                            }}
-                            className={cn(
-                                "px-3 py-1 text-xs font-medium rounded-md transition-colors",
-                                trendMode === 'weekly'
-                                    ? "text-white bg-green-600 hover:bg-green-700"
-                                    : "text-gray-600 bg-gray-100 hover:bg-gray-200"
-                            )}
-                        >
-                            按周
-                        </button>
-                        <button 
-                            onClick={() => {
-                                if (!dataDateRange) return;
-                                // Use the data range but switch mode
-                                setPlatformTrendRange(dataDateRange); 
-                                setPlatformTrendMode('monthly');
-                            }}
-                            className={cn(
-                                "px-3 py-1 text-xs font-medium rounded-md transition-colors",
-                                trendMode === 'monthly'
-                                    ? "text-white bg-purple-600 hover:bg-purple-700"
-                                    : "text-gray-600 bg-gray-100 hover:bg-gray-200"
-                            )}
-                        >
-                            全年按月
-                        </button>
-                    </div>
+            {/* 顶部 KPI 指标卡片 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3 }}
+                whileHover={{ scale: 1.05, translateY: -5 }}
+                className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs opacity-80 font-medium">总播放量</span>
+                  <Play className="w-5 h-5 opacity-80" />
                 </div>
-            </div>
-            <div className="h-[250px]">
-                <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trendData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                        <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-                        <YAxis fontSize={12} stroke="#f97316" label={{ value: '互动数据', angle: -90, position: 'insideLeft' }} />
-                        <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
-                        <Legend />
-                        <Line type="monotone" dataKey="likes" name="点赞量" stroke="#ef4444" strokeWidth={3} dot={false} />
-                        <Line type="monotone" dataKey="comments" name="评论量" stroke="#8b5cf6" strokeWidth={3} dot={false} />
-                        {/* 根据平台类型显示不同的指标 */}
-                        {selectedPlatform === 'wechat' ? (
-                            <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={false} />
-                        ) : hasFavorites ? (
-                            <Line type="monotone" dataKey="favorites" name="收藏量" stroke="#f59e0b" strokeWidth={3} dot={false} />
-                        ) : hasRecommendations ? (
-                            <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={false} />
-                        ) : null}
-                        <Line type="monotone" dataKey="shares" name="转发量" stroke="#10b981" strokeWidth={3} dot={false} />
-                    </LineChart>
-                </ResponsiveContainer>
+                <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.views.toLocaleString()}</div>
+                <div className="flex items-center gap-2 text-xs opacity-70">
+                  <span>累计视频播放</span>
+                  {compareKPIs.views > 0 && (
+                    <span className={currentKPIs.views > compareKPIs.views ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                      {currentKPIs.views > compareKPIs.views ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                      {Math.abs(((currentKPIs.views - compareKPIs.views) / compareKPIs.views) * 100).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              </motion.div>
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3, delay: 0.1 }}
+                whileHover={{ scale: 1.05, translateY: -5 }}
+                className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs opacity-80 font-medium">总点赞量</span>
+                  <Heart className="w-5 h-5 opacity-80" />
+                </div>
+                <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.likes.toLocaleString()}</div>
+                <div className="flex items-center gap-2 text-xs opacity-70">
+                  <span>用户互动点赞</span>
+                  {compareKPIs.likes > 0 && (
+                    <span className={currentKPIs.likes > compareKPIs.likes ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                      {currentKPIs.likes > compareKPIs.likes ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                      {Math.abs(((currentKPIs.likes - compareKPIs.likes) / compareKPIs.likes) * 100).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              </motion.div>
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3, delay: 0.2 }}
+                whileHover={{ scale: 1.05, translateY: -5 }}
+                className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs opacity-80 font-medium">粉丝净增</span>
+                  <Users className="w-5 h-5 opacity-80" />
+                </div>
+                <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.netFans.toLocaleString()}</div>
+                <div className="flex items-center gap-2 text-xs opacity-70">
+                  <span>新增粉丝数量</span>
+                  {compareKPIs.netFans > 0 && (
+                    <span className={currentKPIs.netFans > compareKPIs.netFans ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                      {currentKPIs.netFans > compareKPIs.netFans ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                      {Math.abs(((currentKPIs.netFans - compareKPIs.netFans) / compareKPIs.netFans) * 100).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              </motion.div>
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3, delay: 0.3 }}
+                whileHover={{ scale: 1.05, translateY: -5 }}
+                className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs opacity-80 font-medium">总评论量</span>
+                  <MessageCircle className="w-5 h-5 opacity-80" />
+                </div>
+                <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.comments.toLocaleString()}</div>
+                <div className="flex items-center gap-2 text-xs opacity-70">
+                  <span>用户评论互动</span>
+                  {compareKPIs.comments > 0 && (
+                    <span className={currentKPIs.comments > compareKPIs.comments ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                      {currentKPIs.comments > compareKPIs.comments ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                      {Math.abs(((currentKPIs.comments - compareKPIs.comments) / compareKPIs.comments) * 100).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              </motion.div>
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3, delay: 0.4 }}
+                whileHover={{ scale: 1.05, translateY: -5 }}
+                className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs opacity-80 font-medium">总转发量</span>
+                  <Share2 className="w-5 h-5 opacity-80" />
+                </div>
+                <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.shares.toLocaleString()}</div>
+                <div className="flex items-center gap-2 text-xs opacity-70">
+                  <span>内容传播分享</span>
+                  {compareKPIs.shares > 0 && (
+                    <span className={currentKPIs.shares > compareKPIs.shares ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                      {currentKPIs.shares > compareKPIs.shares ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                      {Math.abs(((currentKPIs.shares - compareKPIs.shares) / compareKPIs.shares) * 100).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              </motion.div>
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.3, delay: 0.5 }}
+                whileHover={{ scale: 1.05, translateY: -5 }}
+                className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs opacity-80 font-medium">互动率</span>
+                  <Activity className="w-5 h-5 opacity-80" />
+                </div>
+                <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.avgInteractionRate.toFixed(2)}%</div>
+                <div className="flex items-center gap-2 text-xs opacity-70">
+                  <span>用户互动比例</span>
+                  {compareKPIs.avgInteractionRate > 0 && (
+                    <span className={currentKPIs.avgInteractionRate > compareKPIs.avgInteractionRate ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                    {currentKPIs.avgInteractionRate > compareKPIs.avgInteractionRate ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                    {Math.abs(((currentKPIs.avgInteractionRate - compareKPIs.avgInteractionRate) / compareKPIs.avgInteractionRate) * 100).toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              </motion.div>
             </div>
 
-            {/* New Chart for Views and Fans (Large Magnitude) */}
-            <div className="mt-8 pt-6 border-t border-gray-100">
+            {/* 整体数据趋势图表 */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="bg-white/85 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+            >
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-blue-600" />
+                        整体数据趋势
+                    </h3>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2 bg-white/70 p-2 rounded-lg border border-gray-200">
+                            {platformData.douyin?.length > 0 && (
+                                <button
+                                    onClick={() => handlePlatformSelect('douyin')}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                                        selectedPlatform === 'douyin'
+                                            ? "bg-blue-600 text-white shadow-sm"
+                                            : "text-gray-600 hover:bg-white/50"
+                                    )}
+                                >
+                                    抖音
+                                </button>
+                            )}
+                            {platformData.kuaishou?.length > 0 && (
+                                <button
+                                    onClick={() => handlePlatformSelect('kuaishou')}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                                        selectedPlatform === 'kuaishou'
+                                            ? "bg-blue-600 text-white shadow-sm"
+                                            : "text-gray-600 hover:bg-white/50"
+                                    )}
+                                >
+                                    快手
+                                </button>
+                            )}
+                            {platformData.wechat?.length > 0 && (
+                                <button
+                                    onClick={() => handlePlatformSelect('wechat')}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                                        selectedPlatform === 'wechat'
+                                            ? "bg-blue-600 text-white shadow-sm"
+                                            : "text-gray-600 hover:bg-white/50"
+                                    )}
+                                >
+                                    视频号
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2 bg-white/70 p-2 rounded-lg border border-gray-200">
+                            <input 
+                                type="date" 
+                                value={trendRange.start} 
+                                onChange={e => {
+                                    setPlatformTrendRange(prev => ({ ...prev, start: e.target.value }));
+                                    setPlatformTrendMode('daily');
+                                }}
+                                className="bg-transparent text-sm px-2 py-1.5 outline-none text-gray-600 w-36"
+                            />
+                            <span className="text-gray-400">-</span>
+                            <input 
+                                type="date" 
+                                value={trendRange.end} 
+                                onChange={e => {
+                                    setPlatformTrendRange(prev => ({ ...prev, end: e.target.value }));
+                                    setPlatformTrendMode('daily');
+                                }}
+                                className="bg-transparent text-sm px-2 py-1.5 outline-none text-gray-600 w-36"
+                            />
+                        </div>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => {
+                                    if (!dataDateRange) return;
+                                    setPlatformTrendRange(dataDateRange);
+                                    setPlatformTrendMode('quarterly');
+                                }}
+                                className={cn(
+                                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                                    trendMode === 'quarterly'
+                                        ? "text-white bg-blue-600 hover:bg-blue-700 shadow-sm"
+                                        : "text-gray-600 bg-gray-100 hover:bg-gray-200"
+                                )}
+                            >
+                                全部(季)
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if (!dataDateRange) return;
+                                    const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
+                                    const start = subDays(end, 7);
+                                    setPlatformTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                    setPlatformTrendMode('daily');
+                                }}
+                                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                            >
+                                近7天
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if (!dataDateRange) return;
+                                    const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
+                                    const start = subDays(end, 30);
+                                    setPlatformTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                    setPlatformTrendMode('daily');
+                                }}
+                                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                            >
+                                近30天
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    const now = new Date();
+                                    const start = startOfMonth(now);
+                                    const end = now;
+                                    setPlatformTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                    setPlatformTrendMode('daily');
+                                }}
+                                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                            >
+                                本月
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    const now = new Date();
+                                    const start = startOfMonth(subMonths(now, 1));
+                                    const end = startOfMonth(now);
+                                    setPlatformTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                    setPlatformTrendMode('daily');
+                                }}
+                                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                            >
+                                上月
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if (!dataDateRange) return;
+                                    setPlatformTrendRange(dataDateRange);
+                                    setPlatformTrendMode('daily');
+                                }}
+                                className={cn(
+                                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                                    trendMode === 'daily'
+                                        ? "text-white bg-blue-600 hover:bg-blue-700 shadow-sm"
+                                        : "text-gray-600 bg-gray-100 hover:bg-gray-200"
+                                )}
+                            >
+                                全部(日)
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if (!dataDateRange) return;
+                                    setPlatformTrendRange(dataDateRange);
+                                    setPlatformTrendMode('weekly');
+                                }}
+                                className={cn(
+                                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                                    trendMode === 'weekly'
+                                        ? "text-white bg-blue-600 hover:bg-blue-700 shadow-sm"
+                                        : "text-gray-600 bg-gray-100 hover:bg-gray-200"
+                                )}
+                            >
+                                按周
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if (!dataDateRange) return;
+                                    setPlatformTrendRange(dataDateRange);
+                                    setPlatformTrendMode('monthly');
+                                }}
+                                className={cn(
+                                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                                    trendMode === 'monthly'
+                                        ? "text-white bg-blue-600 hover:bg-blue-700 shadow-sm"
+                                        : "text-gray-600 bg-gray-100 hover:bg-gray-200"
+                                )}
+                            >
+                                全年按月
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div className="h-[350px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={trendData}>
+                            <defs>
+                                <linearGradient id="colorLikes" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1}/>
+                                </linearGradient>
+                                <linearGradient id="colorComments" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                                </linearGradient>
+                                <linearGradient id="colorShares" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                            <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+                            <YAxis fontSize={12} stroke="#f97316" label={{ value: '互动数据', angle: -90, position: 'insideLeft' }} />
+                            <Tooltip 
+                                contentStyle={{ 
+                                    borderRadius: '8px', 
+                                    border: 'none', 
+                                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+                                    background: 'rgba(255, 255, 255, 0.95)',
+                                    padding: '12px',
+                                    fontSize: '14px'
+                                }} 
+                            />
+                            <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                            <Line type="monotone" dataKey="likes" name="点赞量" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, fill: '#ef4444', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorLikes)" animationDuration={1500} />
+                            <Line type="monotone" dataKey="comments" name="评论量" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4, fill: '#8b5cf6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorComments)" animationDuration={1500} />
+                            {/* 根据平台类型显示不同的指标 */}
+                            {selectedPlatform === 'wechat' ? (
+                                <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                            ) : hasFavorites ? (
+                                <Line type="monotone" dataKey="favorites" name="收藏量" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                            ) : hasRecommendations ? (
+                                <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                            ) : null}
+                            <Line type="monotone" dataKey="shares" name="转发量" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorShares)" animationDuration={1500} />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+            </motion.div>
+
+            {/* 播放量与粉丝趋势图表 */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+              className="bg-white/85 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+            >
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                        <TrendingUp className="w-5 h-5 text-blue-600" />
                        播放量与粉丝趋势 (Views & Fans)
                     </h3>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex items-center gap-2 bg-white/50 p-1 rounded-lg border border-gray-200">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="flex items-center gap-2 bg-white/70 p-2 rounded-lg border border-gray-200">
                             <input 
                                 type="date" 
                                 value={viewsTrendRange.start} 
@@ -2604,7 +2789,7 @@ ${highRatingCopies.length > 0 ? `
                                     setPlatformViewsTrendRange(prev => ({ ...prev, start: e.target.value }));
                                     setPlatformViewsTrendMode('daily');
                                 }}
-                                className="bg-transparent text-sm px-2 py-1 outline-none text-gray-600 w-32"
+                                className="bg-transparent text-sm px-2 py-1.5 outline-none text-gray-600 w-36"
                             />
                             <span className="text-gray-400">-</span>
                             <input 
@@ -2614,169 +2799,204 @@ ${highRatingCopies.length > 0 ? `
                                     setPlatformViewsTrendRange(prev => ({ ...prev, end: e.target.value }));
                                     setPlatformViewsTrendMode('daily');
                                 }}
-                                className="bg-transparent text-sm px-2 py-1 outline-none text-gray-600 w-32"
+                                className="bg-transparent text-sm px-2 py-1.5 outline-none text-gray-600 w-36"
                             />
                         </div>
-                        <button 
-                            onClick={() => {
-                                if (!dataDateRange) return;
-                                const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
-                                const start = subDays(end, 6);
-                                setPlatformViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setPlatformViewsTrendMode('daily');
-                            }}
-                            className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                        >
-                            近7天
-                        </button>
-                        <button 
-                            onClick={() => {
-                                if (!dataDateRange) return;
-                                const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
-                                const start = subDays(end, 29);
-                                setPlatformViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setPlatformViewsTrendMode('daily');
-                            }}
-                            className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                        >
-                            近30天
-                        </button>
-                        <button 
-                            onClick={() => {
-                                if (!dataDateRange) return;
-                                const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
-                                const start = startOfMonth(end);
-                                setPlatformViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setPlatformViewsTrendMode('daily');
-                            }}
-                            className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                        >
-                            本月
-                        </button>
-                        <button 
-                            onClick={() => {
-                                if (!dataDateRange) return;
-                                const today = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
-                                const start = startOfMonth(subMonths(today, 1));
-                                const end = endOfMonth(subMonths(today, 1));
-                                setPlatformViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
-                                setPlatformViewsTrendMode('daily');
-                            }}
-                            className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
-                        >
-                            上月
-                        </button>
-                        <button 
-                            onClick={() => {
-                                if (!dataDateRange) return;
-                                setPlatformViewsTrendRange(dataDateRange);
-                                setPlatformViewsTrendMode('daily');
-                            }}
-                            className={cn(
-                                "px-3 py-1 text-xs font-medium rounded-md transition-colors",
-                                viewsTrendMode === 'daily' && viewsTrendRange.start === dataDateRange?.start && viewsTrendRange.end === dataDateRange?.end
-                                    ? "text-white bg-blue-600 hover:bg-blue-700"
-                                    : "text-gray-600 bg-gray-100 hover:bg-gray-200"
-                            )}
-                        >
-                            全部(日)
-                        </button>
-                        <button 
-                            onClick={() => {
-                                if (!dataDateRange) return;
-                                setPlatformViewsTrendRange(dataDateRange); 
-                                setPlatformViewsTrendMode('weekly');
-                            }}
-                            className={cn(
-                                "px-3 py-1 text-xs font-medium rounded-md transition-colors",
-                                viewsTrendMode === 'weekly'
-                                    ? "text-white bg-green-600 hover:bg-green-700"
-                                    : "text-gray-600 bg-gray-100 hover:bg-gray-200"
-                            )}
-                        >
-                            按周
-                        </button>
-                        <button 
-                            onClick={() => {
-                                if (!dataDateRange) return;
-                                setPlatformViewsTrendRange(dataDateRange); 
-                                setPlatformViewsTrendMode('monthly');
-                            }}
-                            className={cn(
-                                "px-3 py-1 text-xs font-medium rounded-md transition-colors",
-                                viewsTrendMode === 'monthly'
-                                    ? "text-white bg-purple-600 hover:bg-purple-700"
-                                    : "text-gray-600 bg-gray-100 hover:bg-gray-200"
-                            )}
-                        >
-                            全年按月
-                        </button>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => {
+                                    if (!dataDateRange) return;
+                                    setPlatformViewsTrendRange(dataDateRange);
+                                    setPlatformViewsTrendMode('quarterly');
+                                }}
+                                className={cn(
+                                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                                    viewsTrendMode === 'quarterly'
+                                        ? "text-white bg-purple-600 hover:bg-purple-700 shadow-sm"
+                                        : "text-gray-600 bg-gray-100 hover:bg-gray-200"
+                                )}
+                            >
+                                全部(季)
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if (!dataDateRange) return;
+                                    const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
+                                    const start = subDays(end, 7);
+                                    setPlatformViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                    setPlatformViewsTrendMode('daily');
+                                }}
+                                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                            >
+                                近7天
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if (!dataDateRange) return;
+                                    const end = parse(dataDateRange.end, 'yyyy-MM-dd', new Date());
+                                    const start = subDays(end, 30);
+                                    setPlatformViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                    setPlatformViewsTrendMode('daily');
+                                }}
+                                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                            >
+                                近30天
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    const now = new Date();
+                                    const start = startOfMonth(now);
+                                    const end = now;
+                                    setPlatformViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                    setPlatformViewsTrendMode('daily');
+                                }}
+                                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                            >
+                                本月
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    const now = new Date();
+                                    const start = startOfMonth(subMonths(now, 1));
+                                    const end = startOfMonth(now);
+                                    setPlatformViewsTrendRange({ start: format(start, 'yyyy-MM-dd'), end: format(end, 'yyyy-MM-dd') });
+                                    setPlatformViewsTrendMode('daily');
+                                }}
+                                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                            >
+                                上月
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if (!dataDateRange) return;
+                                    setPlatformViewsTrendRange(dataDateRange);
+                                    setPlatformViewsTrendMode('daily');
+                                }}
+                                className={cn(
+                                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                                    viewsTrendMode === 'daily'
+                                        ? "text-white bg-purple-600 hover:bg-purple-700 shadow-sm"
+                                        : "text-gray-600 bg-gray-100 hover:bg-gray-200"
+                                )}
+                            >
+                                全部(日)
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if (!dataDateRange) return;
+                                    setPlatformViewsTrendRange(dataDateRange);
+                                    setPlatformViewsTrendMode('weekly');
+                                }}
+                                className={cn(
+                                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                                    viewsTrendMode === 'weekly'
+                                        ? "text-white bg-purple-600 hover:bg-purple-700 shadow-sm"
+                                        : "text-gray-600 bg-gray-100 hover:bg-gray-200"
+                                )}
+                            >
+                                按周
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    if (!dataDateRange) return;
+                                    setPlatformViewsTrendRange(dataDateRange);
+                                    setPlatformViewsTrendMode('monthly');
+                                }}
+                                className={cn(
+                                    "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                                    viewsTrendMode === 'monthly'
+                                        ? "text-white bg-purple-600 hover:bg-purple-700 shadow-sm"
+                                        : "text-gray-600 bg-gray-100 hover:bg-gray-200"
+                                )}
+                            >
+                                全年按月
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div className="h-[400px]">
                     <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={viewsTrendData}>
+                            <defs>
+                                <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0.1}/>
+                                </linearGradient>
+                                <linearGradient id="colorFans" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0.1}/>
+                                </linearGradient>
+                            </defs>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                             <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
                             <YAxis yAxisId="left" fontSize={12} stroke="#3b82f6" label={{ value: '播放量', angle: -90, position: 'insideLeft' }} />
                             <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#0ea5e9" label={{ value: '累计粉丝量', angle: 90, position: 'insideRight' }} />
-                            <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255, 255, 255, 0.9)' }} />
-                            <Legend />
-                            <Line yAxisId="left" type="monotone" dataKey="views" name="播放量" stroke="#2563eb" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
-                            <Line yAxisId="right" type="monotone" dataKey="fans" name="累计粉丝量" stroke="#0ea5e9" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
+                            <Tooltip 
+                                contentStyle={{ 
+                                    borderRadius: '8px', 
+                                    border: 'none', 
+                                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+                                    background: 'rgba(255, 255, 255, 0.95)',
+                                    padding: '12px',
+                                    fontSize: '14px'
+                                }} 
+                            />
+                            <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                            <Line yAxisId="left" type="monotone" dataKey="views" name="播放量" stroke="#2563eb" strokeWidth={3} dot={{ r: 4, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorViews)" animationDuration={1500} />
+                            <Line yAxisId="right" type="monotone" dataKey="fans" name="累计粉丝量" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 4, fill: '#0ea5e9', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#0ea5e9', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorFans)" animationDuration={1500} />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
-            </div>
+            </motion.div>
 
             {/* AARRR Model Analysis */}
-            <div className="mt-8">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.2 }}
+              className="bg-white/85 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+            >
+                <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-purple-600" />
+                    AARRR 增长模型分析
+                </h3>
                 <Suspense fallback={<div className="flex justify-center items-center h-64">加载中...</div>}>
                     <AARRRAnalysis data={currentData} />
                 </Suspense>
-            </div>
-
-            {/* 整体数据深度诊断 */}
-            <div className="mt-8 pt-6 border-t border-gray-100">
-                <Suspense fallback={<div className="flex justify-center items-center h-64">加载中...</div>}>
-                    <AIAnalysisCard data={currentData} title="整体数据深度诊断 (Global Intelligent Diagnosis)" mode="aarrr-only" platform={selectedPlatform} />
-                </Suspense>
-            </div>
-
-            {/* AI 诊断分析范围 */}
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="mt-4 bg-white/80 backdrop-blur-md p-4 rounded-xl shadow-sm border border-white/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-            >
-               <div className="flex items-center gap-2 text-slate-700 font-medium">
-                  <Sparkles className="w-5 h-5 text-purple-600" />
-                  <span>AI 诊断分析范围</span>
-               </div>
-               <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <input 
-                    type="date" 
-                    value={aiDateRange.start} 
-                    onChange={e => setPlatformAiDateRange(prev => ({ ...prev, start: e.target.value }))}
-                    className="border border-gray-200 rounded px-3 py-1.5 text-sm w-full sm:w-auto bg-white/50 focus:ring-2 focus:ring-purple-500 outline-none transition-all"
-                  />
-                  <span className="text-gray-400">-</span>
-                  <input 
-                    type="date" 
-                    value={aiDateRange.end} 
-                    onChange={e => setPlatformAiDateRange(prev => ({ ...prev, end: e.target.value }))}
-                    className="border border-gray-200 rounded px-3 py-1.5 text-sm w-full sm:w-auto bg-white/50 focus:ring-2 focus:ring-purple-500 outline-none transition-all"
-                  />
-               </div>
             </motion.div>
 
             {/* AI 智能运营诊断 */}
-            <div className="mt-4">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.3 }}
+              className="bg-white/85 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+            >
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-purple-600" />
+                        AI 智能运营诊断
+                    </h3>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <input 
+                            type="date" 
+                            value={aiDateRange.start} 
+                            onChange={e => setPlatformAiDateRange(prev => ({ ...prev, start: e.target.value }))}
+                            className="border border-gray-200 rounded px-3 py-2 text-sm w-full sm:w-auto bg-white/70 focus:ring-2 focus:ring-purple-500 outline-none transition-all"
+                        />
+                        <span className="text-gray-400">-</span>
+                        <input 
+                            type="date" 
+                            value={aiDateRange.end} 
+                            onChange={e => setPlatformAiDateRange(prev => ({ ...prev, end: e.target.value }))}
+                            className="border border-gray-200 rounded px-3 py-2 text-sm w-full sm:w-auto bg-white/70 focus:ring-2 focus:ring-purple-500 outline-none transition-all"
+                        />
+                    </div>
+                </div>
                 <Suspense fallback={<div className="flex justify-center items-center h-64">加载中...</div>}>
                     <AIAnalysisCard data={aiData} title="AI 智能运营诊断 (Intelligent Advisor)" mode="general-only" platform={selectedPlatform} />
                 </Suspense>
-            </div>
+            </motion.div>
         </motion.div>
         )}
 
@@ -2881,20 +3101,219 @@ ${highRatingCopies.length > 0 ? `
 
         {/* KPI Cards */}
         {activeTab === 'range' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <KPICard title="总播放量 (Views)" value={currentKPIs.views} compareValue={compareKPIs.views} icon={Play} />
-          <KPICard title="总点赞量 (Likes)" value={currentKPIs.likes} compareValue={compareKPIs.likes} icon={Heart} />
-          <KPICard title="粉丝净增 (Net Fans)" value={currentKPIs.netFans} compareValue={compareKPIs.netFans} icon={Users} />
-          <KPICard title="总评论量 (Comments)" value={currentKPIs.comments} compareValue={compareKPIs.comments} icon={MessageCircle} />
-          <KPICard title="总转发量 (Shares)" value={currentKPIs.shares} compareValue={compareKPIs.shares} icon={Share2} />
-          {/* 根据平台类型显示不同的指标 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3 }}
+            whileHover={{ scale: 1.05, translateY: -5 }}
+            className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs opacity-80 font-medium">总播放量</span>
+              <Play className="w-5 h-5 opacity-80" />
+            </div>
+            <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.views.toLocaleString()}</div>
+            <div className="flex items-center gap-2 text-xs opacity-70">
+              <span>当前周期</span>
+              {compareKPIs.views > 0 && (
+                <span className={currentKPIs.views > compareKPIs.views ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                  {currentKPIs.views > compareKPIs.views ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                  {Math.abs(((currentKPIs.views - compareKPIs.views) / compareKPIs.views) * 100).toFixed(1)}%
+                </span>
+              )}
+            </div>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, delay: 0.1 }}
+            whileHover={{ scale: 1.05, translateY: -5 }}
+            className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs opacity-80 font-medium">总点赞量</span>
+              <Heart className="w-5 h-5 opacity-80" />
+            </div>
+            <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.likes.toLocaleString()}</div>
+            <div className="flex items-center gap-2 text-xs opacity-70">
+              <span>当前周期</span>
+              {compareKPIs.likes > 0 && (
+                <span className={currentKPIs.likes > compareKPIs.likes ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                  {currentKPIs.likes > compareKPIs.likes ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                  {Math.abs(((currentKPIs.likes - compareKPIs.likes) / compareKPIs.likes) * 100).toFixed(1)}%
+                </span>
+              )}
+            </div>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, delay: 0.2 }}
+            whileHover={{ scale: 1.05, translateY: -5 }}
+            className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs opacity-80 font-medium">粉丝净增</span>
+              <Users className="w-5 h-5 opacity-80" />
+            </div>
+            <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.netFans.toLocaleString()}</div>
+            <div className="flex items-center gap-2 text-xs opacity-70">
+              <span>当前周期</span>
+              {compareKPIs.netFans > 0 && (
+                <span className={currentKPIs.netFans > compareKPIs.netFans ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                  {currentKPIs.netFans > compareKPIs.netFans ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                  {Math.abs(((currentKPIs.netFans - compareKPIs.netFans) / compareKPIs.netFans) * 100).toFixed(1)}%
+                </span>
+              )}
+            </div>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, delay: 0.3 }}
+            whileHover={{ scale: 1.05, translateY: -5 }}
+            className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs opacity-80 font-medium">总评论量</span>
+              <MessageCircle className="w-5 h-5 opacity-80" />
+            </div>
+            <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.comments.toLocaleString()}</div>
+            <div className="flex items-center gap-2 text-xs opacity-70">
+              <span>当前周期</span>
+              {compareKPIs.comments > 0 && (
+                <span className={currentKPIs.comments > compareKPIs.comments ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                  {currentKPIs.comments > compareKPIs.comments ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                  {Math.abs(((currentKPIs.comments - compareKPIs.comments) / compareKPIs.comments) * 100).toFixed(1)}%
+                </span>
+              )}
+            </div>
+          </motion.div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, delay: 0.4 }}
+            whileHover={{ scale: 1.05, translateY: -5 }}
+            className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs opacity-80 font-medium">总转发量</span>
+              <Share2 className="w-5 h-5 opacity-80" />
+            </div>
+            <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.shares.toLocaleString()}</div>
+            <div className="flex items-center gap-2 text-xs opacity-70">
+              <span>当前周期</span>
+              {compareKPIs.shares > 0 && (
+                <span className={currentKPIs.shares > compareKPIs.shares ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                  {currentKPIs.shares > compareKPIs.shares ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                  {Math.abs(((currentKPIs.shares - compareKPIs.shares) / compareKPIs.shares) * 100).toFixed(1)}%
+                </span>
+              )}
+            </div>
+          </motion.div>
           {selectedPlatform === 'wechat' ? (
-            <KPICard title="总推荐量 (Recommendations)" value={currentKPIs.recommendations} compareValue={compareKPIs.recommendations} icon={ThumbsUp} />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3, delay: 0.5 }}
+              whileHover={{ scale: 1.05, translateY: -5 }}
+              className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs opacity-80 font-medium">总推荐量</span>
+                <ThumbsUp className="w-5 h-5 opacity-80" />
+              </div>
+              <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.recommendations.toLocaleString()}</div>
+              <div className="flex items-center gap-2 text-xs opacity-70">
+                <span>当前周期</span>
+                {compareKPIs.recommendations > 0 && (
+                  <span className={currentKPIs.recommendations > compareKPIs.recommendations ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                    {currentKPIs.recommendations > compareKPIs.recommendations ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                    {Math.abs(((currentKPIs.recommendations - compareKPIs.recommendations) / compareKPIs.recommendations) * 100).toFixed(1)}%
+                  </span>
+                )}
+              </div>
+            </motion.div>
           ) : hasFavorites ? (
-            <KPICard title="总收藏量 (Favorites)" value={currentKPIs.favorites} compareValue={compareKPIs.favorites} icon={Star} />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3, delay: 0.5 }}
+              whileHover={{ scale: 1.05, translateY: -5 }}
+              className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs opacity-80 font-medium">总收藏量</span>
+                <Star className="w-5 h-5 opacity-80" />
+              </div>
+              <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.favorites.toLocaleString()}</div>
+              <div className="flex items-center gap-2 text-xs opacity-70">
+                <span>当前周期</span>
+                {compareKPIs.favorites > 0 && (
+                  <span className={currentKPIs.favorites > compareKPIs.favorites ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                    {currentKPIs.favorites > compareKPIs.favorites ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                    {Math.abs(((currentKPIs.favorites - compareKPIs.favorites) / compareKPIs.favorites) * 100).toFixed(1)}%
+                  </span>
+                )}
+              </div>
+            </motion.div>
           ) : hasRecommendations ? (
-            <KPICard title="总推荐量 (Recommendations)" value={currentKPIs.recommendations} compareValue={compareKPIs.recommendations} icon={ThumbsUp} />
-          ) : null}
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3, delay: 0.5 }}
+              whileHover={{ scale: 1.05, translateY: -5 }}
+              className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs opacity-80 font-medium">总推荐量</span>
+                <ThumbsUp className="w-5 h-5 opacity-80" />
+              </div>
+              <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.recommendations.toLocaleString()}</div>
+              <div className="flex items-center gap-2 text-xs opacity-70">
+                <span>当前周期</span>
+                {compareKPIs.recommendations > 0 && (
+                  <span className={currentKPIs.recommendations > compareKPIs.recommendations ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                    {currentKPIs.recommendations > compareKPIs.recommendations ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                    {Math.abs(((currentKPIs.recommendations - compareKPIs.recommendations) / compareKPIs.recommendations) * 100).toFixed(1)}%
+                  </span>
+                )}
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3, delay: 0.5 }}
+              whileHover={{ scale: 1.05, translateY: -5 }}
+              className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs opacity-80 font-medium">互动率</span>
+                <Activity className="w-5 h-5 opacity-80" />
+              </div>
+              <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.avgInteractionRate}%</div>
+              <div className="flex items-center gap-2 text-xs opacity-70">
+                <span>当前周期</span>
+                {compareKPIs.avgInteractionRate > 0 && (
+                  <span className={currentKPIs.avgInteractionRate > compareKPIs.avgInteractionRate ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                    {currentKPIs.avgInteractionRate > compareKPIs.avgInteractionRate ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                    {Math.abs(((currentKPIs.avgInteractionRate - compareKPIs.avgInteractionRate) / compareKPIs.avgInteractionRate) * 100).toFixed(1)}%
+                  </span>
+                )}
+              </div>
+            </motion.div>
+          )}
         </div>
         )}
 
@@ -2964,13 +3383,33 @@ ${highRatingCopies.length > 0 ? `
                     <div className="h-56">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={finalDetailTrend}>
+                                <defs>
+                                  <linearGradient id="colorNetFansCurrent" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#f97316" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#f97316" stopOpacity={0.1}/>
+                                  </linearGradient>
+                                  <linearGradient id="colorNetFansCompare" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.8}/>
+                                    <stop offset="100%" stopColor="#94a3b8" stopOpacity={0.1}/>
+                                  </linearGradient>
+                                </defs>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                 <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
                                 <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f97316" label={{ value: '日增粉丝', angle: 90, position: 'insideRight' }} />
-                                <Tooltip content={<ComparisonTooltip />} />
-                                <Legend />
-                                <Bar yAxisId="right" dataKey="netFans" name="当前周期 日增粉丝" fill="#f97316" radius={[4, 4, 0, 0]} barSize={20} />
-                                <Bar yAxisId="right" dataKey="compareNetFans" name="对比周期 日增粉丝" fill="#94a3b8" radius={[4, 4, 0, 0]} barSize={20} />
+                                <Tooltip 
+                                  content={<ComparisonTooltip />}
+                                  contentStyle={{ 
+                                    borderRadius: '8px', 
+                                    border: 'none', 
+                                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+                                    background: 'rgba(255, 255, 255, 0.95)',
+                                    padding: '12px',
+                                    fontSize: '14px'
+                                  }} 
+                                />
+                                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                                <Bar yAxisId="right" dataKey="netFans" name="当前周期 日增粉丝" fill="url(#colorNetFansCurrent)" radius={[8, 8, 0, 0]} barSize={20} animationDuration={1500} />
+                                <Bar yAxisId="right" dataKey="compareNetFans" name="对比周期 日增粉丝" fill="url(#colorNetFansCompare)" radius={[8, 8, 0, 0]} barSize={20} animationDuration={1500} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -2994,10 +3433,20 @@ ${highRatingCopies.length > 0 ? `
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                 <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
                                 <YAxis fontSize={12} stroke="#94a3b8" unit="%" />
-                                <Tooltip content={<ComparisonTooltip />} />
-                                <Legend />
-                                <Line type="monotone" dataKey="completionRate" name="当前周期 完播率(%)" stroke="#10b981" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6, strokeWidth: 0 }} />
-                                <Line type="monotone" dataKey="compareCompletionRate" name="对比周期 完播率(%)" stroke="#ef4444" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                                <Tooltip 
+                                  content={<ComparisonTooltip />}
+                                  contentStyle={{ 
+                                    borderRadius: '8px', 
+                                    border: 'none', 
+                                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+                                    background: 'rgba(255, 255, 255, 0.95)',
+                                    padding: '12px',
+                                    fontSize: '14px'
+                                  }} 
+                                />
+                                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                                <Line type="monotone" dataKey="completionRate" name="当前周期 完播率(%)" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                                <Line type="monotone" dataKey="compareCompletionRate" name="对比周期 完播率(%)" stroke="#ef4444" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={{ r: 3, fill: '#ef4444', strokeWidth: 1, stroke: '#fff' }} activeDot={{ r: 5, fill: '#ef4444', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -3021,10 +3470,20 @@ ${highRatingCopies.length > 0 ? `
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                 <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
                                 <YAxis fontSize={12} stroke="#94a3b8" unit="%" />
-                                <Tooltip content={<ComparisonTooltip />} />
-                                <Legend />
-                                <Line type="monotone" dataKey="interactionRate" name="当前周期 互动率(%)" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6, strokeWidth: 0 }} />
-                                <Line type="monotone" dataKey="compareInteractionRate" name="对比周期 互动率(%)" stroke="#f59e0b" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 4, strokeWidth: 0 }} />
+                                <Tooltip 
+                                  content={<ComparisonTooltip />}
+                                  contentStyle={{ 
+                                    borderRadius: '8px', 
+                                    border: 'none', 
+                                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+                                    background: 'rgba(255, 255, 255, 0.95)',
+                                    padding: '12px',
+                                    fontSize: '14px'
+                                  }} 
+                                />
+                                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                                <Line type="monotone" dataKey="interactionRate" name="当前周期 互动率(%)" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4, fill: '#8b5cf6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                                <Line type="monotone" dataKey="compareInteractionRate" name="对比周期 互动率(%)" stroke="#f59e0b" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={{ r: 3, fill: '#f59e0b', strokeWidth: 1, stroke: '#fff' }} activeDot={{ r: 5, fill: '#f59e0b', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
                                 <ReferenceLine y={avgInteractionRate} stroke="#64748b" strokeDasharray="4 4" label={{ value: `均值: ${avgInteractionRate.toFixed(2)}%`, position: 'right', fill: '#64748b' }} />
                             </LineChart>
                         </ResponsiveContainer>
@@ -3049,10 +3508,20 @@ ${highRatingCopies.length > 0 ? `
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                 <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
                                 <YAxis yAxisId="left" fontSize={12} stroke="#3b82f6" label={{ value: '播放量', angle: -90, position: 'insideLeft' }} />
-                                <Tooltip content={<ComparisonTooltip />} />
-                                <Legend />
-                                <Line yAxisId="left" type="monotone" dataKey="views" name="当前周期 播放量" stroke="#3b82f6" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
-                                <Line yAxisId="left" type="monotone" dataKey="compareViews" name="对比周期 播放量" stroke="#60a5fa" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 4 }} />
+                                <Tooltip 
+                                  content={<ComparisonTooltip />}
+                                  contentStyle={{ 
+                                    borderRadius: '8px', 
+                                    border: 'none', 
+                                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+                                    background: 'rgba(255, 255, 255, 0.95)',
+                                    padding: '12px',
+                                    fontSize: '14px'
+                                  }} 
+                                />
+                                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                                <Line yAxisId="left" type="monotone" dataKey="views" name="当前周期 播放量" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                                <Line yAxisId="left" type="monotone" dataKey="compareViews" name="对比周期 播放量" stroke="#60a5fa" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={{ r: 3, fill: '#60a5fa', strokeWidth: 1, stroke: '#fff' }} activeDot={{ r: 5, fill: '#60a5fa', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -3076,10 +3545,20 @@ ${highRatingCopies.length > 0 ? `
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                 <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
                                 <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f97316" label={{ value: '互动总量', angle: 90, position: 'insideRight' }} />
-                                <Tooltip content={<ComparisonTooltip />} />
-                                <Legend />
-                                <Line yAxisId="right" type="monotone" dataKey="interactions" name="当前周期 互动总量" stroke="#f97316" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
-                                <Line yAxisId="right" type="monotone" dataKey="compareInteractions" name="对比周期 互动总量" stroke="#fb923c" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 4 }} />
+                                <Tooltip 
+                                  content={<ComparisonTooltip />}
+                                  contentStyle={{ 
+                                    borderRadius: '8px', 
+                                    border: 'none', 
+                                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+                                    background: 'rgba(255, 255, 255, 0.95)',
+                                    padding: '12px',
+                                    fontSize: '14px'
+                                  }} 
+                                />
+                                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                                <Line yAxisId="right" type="monotone" dataKey="interactions" name="当前周期 互动总量" stroke="#f97316" strokeWidth={3} dot={{ r: 4, fill: '#f97316', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f97316', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                                <Line yAxisId="right" type="monotone" dataKey="compareInteractions" name="对比周期 互动总量" stroke="#fb923c" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={{ r: 3, fill: '#fb923c', strokeWidth: 1, stroke: '#fff' }} activeDot={{ r: 5, fill: '#fb923c', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -3103,13 +3582,23 @@ ${highRatingCopies.length > 0 ? `
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                 <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
                                 <YAxis fontSize={12} stroke="#94a3b8" unit="%" />
-                            <Tooltip content={<ComparisonTooltip />} />
-                            <Legend />
-                            <Line type="monotone" dataKey="healthRate" name="当前周期 粉赞比(%)" stroke="#ef4444" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                            <Line type="monotone" dataKey="compareHealthRate" name="对比周期 粉赞比(%)" stroke="#3b82f6" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={{ r: 2 }} activeDot={{ r: 4 }} />
-                            <ReferenceLine y={avgHealthRate} stroke="#64748b" strokeDasharray="4 4" label={{ value: `均值: ${avgHealthRate}%`, position: 'right', fill: '#64748b' }} />
-                        </LineChart>
-                    </ResponsiveContainer>
+                                <Tooltip 
+                                  content={<ComparisonTooltip />}
+                                  contentStyle={{ 
+                                    borderRadius: '8px', 
+                                    border: 'none', 
+                                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
+                                    background: 'rgba(255, 255, 255, 0.95)',
+                                    padding: '12px',
+                                    fontSize: '14px'
+                                  }} 
+                                />
+                                <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                                <Line type="monotone" dataKey="healthRate" name="当前周期 粉赞比(%)" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, fill: '#ef4444', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                                <Line type="monotone" dataKey="compareHealthRate" name="对比周期 粉赞比(%)" stroke="#3b82f6" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={{ r: 3, fill: '#3b82f6', strokeWidth: 1, stroke: '#fff' }} activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
+                                <ReferenceLine y={avgHealthRate} stroke="#64748b" strokeDasharray="4 4" label={{ value: `均值: ${avgHealthRate}%`, position: 'right', fill: '#64748b' }} />
+                            </LineChart>
+                        </ResponsiveContainer>
                 </div>
             </motion.div>
 
@@ -3251,6 +3740,94 @@ ${highRatingCopies.length > 0 ? `
                 transition={{ delay: 0.1 }}
                 className="space-y-6"
             >
+                {/* 顶部 KPI 指标卡片 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.3 }}
+                        whileHover={{ scale: 1.05, translateY: -5 }}
+                        className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs opacity-80 font-medium">月播放量</span>
+                            <Play className="w-5 h-5 opacity-80" />
+                        </div>
+                        <div className="text-2xl md:text-3xl font-bold mb-2">{monthDataB.views.toLocaleString()}</div>
+                        <div className="flex items-center gap-2 text-xs opacity-70">
+                            <span>当前月份</span>
+                            <span className={monthDataB.views > monthDataA.views ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                                {monthDataB.views > monthDataA.views ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                                {Math.abs(((monthDataB.views - monthDataA.views) / monthDataA.views) * 100).toFixed(1)}%
+                            </span>
+                        </div>
+                    </motion.div>
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.3, delay: 0.1 }}
+                        whileHover={{ scale: 1.05, translateY: -5 }}
+                        className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs opacity-80 font-medium">月点赞量</span>
+                            <Heart className="w-5 h-5 opacity-80" />
+                        </div>
+                        <div className="text-2xl md:text-3xl font-bold mb-2">{monthDataB.likes.toLocaleString()}</div>
+                        <div className="flex items-center gap-2 text-xs opacity-70">
+                            <span>当前月份</span>
+                            <span className={monthDataB.likes > monthDataA.likes ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                                {monthDataB.likes > monthDataA.likes ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                                {Math.abs(((monthDataB.likes - monthDataA.likes) / monthDataA.likes) * 100).toFixed(1)}%
+                            </span>
+                        </div>
+                    </motion.div>
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.3, delay: 0.2 }}
+                        whileHover={{ scale: 1.05, translateY: -5 }}
+                        className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs opacity-80 font-medium">月净增粉</span>
+                            <Users className="w-5 h-5 opacity-80" />
+                        </div>
+                        <div className="text-2xl md:text-3xl font-bold mb-2">{monthDataB.netFans.toLocaleString()}</div>
+                        <div className="flex items-center gap-2 text-xs opacity-70">
+                            <span>当前月份</span>
+                            <span className={monthDataB.netFans > monthDataA.netFans ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                                {monthDataB.netFans > monthDataA.netFans ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                                {Math.abs(((monthDataB.netFans - monthDataA.netFans) / monthDataA.netFans) * 100).toFixed(1)}%
+                            </span>
+                        </div>
+                    </motion.div>
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.3, delay: 0.3 }}
+                        whileHover={{ scale: 1.05, translateY: -5 }}
+                        className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-xs opacity-80 font-medium">互动率</span>
+                            <Activity className="w-5 h-5 opacity-80" />
+                        </div>
+                        <div className="text-2xl md:text-3xl font-bold mb-2">{monthDataB.avgInteractionRate}%</div>
+                        <div className="flex items-center gap-2 text-xs opacity-70">
+                            <span>当前月份</span>
+                            <span className={parseFloat(monthDataB.avgInteractionRate) > parseFloat(monthDataA.avgInteractionRate) ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
+                                {parseFloat(monthDataB.avgInteractionRate) > parseFloat(monthDataA.avgInteractionRate) ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
+                                {Math.abs(((parseFloat(monthDataB.avgInteractionRate) - parseFloat(monthDataA.avgInteractionRate)) / parseFloat(monthDataA.avgInteractionRate)) * 100).toFixed(1)}%
+                            </span>
+                        </div>
+                    </motion.div>
+                </div>
+
                 {/* Charts Section 1: Monthly Comparison */}
                 <div className="mb-6">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
@@ -3549,32 +4126,64 @@ ${highRatingCopies.length > 0 ? `
                         <table className="w-full text-sm text-left text-gray-500">
                             <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                                 <tr>
-                                    <th className="px-6 py-3">排名</th>
-                                    <th className="px-6 py-3">日期</th>
-                                    <th className="px-6 py-3">标题</th>
-                                    <th className="px-6 py-3">播放量</th>
-                                    <th className="px-6 py-3">点赞</th>
-                                    <th className="px-6 py-3">互动率</th>
-                                    <th className="px-6 py-3">评论</th>
-                                    {hasFavorites ? <th className="px-6 py-3">收藏</th> : hasRecommendations ? <th className="px-6 py-3">推荐</th> : null}
-                                    <th className="px-6 py-3">转发</th>
-                                    <th className="px-6 py-3">完播率</th>
+                                    <th className="px-6 py-4">排名</th>
+                                    <th className="px-6 py-4">日期</th>
+                                    <th className="px-6 py-4">标题</th>
+                                    <th className="px-6 py-4">播放量</th>
+                                    <th className="px-6 py-4">点赞</th>
+                                    <th className="px-6 py-4">互动率</th>
+                                    <th className="px-6 py-4">评论</th>
+                                    {hasFavorites ? <th className="px-6 py-4">收藏</th> : hasRecommendations ? <th className="px-6 py-4">推荐</th> : null}
+                                    <th className="px-6 py-4">转发</th>
+                                    <th className="px-6 py-4">完播率</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {(topVideosMode === 'range' ? top10ExplosiveVideos : monthlyTop10Videos).map((item, index) => (
-                                    <tr key={index} className="bg-white border-b hover:bg-gray-50">
-                                        <td className="px-6 py-4 font-bold text-gray-900">#{index + 1}</td>
+                                    <motion.tr 
+                                        key={index} 
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: index * 0.1 }}
+                                        className="bg-white border-b hover:bg-gray-50"
+                                    >
+                                        <td className="px-6 py-4">
+                                            <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : index === 2 ? 'bg-amber-700' : 'bg-gray-200 text-gray-700'}`}>
+                                                {index + 1}
+                                            </span>
+                                        </td>
                                         <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{item.date}</td>
-                                        <td className="px-6 py-4 max-w-xs truncate" title={item.title}>{item.title}</td>
+                                        <td className="px-6 py-4 max-w-xs truncate" title={item.title}>
+                                            <div className="font-medium text-gray-800 hover:text-blue-600 transition-colors">{item.title}</div>
+                                        </td>
                                         <td className="px-6 py-4 font-bold text-blue-600">{item.views.toLocaleString()}</td>
                                         <td className="px-6 py-4">{item.likes.toLocaleString()}</td>
-                                        <td className="px-6 py-4 text-purple-600 font-medium">{item.interactionRate.toFixed(2)}%</td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-purple-600 font-medium">{item.interactionRate.toFixed(2)}%</span>
+                                                <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                                    <div 
+                                                        className="h-full bg-purple-500 rounded-full" 
+                                                        style={{ width: `${Math.min(item.interactionRate * 2, 100)}%` }}
+                                                    ></div>
+                                                </div>
+                                            </div>
+                                        </td>
                                         <td className="px-6 py-4">{item.comments}</td>
                                         {hasFavorites ? <td className="px-6 py-4">{item.favorites}</td> : hasRecommendations ? <td className="px-6 py-4">{item.recommendationsCount}</td> : null}
                                         <td className="px-6 py-4">{item.shares}</td>
-                                        <td className="px-6 py-4">{item.completionRate}</td>
-                                    </tr>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-green-600 font-medium">{item.completionRate}</span>
+                                                <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                                    <div 
+                                                        className="h-full bg-green-500 rounded-full" 
+                                                        style={{ width: `${parseFloat(item.completionRate) || 0}%` }}
+                                                    ></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </motion.tr>
                                 ))}
                             </tbody>
                         </table>
@@ -3582,6 +4191,39 @@ ${highRatingCopies.length > 0 ? `
                     {(topVideosMode === 'range' ? top10ExplosiveVideos.length === 0 : monthlyTop10Videos.length === 0) && (
                         <div className="p-8 text-center text-gray-400">当前所选日期范围内无数据</div>
                     )}
+                </motion.div>
+
+                {/* 标题词云图 */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.4 }}
+                    className="bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-white/50 overflow-hidden"
+                >
+                    <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <span className="text-purple-500">💬</span> 
+                            标题关键词词云
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                            显示{topVideosMode === 'range' ? '分析周期内' : `2025年${selectedMonthForVideos.split('-')[1]}月`}爆款视频标题中出现频率最高的关键词
+                        </p>
+                    </div>
+                    <div className="p-6">
+                        <div className="h-80">
+                            {wordcloudData.length > 0 ? (
+                                <ReactWordcloud
+                                    options={wordcloudOptions}
+                                    words={wordcloudData}
+                                />
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-gray-400">
+                                    无足够数据生成词云
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </motion.div>
             </motion.div>
         )}

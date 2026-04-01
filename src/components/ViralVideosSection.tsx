@@ -1001,141 +1001,134 @@ ${analysisResult}
             <p className="font-medium">正在获取最新爆款数据...</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-gray-50/50 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
-                <tr>
-                  <th className="px-6 py-4">排名</th>
-                  <th className="px-6 py-4">视频内容</th>
-                  <th className="px-6 py-4">发布账号</th>
-                  <th className="px-6 py-4 text-center">互动数据</th>
-                  <th className="px-6 py-4">发布时间</th>
-                  <th className="px-6 py-4 text-right">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {videos.map((video) => (
-                  <tr key={video.id} className="hover:bg-blue-50/50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center font-bold shadow-sm transition-transform group-hover:scale-110",
-                        video.rank === 1 ? "bg-amber-100 text-amber-600" :
-                        video.rank === 2 ? "bg-slate-200 text-slate-600" :
-                        video.rank === 3 ? "bg-orange-100 text-orange-600" :
-                        "bg-gray-50 text-gray-400"
-                      )}>
-                        {video.rank}
+          <div className="space-y-3">
+            {videos.map((video) => (
+              <motion.div
+                key={video.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-xl p-4 border border-gray-100 hover:shadow-lg hover:border-blue-200 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  {/* 排名 */}
+                  <div className="shrink-0">
+                    <div className={cn(
+                      "w-10 h-10 rounded-xl flex items-center justify-center font-bold text-lg shadow-sm transition-transform group-hover:scale-110",
+                      video.rank === 1 ? "bg-gradient-to-br from-amber-400 to-amber-500 text-white" :
+                      video.rank === 2 ? "bg-gradient-to-br from-slate-300 to-slate-400 text-white" :
+                      video.rank === 3 ? "bg-gradient-to-br from-orange-400 to-orange-500 text-white" :
+                      "bg-gray-100 text-gray-400"
+                    )}>
+                      {video.rank}
+                    </div>
+                  </div>
+
+                  {/* 视频封面和标题 */}
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="relative w-20 h-24 rounded-lg bg-gray-100 overflow-hidden shrink-0 shadow-sm border border-gray-200">
+                      {video.cover ? (
+                        <img src={video.cover} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                          <Play className="w-8 h-8 text-gray-200" />
+                        </div>
+                      )}
+                      <div className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/70 rounded text-[9px] text-white font-medium">
+                        {video.duration}
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-4">
-                        <div className="relative w-16 h-20 rounded-lg bg-gray-100 overflow-hidden shrink-0 shadow-sm border border-gray-200">
-                          {video.cover ? (
-                            <img src={video.cover} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                              <Play className="w-6 h-6 text-gray-200" />
-                            </div>
-                          )}
-                          <div className="absolute bottom-1 right-1 px-1 py-0.5 bg-black/60 rounded text-[8px] text-white font-medium">
-                            {video.duration}
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-1.5 max-w-md">
-                          <h5 className="font-bold text-gray-900 text-sm line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors">
-                            {video.title}
-                          </h5>
-                          <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-bold rounded uppercase">
-                              {video.category === 'land' ? '征地拆迁' : '通用普法'}
-                            </span>
-                            <span className="px-2 py-0.5 bg-purple-50 text-purple-600 text-[9px] font-bold rounded uppercase">
-                              抖音爆款
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gray-100 border-2 border-white shadow-sm flex items-center justify-center">
-                          <User className="w-5 h-5 text-gray-400" />
-                        </div>
-                        <div className="flex flex-col">
-                          <div className="font-bold text-gray-900 text-sm">{video.author}</div>
-                          <div className="text-[10px] text-gray-400 font-medium">认证律师/法律博主</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-3 min-w-[140px]">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <ThumbsUp className="w-3.5 h-3.5 text-red-500" />
-                            <span className="text-[10px] text-gray-500 font-medium">点赞</span>
-                          </div>
-                          <span className="text-xs font-bold text-gray-900 tabular-nums">{video.likes.toLocaleString()}</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: '85%' }}
-                            className="h-full bg-gradient-to-r from-red-400 to-red-500 rounded-full"
-                          />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <MessageCircle className="w-3.5 h-3.5 text-blue-500" />
-                            <span className="text-[10px] text-gray-500 font-medium">评论</span>
-                          </div>
-                          <span className="text-xs font-bold text-gray-900 tabular-nums">{video.comments.toLocaleString()}</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: '45%' }}
-                            className="h-full bg-gradient-to-r from-blue-400 to-blue-500 rounded-full"
-                          />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
-                          <Clock className="w-3.5 h-3.5 text-gray-400" />
+                    </div>
+                    <div className="flex flex-col gap-2 flex-1">
+                      <h5 className="font-bold text-gray-900 text-base line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors">
+                        {video.title}
+                      </h5>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold rounded-md uppercase">
+                          {video.category === 'land' ? '征地拆迁' : '通用普法'}
+                        </span>
+                        <span className="px-2.5 py-1 bg-purple-50 text-purple-600 text-[10px] font-bold rounded-md uppercase">
+                          {video.platform === 'douyin' ? '抖音爆款' : video.platform === 'kuaishou' ? '快手热门' : '视频号精选'}
+                        </span>
+                        <span className="flex items-center gap-1 text-xs text-gray-500">
+                          <Clock className="w-3 h-3" />
                           {video.publishTime}
-                        </div>
+                        </span>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex flex-col items-end gap-2">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleDeepAnalysis(video)}
-                            className="inline-flex items-center gap-2 px-3 py-2 bg-purple-50 text-purple-600 hover:bg-purple-100 rounded-lg text-xs font-bold transition-colors border border-purple-100"
-                          >
-                            <Sparkles className="w-3.5 h-3.5" />
-                            深度分析
-                          </button>
-                          <a
-                            href={video.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 rounded-lg text-xs font-bold shadow-md shadow-blue-200 transition-all hover:-translate-y-0.5"
-                          >
-                            <Play className="w-3.5 h-3.5 fill-current" />
-                            查看视频
-                          </a>
-                        </div>
-                        <button className="text-[10px] text-gray-400 hover:text-blue-600 transition-colors font-medium">
-                          监控该账号
-                        </button>
+                    </div>
+                  </div>
+
+                  {/* 发布账号 */}
+                  <div className="shrink-0">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 border-2 border-white shadow-sm flex items-center justify-center">
+                        <User className="w-4 h-4 text-blue-500" />
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <div className="flex flex-col">
+                        <div className="font-bold text-gray-900 text-xs">{video.author}</div>
+                        <div className="text-[9px] text-gray-400 font-medium">法律博主</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 互动数据 - 可视化进度条 */}
+                  <div className="flex-1">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <ThumbsUp className="w-3.5 h-3.5 text-red-500" />
+                          <span className="text-[10px] text-gray-500 font-medium">点赞</span>
+                        </div>
+                        <span className="text-xs font-bold text-red-600 tabular-nums">{video.likes.toLocaleString()}</span>
+                      </div>
+                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min((video.likes / 15000) * 100, 100)}%` }}
+                          transition={{ duration: 0.8, ease: "easeOut" }}
+                          className="h-full bg-gradient-to-r from-red-400 to-red-500 rounded-full"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <MessageCircle className="w-3.5 h-3.5 text-blue-500" />
+                          <span className="text-[10px] text-gray-500 font-medium">评论</span>
+                        </div>
+                        <span className="text-xs font-bold text-blue-600 tabular-nums">{video.comments.toLocaleString()}</span>
+                      </div>
+                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min((video.comments / 1500) * 100, 100)}%` }}
+                          transition={{ duration: 0.8, ease: "easeOut" }}
+                          className="h-full bg-gradient-to-r from-blue-400 to-blue-500 rounded-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 操作按钮 */}
+                  <div className="shrink-0">
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => handleDeepAnalysis(video)}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 rounded-lg text-xs font-bold shadow-md shadow-purple-200 transition-all hover:-translate-y-0.5"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        深度分析
+                      </button>
+                      <a
+                        href={video.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-gray-50 text-gray-700 hover:bg-gray-100 rounded-lg text-xs font-bold border border-gray-200 transition-all"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        查看视频
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
           </div>
         )}
       </motion.div>
