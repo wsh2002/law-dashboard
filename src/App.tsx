@@ -2097,8 +2097,8 @@ ${highRatingCopies.length > 0 ? `
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAViews)" radius={[8, 8, 0, 0]} animationDuration={1500} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBViews)" radius={[8, 8, 0, 0]} animationDuration={1500} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAViews)" radius={[8, 8, 0, 0]} animationDuration={800} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBViews)" radius={[8, 8, 0, 0]} animationDuration={800} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -2130,8 +2130,8 @@ ${highRatingCopies.length > 0 ? `
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAKPIs)" radius={[8, 8, 0, 0]} animationDuration={1500} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBKPIs)" radius={[8, 8, 0, 0]} animationDuration={1500} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAKPIs)" radius={[8, 8, 0, 0]} animationDuration={800} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBKPIs)" radius={[8, 8, 0, 0]} animationDuration={800} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -2163,8 +2163,8 @@ ${highRatingCopies.length > 0 ? `
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAComment)" radius={[8, 8, 0, 0]} animationDuration={1500} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBComment)" radius={[8, 8, 0, 0]} animationDuration={1500} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAComment)" radius={[8, 8, 0, 0]} animationDuration={800} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBComment)" radius={[8, 8, 0, 0]} animationDuration={800} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -2196,8 +2196,8 @@ ${highRatingCopies.length > 0 ? `
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorARate)" radius={[8, 8, 0, 0]} animationDuration={1500} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBRate)" radius={[8, 8, 0, 0]} animationDuration={1500} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorARate)" radius={[8, 8, 0, 0]} animationDuration={800} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBRate)" radius={[8, 8, 0, 0]} animationDuration={800} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -2227,8 +2227,8 @@ ${highRatingCopies.length > 0 ? `
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar yAxisId="left" dataKey="views" name="月播放量" fill="url(#colorViews)" radius={[8, 8, 0, 0]} animationDuration={1500} />
-        <Line yAxisId="right" type="monotone" dataKey="likes" name="月点赞量" stroke="#f43f5e" strokeWidth={3} dot={{ r: 4, fill: '#f43f5e', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f43f5e', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+        <Bar yAxisId="left" dataKey="views" name="月播放量" fill="url(#colorViews)" radius={[8, 8, 0, 0]} animationDuration={800} />
+        <Line yAxisId="right" type="monotone" dataKey="likes" name="月点赞量" stroke="#f43f5e" strokeWidth={3} dot={{ r: 4, fill: '#f43f5e', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f43f5e', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
       </ComposedChart>
     </ResponsiveContainer>
   ));
@@ -2256,8 +2256,8 @@ ${highRatingCopies.length > 0 ? `
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Line type="monotone" dataKey="netFans" name="月净增粉" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
-        <Bar dataKey="netFans" name="月净增粉" fill="url(#colorNetFans)" radius={[8, 8, 0, 0]} animationDuration={1500} />
+        <Line type="monotone" dataKey="netFans" name="月净增粉" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
+        <Bar dataKey="netFans" name="月净增粉" fill="url(#colorNetFans)" radius={[8, 8, 0, 0]} animationDuration={800} />
       </ComposedChart>
     </ResponsiveContainer>
   ));
@@ -2387,18 +2387,19 @@ ${highRatingCopies.length > 0 ? `
         {/* --- SECTION 0: OVERALL TREND --- */}
         {activeTab === 'overview' && showAnalysis && (
         <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="space-y-6"
-        >
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-6"
+          >
             {/* 顶部 KPI 指标卡片 */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3 }}
-                whileHover={{ scale: 1.05, translateY: -5 }}
+                transition={{ duration: 0.15 }}
+                whileHover={{ scale: 1.02, translateY: -2 }}
                 className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
@@ -2420,8 +2421,8 @@ ${highRatingCopies.length > 0 ? `
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3, delay: 0.1 }}
-                whileHover={{ scale: 1.05, translateY: -5 }}
+                transition={{ duration: 0.15, delay: 0.05 }}
+                whileHover={{ scale: 1.02, translateY: -2 }}
                 className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
@@ -2443,8 +2444,8 @@ ${highRatingCopies.length > 0 ? `
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3, delay: 0.2 }}
-                whileHover={{ scale: 1.05, translateY: -5 }}
+                transition={{ duration: 0.15, delay: 0.1 }}
+                whileHover={{ scale: 1.02, translateY: -2 }}
                 className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
@@ -2466,8 +2467,8 @@ ${highRatingCopies.length > 0 ? `
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3, delay: 0.3 }}
-                whileHover={{ scale: 1.05, translateY: -5 }}
+                transition={{ duration: 0.15, delay: 0.15 }}
+                whileHover={{ scale: 1.02, translateY: -2 }}
                 className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
@@ -2489,8 +2490,8 @@ ${highRatingCopies.length > 0 ? `
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3, delay: 0.4 }}
-                whileHover={{ scale: 1.05, translateY: -5 }}
+                transition={{ duration: 0.15, delay: 0.2 }}
+                whileHover={{ scale: 1.02, translateY: -2 }}
                 className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
@@ -2512,8 +2513,8 @@ ${highRatingCopies.length > 0 ? `
               <motion.div 
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3, delay: 0.5 }}
-                whileHover={{ scale: 1.05, translateY: -5 }}
+                transition={{ duration: 0.15, delay: 0.25 }}
+                whileHover={{ scale: 1.02, translateY: -2 }}
                 className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
@@ -2538,7 +2539,7 @@ ${highRatingCopies.length > 0 ? `
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
+              transition={{ duration: 0.2 }}
               className="bg-white/85 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
             >
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -2752,17 +2753,17 @@ ${highRatingCopies.length > 0 ? `
                                 }} 
                             />
                             <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                            <Line type="monotone" dataKey="likes" name="点赞量" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, fill: '#ef4444', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorLikes)" animationDuration={1500} />
-                            <Line type="monotone" dataKey="comments" name="评论量" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4, fill: '#8b5cf6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorComments)" animationDuration={1500} />
+                            <Line type="monotone" dataKey="likes" name="点赞量" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, fill: '#ef4444', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorLikes)" animationDuration={800} />
+                            <Line type="monotone" dataKey="comments" name="评论量" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4, fill: '#8b5cf6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorComments)" animationDuration={800} />
                             {/* 根据平台类型显示不同的指标 */}
                             {selectedPlatform === 'wechat' ? (
-                                <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                                <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
                             ) : hasFavorites ? (
-                                <Line type="monotone" dataKey="favorites" name="收藏量" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                                <Line type="monotone" dataKey="favorites" name="收藏量" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
                             ) : hasRecommendations ? (
-                                <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                                <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
                             ) : null}
-                            <Line type="monotone" dataKey="shares" name="转发量" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorShares)" animationDuration={1500} />
+                            <Line type="monotone" dataKey="shares" name="转发量" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorShares)" animationDuration={800} />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
@@ -2772,7 +2773,7 @@ ${highRatingCopies.length > 0 ? `
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.1 }}
+              transition={{ duration: 0.2, delay: 0.05 }}
               className="bg-white/85 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
             >
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -2942,8 +2943,8 @@ ${highRatingCopies.length > 0 ? `
                                 }} 
                             />
                             <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                            <Line yAxisId="left" type="monotone" dataKey="views" name="播放量" stroke="#2563eb" strokeWidth={3} dot={{ r: 4, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorViews)" animationDuration={1500} />
-                            <Line yAxisId="right" type="monotone" dataKey="fans" name="累计粉丝量" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 4, fill: '#0ea5e9', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#0ea5e9', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorFans)" animationDuration={1500} />
+                            <Line yAxisId="left" type="monotone" dataKey="views" name="播放量" stroke="#2563eb" strokeWidth={3} dot={{ r: 4, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorViews)" animationDuration={800} />
+                            <Line yAxisId="right" type="monotone" dataKey="fans" name="累计粉丝量" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 4, fill: '#0ea5e9', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#0ea5e9', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorFans)" animationDuration={800} />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
@@ -2953,7 +2954,7 @@ ${highRatingCopies.length > 0 ? `
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.2 }}
+              transition={{ duration: 0.2, delay: 0.1 }}
               className="bg-white/85 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
             >
                 <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
@@ -2969,7 +2970,7 @@ ${highRatingCopies.length > 0 ? `
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.3 }}
+              transition={{ duration: 0.2, delay: 0.15 }}
               className="bg-white/85 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
             >
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
