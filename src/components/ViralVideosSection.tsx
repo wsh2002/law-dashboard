@@ -196,7 +196,8 @@ const CATEGORIES = [
 ];
 
 // ✅ Whisper 服务地址
-const WHISPER_API = '';
+// 修改为您的腾讯云服务器 IP 地址
+const WHISPER_API = 'http://123.45.67.89:8765'; // 请替换为您的实际服务器 IP
 
 const ViralVideosSection = () => {
   const [showApiConfig, setShowApiConfig] = useState(false);
@@ -307,12 +308,19 @@ const ViralVideosSection = () => {
   setManualTranscript('');
   setSubtitles([]);
 
+  // 设置超时
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+
   try {
     const resp = await fetch(`${WHISPER_API}/api/process`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: analyzingVideo.url })
+      body: JSON.stringify({ url: analyzingVideo.url }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!resp.ok) {
       throw new Error(`HTTP ${resp.status}`);
@@ -327,7 +335,7 @@ const ViralVideosSection = () => {
       const { done: readerDone, value } = await reader.read();
       done = readerDone;
       if (done) break;
-      
+
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n\n');
       buffer = lines.pop() || '';
@@ -348,12 +356,12 @@ const ViralVideosSection = () => {
         if (eventType && eventData) {
           try {
             const data = JSON.parse(eventData);
-            
+
             if (eventType === 'result' && data.subtitles) {
               setSubtitles(data.subtitles);
               const text = data.subtitles.map((s: { text: string }) => s.text).join('\n');
               setManualTranscript(text);
-              
+
               // 保存到文案库
               if (analyzingVideo) {
                 const scriptItem = {
@@ -366,7 +374,7 @@ const ViralVideosSection = () => {
                   subtitles: data.subtitles,
                   timestamp: new Date().toISOString()
                 };
-                
+
                 // 使用Firebase保存数据
                 firebase.push('script_library', scriptItem);
               }
@@ -387,10 +395,15 @@ const ViralVideosSection = () => {
         }
       }
     }
-  } catch (e) {
-    setTranscribeError('无法连接到识别服务,请确认 Whisper 服务已启动');
+  } catch (e: any) {
+    if (e.name === 'AbortError') {
+      setTranscribeError('识别超时，请检查网络连接或重试');
+    } else {
+      setTranscribeError('无法连接到识别服务,请确认 Whisper 服务已启动');
+    }
     console.error('识别错误:', e);
   } finally {
+    clearTimeout(timeoutId);
     setIsDeepTranscribing(false);
   }
 };
@@ -420,12 +433,14 @@ const ViralVideosSection = () => {
       if (validCount === 0) {
         // 打印当前视频的URL，以便调试
         console.log('当前视频URL:', currentVideos.map(v => v.url));
+        console.log('当前视频长度:', currentVideos.length);
         setBatchErrors(['没有找到有效的视频链接']);
         return;
       }
       
       // 打印找到的有效视频
       console.log('找到的有效视频:', validVideos.map(v => v.title));
+      console.log('有效视频数量:', validCount);
 
       
       let processed = 0;
@@ -772,13 +787,20 @@ ${analysisResult}
                 if (link) {
                   setIsTranscribing(true);
                   setTranscribeError('');
-                  
+
+                  // 设置超时
+                  const controller = new AbortController();
+                  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+
                   try {
                     const resp = await fetch(`${WHISPER_API}/api/process`, {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ url: link })
+                      body: JSON.stringify({ url: link }),
+                      signal: controller.signal
                     });
+
+                    clearTimeout(timeoutId);
 
                     if (!resp.ok) {
                       throw new Error(`HTTP ${resp.status}`);
@@ -793,7 +815,7 @@ ${analysisResult}
                       const { done: readerDone, value } = await reader.read();
                       done = readerDone;
                       if (done) break;
-                      
+
                       buffer += decoder.decode(value, { stream: true });
                       const lines = buffer.split('\n\n');
                       buffer = lines.pop() || '';
@@ -814,10 +836,10 @@ ${analysisResult}
                         if (eventType && eventData) {
                           try {
                             const data = JSON.parse(eventData);
-                            
+
                             if (eventType === 'result' && data.subtitles) {
                               const text = data.subtitles.map((s: { text: string }) => s.text).join('\n');
-                               
+
                               // 保存到文案库
                               const scriptItem = {
                                 id: Date.now().toString(),
@@ -829,10 +851,10 @@ ${analysisResult}
                                 subtitles: data.subtitles,
                                 timestamp: new Date().toISOString()
                               };
-                              
+
                               // 使用Firebase保存数据
                               firebase.push('script_library', scriptItem);
-                              
+
                               // 显示成功提示
                               alert('文案识别成功，已保存到文案库！');
                               input.value = '';
@@ -853,10 +875,15 @@ ${analysisResult}
                         }
                       }
                     }
-                  } catch (e) {
-                    setTranscribeError('无法连接到识别服务,请确认 Whisper 服务已启动');
+                  } catch (e: any) {
+                    if (e.name === 'AbortError') {
+                      setTranscribeError('识别超时，请检查网络连接或重试');
+                    } else {
+                      setTranscribeError('无法连接到识别服务,请确认 Whisper 服务已启动');
+                    }
                     console.error('识别错误:', e);
                   } finally {
+                    clearTimeout(timeoutId);
                     setIsTranscribing(false);
                   }
                 }
