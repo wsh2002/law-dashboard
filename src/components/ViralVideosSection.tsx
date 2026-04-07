@@ -404,12 +404,6 @@ const ViralVideosSection = () => {
     setBatchErrors([]);
     
     try {
-      // 检查 WHISPER_API 是否配置
-      if (!WHISPER_API) {
-        setBatchErrors(['错误：未配置 Whisper API 服务地址']);
-        return;
-      }
-      
       // 使用当前videos数组中的所有视频，因为已经根据selectedCategory过滤过了
       const currentVideos = videos;
       const total = currentVideos.length;
