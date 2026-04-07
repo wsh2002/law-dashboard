@@ -905,7 +905,7 @@ ${analysisResult}
                 ) : (
                   <>
                     <Sparkles className="w-3.5 h-3.5" />
-                    批量识别台词
+                    批量识别分词
                   </>
                 )}
               </button>
