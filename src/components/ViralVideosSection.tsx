@@ -401,9 +401,15 @@ const ViralVideosSection = () => {
     setBatchErrors([]);
     
     try {
-      // 只处理当前选中分类的视频
-      const currentVideos = videos.filter(v => v.category === selectedCategory);
+      // 使用当前videos数组中的所有视频，因为已经根据selectedCategory过滤过了
+      const currentVideos = videos;
       const total = currentVideos.length;
+      
+      if (total === 0) {
+        setBatchErrors(['没有找到可处理的视频']);
+        return;
+      }
+      
       let processed = 0;
       
       for (const video of currentVideos) {
