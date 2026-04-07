@@ -401,6 +401,12 @@ const ViralVideosSection = () => {
     setBatchErrors([]);
     
     try {
+      // 检查 WHISPER_API 是否配置
+      if (!WHISPER_API) {
+        setBatchErrors(['错误：未配置 Whisper API 服务地址']);
+        return;
+      }
+      
       // 使用当前videos数组中的所有视频，因为已经根据selectedCategory过滤过了
       const currentVideos = videos;
       const total = currentVideos.length;
@@ -410,120 +416,127 @@ const ViralVideosSection = () => {
         return;
       }
       
+      // 过滤出有效的视频（有实际URL的）
+      const validVideos = currentVideos.filter(video => video.url && video.url !== '#');
+      const validCount = validVideos.length;
+      
+      if (validCount === 0) {
+        setBatchErrors(['没有找到有效的视频链接']);
+        return;
+      }
+      
       let processed = 0;
       
-      for (const video of currentVideos) {
+      for (const video of validVideos) {
         // 检查是否已取消
         if (controller.signal.aborted) {
           break;
         }
         
-        if (video.url && video.url !== '#') {
-          try {
-            const resp = await fetch(`${WHISPER_API}/api/process`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ url: video.url }),
-              signal: controller.signal
+        try {
+          const resp = await fetch(`${WHISPER_API}/api/process`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: video.url }),
+            signal: controller.signal
+          });
+
+          if (!resp.ok) {
+            throw new Error(`HTTP ${resp.status}`);
+          }
+
+          const reader = resp.body!.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let subtitles: { start: string; end: string; text: string }[] = [];
+          let done = false;
+
+          while (!done) {
+            // 检查是否已取消
+            if (controller.signal.aborted) {
+              break;
+            }
+            
+            const { done: readerDone, value } = await reader.read();
+            done = readerDone;
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop() || '';
+
+            for (const chunk of lines) {
+              const eventLines = chunk.split('\n');
+              let eventType = '';
+              let eventData = '';
+
+              for (const line of eventLines) {
+                if (line.startsWith('event: ')) {
+                  eventType = line.slice(7).trim();
+                } else if (line.startsWith('data: ')) {
+                  eventData = line.slice(6);
+                }
+              }
+
+              if (eventType && eventData) {
+                try {
+                  const data = JSON.parse(eventData);
+                  
+                  if (eventType === 'result' && data.subtitles) {
+                    subtitles = data.subtitles;
+                  } else if (eventType === 'error') {
+                    throw new Error(data.message);
+                  }
+                } catch (e) {
+                  console.error('解析 SSE 数据失败:', e);
+                }
+              }
+            }
+          }
+
+          if (subtitles.length > 0) {
+            const text = subtitles.map((s) => s.text).join('\n');
+            
+            // 更新视频状态
+            setVideos(prev => {
+              const updatedVideos = prev.map(v => 
+                v.id === video.id ? { ...v, content: text , subtitles: subtitles} : v
+              );
+              
+              // 保存到本地存储
+              const videosToSave = updatedVideos.reduce((acc, v) => {
+                acc[v.id] = { content: v.content || '' , subtitles: v.subtitles || []};
+                return acc;
+              }, {} as Record<string, Partial<ViralVideo>>);
+              localStorage.setItem('viral_videos', JSON.stringify(videosToSave));
+              
+              return updatedVideos;
             });
-
-            if (!resp.ok) {
-              throw new Error(`HTTP ${resp.status}`);
-            }
-
-            const reader = resp.body!.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-            let subtitles: { start: string; end: string; text: string }[] = [];
-            let done = false;
-
-            while (!done) {
-              // 检查是否已取消
-              if (controller.signal.aborted) {
-                break;
-              }
-              
-              const { done: readerDone, value } = await reader.read();
-              done = readerDone;
-              if (done) break;
-              
-              buffer += decoder.decode(value, { stream: true });
-              const lines = buffer.split('\n\n');
-              buffer = lines.pop() || '';
-
-              for (const chunk of lines) {
-                const eventLines = chunk.split('\n');
-                let eventType = '';
-                let eventData = '';
-
-                for (const line of eventLines) {
-                  if (line.startsWith('event: ')) {
-                    eventType = line.slice(7).trim();
-                  } else if (line.startsWith('data: ')) {
-                    eventData = line.slice(6);
-                  }
-                }
-
-                if (eventType && eventData) {
-                  try {
-                    const data = JSON.parse(eventData);
-                    
-                    if (eventType === 'result' && data.subtitles) {
-                      subtitles = data.subtitles;
-                    } else if (eventType === 'error') {
-                      throw new Error(data.message);
-                    }
-                  } catch (e) {
-                    console.error('解析 SSE 数据失败:', e);
-                  }
-                }
-              }
-            }
-
-            if (subtitles.length > 0) {
-              const text = subtitles.map((s) => s.text).join('\n');
-              
-              // 更新视频状态
-              setVideos(prev => {
-                const updatedVideos = prev.map(v => 
-                  v.id === video.id ? { ...v, content: text , subtitles: subtitles} : v
-                );
-                
-                // 保存到本地存储
-                const videosToSave = updatedVideos.reduce((acc, v) => {
-                  acc[v.id] = { content: v.content || '' , subtitles: v.subtitles || []};
-                  return acc;
-                }, {} as Record<string, Partial<ViralVideo>>);
-                localStorage.setItem('viral_videos', JSON.stringify(videosToSave));
-                
-                return updatedVideos;
-              });
-              
-              // 保存到文案库
-              const scriptItem = {
-                id: Date.now().toString(),
-                videoId: video.id,
-                title: video.title,
-                author: video.author,
-                platform: video.platform || 'douyin',
-                content: text,
-                subtitles: subtitles,
-                timestamp: new Date().toISOString()
-              };
-              
-              // 使用Firebase保存数据
-              firebase.push('script_library', scriptItem);
-            }
-          } catch (error) {
-            // 忽略取消操作的错误
-            if (!controller.signal.aborted) {
-              setBatchErrors(prev => [...prev, `视频 "${video.title}" 处理失败`]);
-            }
+            
+            // 保存到文案库
+            const scriptItem = {
+              id: Date.now().toString(),
+              videoId: video.id,
+              title: video.title,
+              author: video.author,
+              platform: video.platform || 'douyin',
+              content: text,
+              subtitles: subtitles,
+              timestamp: new Date().toISOString()
+            };
+            
+            // 使用Firebase保存数据
+            firebase.push('script_library', scriptItem);
+          }
+        } catch (error) {
+          // 忽略取消操作的错误
+          if (!controller.signal.aborted) {
+            setBatchErrors(prev => [...prev, `视频 "${video.title}" 处理失败`]);
           }
         }
         
         processed++;
-        setBatchProgress(Math.round((processed / total) * 100));
+        setBatchProgress(Math.round((processed / validCount) * 100));
       }
     } finally {
       setIsBatchProcessing(false);
