@@ -414,13 +414,19 @@ const ViralVideosSection = () => {
       }
       
       // 过滤出有效的视频（有实际URL的）
-      const validVideos = currentVideos.filter(video => video.url && video.url !== '#');
+      const validVideos = currentVideos.filter(video => video.url && video.url !== '#' && video.url !== '');
       const validCount = validVideos.length;
       
       if (validCount === 0) {
+        // 打印当前视频的URL，以便调试
+        console.log('当前视频URL:', currentVideos.map(v => v.url));
         setBatchErrors(['没有找到有效的视频链接']);
         return;
       }
+      
+      // 打印找到的有效视频
+      console.log('找到的有效视频:', validVideos.map(v => v.title));
+
       
       let processed = 0;
       
@@ -434,8 +440,7 @@ const ViralVideosSection = () => {
           const resp = await fetch(`${WHISPER_API}/api/process`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: video.url }),
-            signal: controller.signal
+            body: JSON.stringify({ url: video.url })
           });
 
           if (!resp.ok) {
