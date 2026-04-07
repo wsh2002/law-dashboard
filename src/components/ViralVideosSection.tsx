@@ -262,9 +262,12 @@ const ViralVideosSection = () => {
   }, []);
 
 
-  // ✅ 自动识别状态
+  // ✅ 自动识别状态（顶部识别文案按钮）
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcribeError, setTranscribeError] = useState('');
+
+  // ✅ 深度分析识别状态（一键识别台词按钮）
+  const [isDeepTranscribing, setIsDeepTranscribing] = useState(false);
 
   // ✅ 新增：带时间戳的字幕数据
   const [subtitles, setSubtitles] = useState<{ start: string; end: string; text: string }[]>([]);
@@ -299,7 +302,7 @@ const ViralVideosSection = () => {
     return;
   }
 
-  setIsTranscribing(true);
+  setIsDeepTranscribing(true);
   setTranscribeError('');
   setManualTranscript('');
   setSubtitles([]);
@@ -388,7 +391,7 @@ const ViralVideosSection = () => {
     setTranscribeError('无法连接到识别服务,请确认 Whisper 服务已启动');
     console.error('识别错误:', e);
   } finally {
-    setIsTranscribing(false);
+    setIsDeepTranscribing(false);
   }
 };
 
@@ -485,7 +488,17 @@ const ViralVideosSection = () => {
                   if (eventType === 'result' && data.subtitles) {
                     subtitles = data.subtitles;
                   } else if (eventType === 'error') {
-                    throw new Error(data.message);
+                    if (data.message === 'COOKIE_EXPIRED') {
+                      throw new Error('Cookie 已过期,请更新 cookies.txt 后重启服务');
+                    } else {
+                      throw new Error(data.message);
+                    }
+                  } else if (eventType === 'queued') {
+                    // 显示排队状态
+                    console.log(`视频 "${video.title}" 排队中: ${data.hint}`);
+                  } else if (eventType === 'progress') {
+                    // 显示识别进度
+                    console.log(`视频 "${video.title}" 识别进度: ${data.progress}%`);
                   }
                 } catch (e) {
                   console.error('解析 SSE 数据失败:', e);
@@ -531,7 +544,15 @@ const ViralVideosSection = () => {
         } catch (error) {
           // 忽略取消操作的错误
           if (!controller.signal.aborted) {
-            setBatchErrors(prev => [...prev, `视频 "${video.title}" 处理失败`]);
+            if (error instanceof Error) {
+              if (error.message.includes('Cookie 已过期')) {
+                setBatchErrors(prev => [...prev, `视频 "${video.title}" 处理失败: ${error.message}`]);
+              } else {
+                setBatchErrors(prev => [...prev, `视频 "${video.title}" 处理失败: ${error.message}`]);
+              }
+            } else {
+              setBatchErrors(prev => [...prev, `视频 "${video.title}" 处理失败`]);
+            }
           }
         }
         
@@ -1277,20 +1298,20 @@ ${analysisResult}
                             )}
                             <button
                               onClick={handleAutoTranscribe}
-                              disabled={isTranscribing}
+                              disabled={isDeepTranscribing}
                               className={cn(
                                 "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border",
-                                isTranscribing
+                                isDeepTranscribing
                                   ? "bg-gray-100 text-gray-400 border-gray-200"
                                   : "bg-blue-600 text-white border-blue-700 hover:bg-blue-700 shadow-sm"
                               )}
                             >
-                              {isTranscribing ? (
+                              {isDeepTranscribing ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />
                               ) : (
                                 <Sparkles className="w-3 h-3" />
                               )}
-                              {isTranscribing ? '正在自动识别...' : '一键识别台词'}
+                              {isDeepTranscribing ? '正在自动识别...' : '一键识别台词'}
                             </button>
                           </div>
                         </div>
