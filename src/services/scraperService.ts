@@ -12,40 +12,72 @@ interface ScraperConfig {
 // 爬虫结果
 interface ScrapingResult {
   success: boolean;
-  data?: ViralVideo;
+  data?: ViralVideo | null;
   error?: string;
 }
 
-// 支持的平台
-const SUPPORTED_PLATFORMS = ['douyin', 'kuaishou', 'xiaohongshu', 'bilibili', 'weibo'];
+// 从 URL 提取平台
+function extractPlatform(url: string): 'douyin' | 'kuaishou' | 'xiaohongshu' | 'bilibili' | 'weibo' | null {
+  const urlObj = new URL(url);
+  const hostname = urlObj.hostname.toLowerCase();
+
+  if (hostname.includes('douyin.com')) return 'douyin';
+  if (hostname.includes('kuaishou.com')) return 'kuaishou';
+  if (hostname.includes('xiaohongshu.com')) return 'xiaohongshu';
+  if (hostname.includes('bilibili.com')) return 'bilibili';
+  if (hostname.includes('weibo.com')) return 'weibo';
+
+  return null;
+}
+
+// 带超时的 fetch 函数
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout: number = 30000): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
 
 // 爬取单个视频
 export const scrapeVideo = async (
   url: string,
   config: Partial<ScraperConfig> = {}
 ): Promise<ScrapingResult> => {
-  const scraperConfig: ScraperConfig = {
-    platform: extractPlatform(url),
-    maxRetries: 3,
-    timeout: 30000,
-    ...config
-  };
+  const platform = extractPlatform(url);
 
-  if (!scraperConfig.platform) {
+  if (!platform) {
     return {
       success: false,
       error: '不支持的平台'
     };
   }
 
+  const scraperConfig: ScraperConfig = {
+    platform,
+    maxRetries: 3,
+    timeout: 30000,
+    ...config
+  };
+
   try {
     // 这里实现实际的爬虫逻辑
     // 1. 获取页面内容
-    const response = await fetch(url, {
-      timeout: scraperConfig.timeout,
-      // 可以添加代理配置
+    const response = await fetchWithTimeout(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
       ...(scraperConfig.proxy && { headers: { 'Proxy-Authorization': `Bearer ${scraperConfig.proxy}` } })
-    });
+    }, scraperConfig.timeout);
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -94,20 +126,6 @@ export const batchScrapeVideos = async (
   return results;
 };
 
-// 从 URL 提取平台
-function extractPlatform(url: string): 'douyin' | 'kuaishou' | 'xiaohongshu' | 'bilibili' | 'weibo' | null {
-  const urlObj = new URL(url);
-  const hostname = urlObj.hostname.toLowerCase();
-
-  if (hostname.includes('douyin.com')) return 'douyin';
-  if (hostname.includes('kuaishou.com')) return 'kuaishou';
-  if (hostname.includes('xiaohongshu.com')) return 'xiaohongshu';
-  if (hostname.includes('bilibili.com')) return 'bilibili';
-  if (hostname.includes('weibo.com')) return 'weibo';
-
-  return null;
-}
-
 // 解析视频内容
 function parseVideoContent(html: string, platform: string): ViralVideo | null {
   // 这里需要根据不同平台的页面结构实现具体的解析逻辑
@@ -138,7 +156,7 @@ function parseVideoContent(html: string, platform: string): ViralVideo | null {
 }
 
 // 抖音解析（示例）
-function parseDouyinContent(html: string): ViralVideo | null {
+function parseDouyinContent(_html: string): ViralVideo | null {
   // 实际项目中需要解析页面中的脚本标签或 JSON 数据
   // 这里返回示例数据
   return {
@@ -153,7 +171,7 @@ function parseDouyinContent(html: string): ViralVideo | null {
 }
 
 // 快手解析（示例）
-function parseKuaishouContent(html: string): ViralVideo | null {
+function parseKuaishouContent(_html: string): ViralVideo | null {
   return {
     id: Date.now().toString(),
     title: '示例快手视频标题',
@@ -166,7 +184,7 @@ function parseKuaishouContent(html: string): ViralVideo | null {
 }
 
 // 小红书解析（示例）
-function parseXiaohongshuContent(html: string): ViralVideo | null {
+function parseXiaohongshuContent(_html: string): ViralVideo | null {
   return {
     id: Date.now().toString(),
     title: '示例小红书笔记标题',
@@ -179,7 +197,7 @@ function parseXiaohongshuContent(html: string): ViralVideo | null {
 }
 
 // B站解析（示例）
-function parseBilibiliContent(html: string): ViralVideo | null {
+function parseBilibiliContent(_html: string): ViralVideo | null {
   return {
     id: Date.now().toString(),
     title: '示例B站视频标题',
@@ -192,7 +210,7 @@ function parseBilibiliContent(html: string): ViralVideo | null {
 }
 
 // 微博解析（示例）
-function parseWeiboContent(html: string): ViralVideo | null {
+function parseWeiboContent(_html: string): ViralVideo | null {
   return {
     id: Date.now().toString(),
     title: '示例微博标题',
