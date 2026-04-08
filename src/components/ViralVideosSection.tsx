@@ -197,7 +197,7 @@ const CATEGORIES = [
 
 // ✅ Whisper 服务地址
 // 修改为您的腾讯云服务器 IP 地址
-const WHISPER_API = 'http://123.45.67.89:8765'; // 请替换为您的实际服务器 IP
+const WHISPER_API = 'http://124.223.77.202:8000'; // 请替换为您的实际服务器 IP
 
 const ViralVideosSection = () => {
   const [showApiConfig, setShowApiConfig] = useState(false);
@@ -278,6 +278,7 @@ const ViralVideosSection = () => {
   const [batchProgress, setBatchProgress] = useState(0);
   const [batchErrors, setBatchErrors] = useState<string[]>([]);
   const [batchAbortController, setBatchAbortController] = useState<AbortController | null>(null);
+  const [batchStatus, setBatchStatus] = useState<Record<string, string>>({});
 
   const handleDeepAnalysis = (video: ViralVideo) => {
     setAnalyzingVideo(video);
@@ -415,11 +416,15 @@ const ViralVideosSection = () => {
     setIsBatchProcessing(true);
     setBatchProgress(0);
     setBatchErrors([]);
-    
+    setBatchStatus({});
+
     try {
       // 使用当前videos数组中的所有视频，因为已经根据selectedCategory过滤过了
       const currentVideos = videos;
       const total = currentVideos.length;
+      
+      console.log('批量识别开始 - 当前显示视频数量:', total);
+      console.log('批量识别开始 - 所有视频URL:', currentVideos.map(v => v.url));
       
       if (total === 0) {
         setBatchErrors(['没有找到可处理的视频']);
@@ -430,10 +435,11 @@ const ViralVideosSection = () => {
       const validVideos = currentVideos.filter(video => video.url && video.url !== '#' && video.url !== '');
       const validCount = validVideos.length;
       
+      console.log('批量识别开始 - 有效视频数量:', validCount);
+      console.log('批量识别开始 - 有效视频URL:', validVideos.map(v => v.url));
+      
       if (validCount === 0) {
-        // 打印当前视频的URL，以便调试
-        console.log('当前视频URL:', currentVideos.map(v => v.url));
-        console.log('当前视频长度:', currentVideos.length);
+        console.log('批量识别失败 - 没有找到有效的视频链接');
         setBatchErrors(['没有找到有效的视频链接']);
         return;
       }
@@ -445,19 +451,31 @@ const ViralVideosSection = () => {
       
       let processed = 0;
       
-      for (const video of validVideos) {
+      console.log('开始循环处理视频，总共有', validCount, '个视频');
+      console.log('validVideos 数组长度:', validVideos.length);
+      
+      for (let i = 0; i < validVideos.length; i++) {
+        console.log(`循环迭代 ${i + 1} 开始`);
+        const video = validVideos[i];
+        
         // 检查是否已取消
         if (controller.signal.aborted) {
+          console.log('批量识别已取消');
           break;
         }
         
+        console.log(`正在处理视频 ${i + 1}/${validVideos.length}: ${video.title} (URL: ${video.url})`);
+        
         try {
+          console.log(`请求 Whisper API: ${WHISPER_API}/api/process`);
           const resp = await fetch(`${WHISPER_API}/api/process`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: video.url })
           });
 
+          console.log(`Whisper API 响应状态: ${resp.status} ${resp.statusText}`);
+          
           if (!resp.ok) {
             throw new Error(`HTTP ${resp.status}`);
           }
@@ -498,9 +516,11 @@ const ViralVideosSection = () => {
               if (eventType && eventData) {
                 try {
                   const data = JSON.parse(eventData);
+                  console.log(`收到事件: ${eventType}`, data);
                   
                   if (eventType === 'result' && data.subtitles) {
                     subtitles = data.subtitles;
+                    console.log(`成功获取字幕，共 ${subtitles.length} 条`);
                   } else if (eventType === 'error') {
                     if (data.message === 'COOKIE_EXPIRED') {
                       throw new Error('Cookie 已过期,请更新 cookies.txt 后重启服务');
@@ -512,7 +532,17 @@ const ViralVideosSection = () => {
                     console.log(`视频 "${video.title}" 排队中: ${data.hint}`);
                   } else if (eventType === 'progress') {
                     // 显示识别进度
-                    console.log(`视频 "${video.title}" 识别进度: ${data.progress}%`);
+                    let stepName = '';
+                    switch(data.step) {
+                      case 1: stepName = '下载视频'; break;
+                      case 2: stepName = '提取音频'; break;
+                      case 3: stepName = 'Whisper识别'; break;
+                      case 4: stepName = 'AI纠错'; break;
+                      default: stepName = '处理中';
+                    }
+                    const statusText = `${stepName}: ${data.hint || ''}`;
+                    setBatchStatus(prev => ({ ...prev, [video.id]: statusText }));
+                    console.log(`视频 "${video.title}" 识别进度: ${stepName} - ${data.hint || ''}`);
                   }
                 } catch (e) {
                   console.error('解析 SSE 数据失败:', e);
@@ -523,10 +553,15 @@ const ViralVideosSection = () => {
 
           if (subtitles.length > 0) {
             const text = subtitles.map((s) => s.text).join('\n');
-            
+            const textLength = text.length;
+            console.log(`视频 "${video.title}" 识别成功，生成 ${textLength} 字文案`);
+
+            // 标记为处理完成
+            setBatchStatus(prev => ({ ...prev, [video.id]: `✅ 处理完成 (${textLength}字)` }));
+
             // 更新视频状态
             setVideos(prev => {
-              const updatedVideos = prev.map(v => 
+              const updatedVideos = prev.map(v =>
                 v.id === video.id ? { ...v, content: text , subtitles: subtitles} : v
               );
               
@@ -553,9 +588,19 @@ const ViralVideosSection = () => {
             };
             
             // 使用Firebase保存数据
-            firebase.push('script_library', scriptItem);
+            console.log('准备保存到文案库:', scriptItem.title);
+            try {
+              firebase.push('script_library', scriptItem);
+              console.log(`视频 "${video.title}" 已保存到文案库`);
+            } catch (firebaseError) {
+              console.error(`保存到文案库失败:`, firebaseError);
+              // 继续执行，不影响循环
+            }
+          } else {
+            console.log(`视频 "${video.title}" 识别成功，但没有获取到字幕`);
           }
         } catch (error) {
+          console.error(`视频 "${video.title}" 处理失败:`, error);
           // 忽略取消操作的错误
           if (!controller.signal.aborted) {
             if (error instanceof Error) {
@@ -571,8 +616,17 @@ const ViralVideosSection = () => {
         }
         
         processed++;
-        setBatchProgress(Math.round((processed / validCount) * 100));
+        const newProgress = Math.round((processed / validVideos.length) * 100);
+        console.log(`处理进度: ${processed}/${validVideos.length} (${newProgress}%)`);
+        setBatchProgress(newProgress);
+        
+        console.log(`视频 ${i + 1} 处理完成，准备处理下一个视频`);
+        console.log(`循环迭代 ${i + 1} 结束`);
       }
+      
+      console.log('批量识别完成');
+    } catch (error) {
+      console.error('批量识别发生错误:', error);
     } finally {
       setIsBatchProcessing(false);
       setBatchAbortController(null);
@@ -1009,6 +1063,28 @@ ${analysisResult}
                       <li>• 还有 {batchErrors.length - 3} 个视频处理失败</li>
                     )}
                   </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 批量处理状态显示 */}
+          {isBatchProcessing && Object.keys(batchStatus).length > 0 && (
+            <div className="w-full bg-blue-50 border border-blue-100 rounded-lg p-3 max-h-40 overflow-y-auto">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-blue-600">视频处理状态：</p>
+                  <div className="text-[10px] text-blue-500 mt-1 space-y-1">
+                    {videos.map(video => (
+                      <div key={video.id} className="flex justify-between items-center">
+                        <span className="truncate max-w-[200px]">{video.title}</span>
+                        <span className="text-blue-600 font-medium">
+                          {batchStatus[video.id] || '等待处理...'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
