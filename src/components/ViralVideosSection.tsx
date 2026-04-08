@@ -267,19 +267,13 @@ const ViralVideosSection = () => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcribeError, setTranscribeError] = useState('');
 
-  // ✅ 深度分析识别状态（一键识别台词按钮）
-  const [isDeepTranscribing, setIsDeepTranscribing] = useState(false);
+  // ✅ 深度分析识别状态（一键识别台词按钮）- 改为对象形式，每个视频独立
+  const [isDeepTranscribing, setIsDeepTranscribing] = useState<Record<string, boolean>>({});
 
   // ✅ 新增：带时间戳的字幕数据
   const [subtitles, setSubtitles] = useState<{ start: string; end: string; text: string }[]>([]);
 
-  // ✅ 批量处理状态
-  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
-  const [batchProgress, setBatchProgress] = useState(0);
-  const [batchErrors, setBatchErrors] = useState<string[]>([]);
-  const [batchAbortController, setBatchAbortController] = useState<AbortController | null>(null);
-  const [batchStatus, setBatchStatus] = useState<Record<string, string>>({});
-
+  
   const handleDeepAnalysis = (video: ViralVideo) => {
     setAnalyzingVideo(video);
     // 检查分析缓存
@@ -293,18 +287,21 @@ const ViralVideosSection = () => {
     setAnalysisStep('idle');
     setActiveTab('document');
     setTranscribeError('');
-    // 保持 subtitles 为空，因为批量识别只保存了纯文本
-    setSubtitles(video.subtitles || []);
+        setSubtitles(video.subtitles || []);
   };
 
   // ✅ 自动识别函数（保留时间戳）
  const handleAutoTranscribe = async () => {
-  if (!analyzingVideo?.url || analyzingVideo.url === '#') {
+  // 保存当前视频到局部变量，避免状态变化影响
+  const currentVideo = analyzingVideo;
+  
+  if (!currentVideo?.url || currentVideo.url === '#') {
     setTranscribeError('该视频暂无有效链接,请手动粘贴台词');
     return;
   }
 
-  setIsDeepTranscribing(true);
+  // 设置当前视频的识别状态为 true
+  setIsDeepTranscribing(prev => ({ ...prev, [currentVideo.id]: true }));
   setTranscribeError('');
   setManualTranscript('');
   setSubtitles([]);
@@ -314,14 +311,16 @@ const ViralVideosSection = () => {
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
 
   try {
+    console.log('开始识别视频:', currentVideo.title);
     const resp = await fetch(`${WHISPER_API}/api/process`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: analyzingVideo.url }),
+      body: JSON.stringify({ url: currentVideo.url }),
       signal: controller.signal
     });
 
     clearTimeout(timeoutId);
+    console.log('API 响应状态:', resp.status);
 
     if (!resp.ok) {
       throw new Error(`HTTP ${resp.status}`);
@@ -335,7 +334,10 @@ const ViralVideosSection = () => {
     while (!done) {
       const { done: readerDone, value } = await reader.read();
       done = readerDone;
-      if (done) break;
+      if (done) {
+        console.log('读取完成');
+        break;
+      }
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n\n');
@@ -357,33 +359,66 @@ const ViralVideosSection = () => {
         if (eventType && eventData) {
           try {
             const data = JSON.parse(eventData);
+            console.log('收到事件:', eventType, data);
 
             if (eventType === 'result' && data.subtitles) {
+              console.log('收到结果，开始更新状态');
               setSubtitles(data.subtitles);
               const text = data.subtitles.map((s: { text: string }) => s.text).join('\n');
               setManualTranscript(text);
 
-              // 保存到文案库
-              if (analyzingVideo) {
+              // 保存到视频对象，实现永久保存
+              if (currentVideo) {
+                setVideos(prev => {
+                  const updatedVideos = prev.map(v => 
+                    v.id === currentVideo.id ? { ...v, content: text , subtitles: data.subtitles} : v
+                  );
+                  
+                  // 保存到本地存储
+                  const videosToSave = updatedVideos.reduce((acc, v) => {
+                    acc[v.id] = { content: v.content || '' , subtitles: v.subtitles || []};
+                    return acc;
+                  }, {} as Record<string, Partial<ViralVideo>>);
+                  localStorage.setItem('viral_videos', JSON.stringify(videosToSave));
+                  
+                  return updatedVideos;
+                });
+
+                // 保存到文案库
                 const scriptItem = {
                   id: Date.now().toString(),
-                  videoId: analyzingVideo.id,
-                  title: analyzingVideo.title,
-                  author: analyzingVideo.author,
-                  platform: analyzingVideo.platform || 'douyin',
+                  videoId: currentVideo.id,
+                  title: currentVideo.title,
+                  author: currentVideo.author,
+                  platform: currentVideo.platform || 'douyin',
                   content: text,
                   subtitles: data.subtitles,
                   timestamp: new Date().toISOString()
                 };
 
                 // 使用Firebase保存数据
-                firebase.push('script_library', scriptItem);
+                try {
+                  firebase.push('script_library', scriptItem);
+                  console.log(`视频 "${currentVideo.title}" 已保存到文案库`);
+                } catch (firebaseError) {
+                  console.error(`保存到文案库失败:`, firebaseError);
+                }
+              }
+              
+              // 立即更新识别状态为 false
+              console.log('识别完成，更新状态为 false');
+              if (currentVideo) {
+                setIsDeepTranscribing(prev => ({ ...prev, [currentVideo.id]: false }));
               }
             } else if (eventType === 'error') {
               if (data.message === 'COOKIE_EXPIRED') {
                 setTranscribeError('Cookie 已过期,请更新 cookies.txt 后重启服务');
               } else {
                 setTranscribeError(`识别失败:${data.message}`);
+              }
+              // 错误时也更新状态
+              if (currentVideo) {
+                setIsDeepTranscribing(prev => ({ ...prev, [currentVideo.id]: false }));
               }
             } else if (eventType === 'queued') {
               setTranscribeError(`⏳ ${data.hint}`);
@@ -403,243 +438,23 @@ const ViralVideosSection = () => {
       setTranscribeError('无法连接到识别服务,请确认 Whisper 服务已启动');
     }
     console.error('识别错误:', e);
+    // 错误时也更新状态
+    if (currentVideo) {
+      console.log('识别错误，更新状态为 false');
+      setIsDeepTranscribing(prev => ({ ...prev, [currentVideo.id]: false }));
+    }
   } finally {
     clearTimeout(timeoutId);
-    setIsDeepTranscribing(false);
+    // 再次确保状态被更新
+    if (currentVideo) {
+      console.log('finally 块，更新状态为 false');
+      setIsDeepTranscribing(prev => ({ ...prev, [currentVideo.id]: false }));
+    }
   }
 };
 
-  // ✅ 批量识别函数
-  const handleBatchTranscribe = async () => {
-    const controller = new AbortController();
-    setBatchAbortController(controller);
-    setIsBatchProcessing(true);
-    setBatchProgress(0);
-    setBatchErrors([]);
-    setBatchStatus({});
-
-    try {
-      // 使用当前videos数组中的所有视频，因为已经根据selectedCategory过滤过了
-      const currentVideos = videos;
-      const total = currentVideos.length;
-      
-      console.log('批量识别开始 - 当前显示视频数量:', total);
-      console.log('批量识别开始 - 所有视频URL:', currentVideos.map(v => v.url));
-      
-      if (total === 0) {
-        setBatchErrors(['没有找到可处理的视频']);
-        return;
-      }
-      
-      // 过滤出有效的视频（有实际URL的）
-      const validVideos = currentVideos.filter(video => video.url && video.url !== '#' && video.url !== '');
-      const validCount = validVideos.length;
-      
-      console.log('批量识别开始 - 有效视频数量:', validCount);
-      console.log('批量识别开始 - 有效视频URL:', validVideos.map(v => v.url));
-      
-      if (validCount === 0) {
-        console.log('批量识别失败 - 没有找到有效的视频链接');
-        setBatchErrors(['没有找到有效的视频链接']);
-        return;
-      }
-      
-      // 打印找到的有效视频
-      console.log('找到的有效视频:', validVideos.map(v => v.title));
-      console.log('有效视频数量:', validCount);
-
-      
-      let processed = 0;
-      
-      console.log('开始循环处理视频，总共有', validCount, '个视频');
-      console.log('validVideos 数组长度:', validVideos.length);
-      
-      for (let i = 0; i < validVideos.length; i++) {
-        console.log(`循环迭代 ${i + 1} 开始`);
-        const video = validVideos[i];
-        
-        // 检查是否已取消
-        if (controller.signal.aborted) {
-          console.log('批量识别已取消');
-          break;
-        }
-        
-        console.log(`正在处理视频 ${i + 1}/${validVideos.length}: ${video.title} (URL: ${video.url})`);
-        
-        try {
-          console.log(`请求 Whisper API: ${WHISPER_API}/api/process`);
-          const resp = await fetch(`${WHISPER_API}/api/process`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url: video.url })
-          });
-
-          console.log(`Whisper API 响应状态: ${resp.status} ${resp.statusText}`);
-          
-          if (!resp.ok) {
-            throw new Error(`HTTP ${resp.status}`);
-          }
-
-          const reader = resp.body!.getReader();
-          const decoder = new TextDecoder();
-          let buffer = '';
-          let subtitles: { start: string; end: string; text: string }[] = [];
-          let done = false;
-
-          while (!done) {
-            // 检查是否已取消
-            if (controller.signal.aborted) {
-              break;
-            }
-            
-            const { done: readerDone, value } = await reader.read();
-            done = readerDone;
-            if (done) break;
-            
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n\n');
-            buffer = lines.pop() || '';
-
-            for (const chunk of lines) {
-              const eventLines = chunk.split('\n');
-              let eventType = '';
-              let eventData = '';
-
-              for (const line of eventLines) {
-                if (line.startsWith('event: ')) {
-                  eventType = line.slice(7).trim();
-                } else if (line.startsWith('data: ')) {
-                  eventData = line.slice(6);
-                }
-              }
-
-              if (eventType && eventData) {
-                try {
-                  const data = JSON.parse(eventData);
-                  console.log(`收到事件: ${eventType}`, data);
-                  
-                  if (eventType === 'result' && data.subtitles) {
-                    subtitles = data.subtitles;
-                    console.log(`成功获取字幕，共 ${subtitles.length} 条`);
-                  } else if (eventType === 'error') {
-                    if (data.message === 'COOKIE_EXPIRED') {
-                      throw new Error('Cookie 已过期,请更新 cookies.txt 后重启服务');
-                    } else {
-                      throw new Error(data.message);
-                    }
-                  } else if (eventType === 'queued') {
-                    // 显示排队状态
-                    console.log(`视频 "${video.title}" 排队中: ${data.hint}`);
-                  } else if (eventType === 'progress') {
-                    // 显示识别进度
-                    let stepName = '';
-                    switch(data.step) {
-                      case 1: stepName = '下载视频'; break;
-                      case 2: stepName = '提取音频'; break;
-                      case 3: stepName = 'Whisper识别'; break;
-                      case 4: stepName = 'AI纠错'; break;
-                      default: stepName = '处理中';
-                    }
-                    const statusText = `${stepName}: ${data.hint || ''}`;
-                    setBatchStatus(prev => ({ ...prev, [video.id]: statusText }));
-                    console.log(`视频 "${video.title}" 识别进度: ${stepName} - ${data.hint || ''}`);
-                  }
-                } catch (e) {
-                  console.error('解析 SSE 数据失败:', e);
-                }
-              }
-            }
-          }
-
-          if (subtitles.length > 0) {
-            const text = subtitles.map((s) => s.text).join('\n');
-            const textLength = text.length;
-            console.log(`视频 "${video.title}" 识别成功，生成 ${textLength} 字文案`);
-
-            // 标记为处理完成
-            setBatchStatus(prev => ({ ...prev, [video.id]: `✅ 处理完成 (${textLength}字)` }));
-
-            // 更新视频状态
-            setVideos(prev => {
-              const updatedVideos = prev.map(v =>
-                v.id === video.id ? { ...v, content: text , subtitles: subtitles} : v
-              );
-              
-              // 保存到本地存储
-              const videosToSave = updatedVideos.reduce((acc, v) => {
-                acc[v.id] = { content: v.content || '' , subtitles: v.subtitles || []};
-                return acc;
-              }, {} as Record<string, Partial<ViralVideo>>);
-              localStorage.setItem('viral_videos', JSON.stringify(videosToSave));
-              
-              return updatedVideos;
-            });
-            
-            // 保存到文案库
-            const scriptItem = {
-              id: Date.now().toString(),
-              videoId: video.id,
-              title: video.title,
-              author: video.author,
-              platform: video.platform || 'douyin',
-              content: text,
-              subtitles: subtitles,
-              timestamp: new Date().toISOString()
-            };
-            
-            // 使用Firebase保存数据
-            console.log('准备保存到文案库:', scriptItem.title);
-            try {
-              firebase.push('script_library', scriptItem);
-              console.log(`视频 "${video.title}" 已保存到文案库`);
-            } catch (firebaseError) {
-              console.error(`保存到文案库失败:`, firebaseError);
-              // 继续执行，不影响循环
-            }
-          } else {
-            console.log(`视频 "${video.title}" 识别成功，但没有获取到字幕`);
-          }
-        } catch (error) {
-          console.error(`视频 "${video.title}" 处理失败:`, error);
-          // 忽略取消操作的错误
-          if (!controller.signal.aborted) {
-            if (error instanceof Error) {
-              if (error.message.includes('Cookie 已过期')) {
-                setBatchErrors(prev => [...prev, `视频 "${video.title}" 处理失败: ${error.message}`]);
-              } else {
-                setBatchErrors(prev => [...prev, `视频 "${video.title}" 处理失败: ${error.message}`]);
-              }
-            } else {
-              setBatchErrors(prev => [...prev, `视频 "${video.title}" 处理失败`]);
-            }
-          }
-        }
-        
-        processed++;
-        const newProgress = Math.round((processed / validVideos.length) * 100);
-        console.log(`处理进度: ${processed}/${validVideos.length} (${newProgress}%)`);
-        setBatchProgress(newProgress);
-        
-        console.log(`视频 ${i + 1} 处理完成，准备处理下一个视频`);
-        console.log(`循环迭代 ${i + 1} 结束`);
-      }
-      
-      console.log('批量识别完成');
-    } catch (error) {
-      console.error('批量识别发生错误:', error);
-    } finally {
-      setIsBatchProcessing(false);
-      setBatchAbortController(null);
-    }
-  };
-
-  // ✅ 取消批量识别函数
-  const handleCancelBatchTranscribe = () => {
-    if (batchAbortController) {
-      batchAbortController.abort();
-    }
-  };
-
+  
+  
   const handleStartAnalysis = async () => {
     if (!manualTranscript) return;
     if (!analyzingVideo) {
@@ -1005,41 +820,7 @@ ${analysisResult}
               <span className="text-[10px] text-gray-500 font-medium">后台自动刷新中</span>
             </div>
             
-            {/* ✅ 批量识别按钮 */}
-            <div className="flex gap-2">
-              <button
-                onClick={handleBatchTranscribe}
-                disabled={isBatchProcessing}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border",
-                  isBatchProcessing
-                    ? "bg-gray-100 text-gray-400 border-gray-200"
-                    : "bg-blue-600 text-white border-blue-700 hover:bg-blue-700 shadow-sm"
-                )}
-              >
-                {isBatchProcessing ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    批量识别中... {batchProgress}%
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5" />
-                    批量识别分词
-                  </>
-                )}
-              </button>
-              {isBatchProcessing && (
-                <button
-                  onClick={handleCancelBatchTranscribe}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white border border-red-700 hover:bg-red-700 rounded-lg text-xs font-bold transition-all shadow-sm"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  取消识别
-                </button>
-              )}
-            </div>
-            
+                        
             <button
               onClick={() => setShowApiConfig(!showApiConfig)}
               className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
@@ -1048,48 +829,8 @@ ${analysisResult}
             </button>
           </div>
           
-          {/* ✅ 批量处理错误提示 */}
-          {batchErrors.length > 0 && (
-            <div className="w-full bg-red-50 border border-red-100 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-bold text-red-600">批量处理完成，部分视频处理失败：</p>
-                  <ul className="text-[10px] text-red-500 mt-1 space-y-1">
-                    {batchErrors.slice(0, 3).map((error, index) => (
-                      <li key={index}>• {error}</li>
-                    ))}
-                    {batchErrors.length > 3 && (
-                      <li>• 还有 {batchErrors.length - 3} 个视频处理失败</li>
-                    )}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 批量处理状态显示 */}
-          {isBatchProcessing && Object.keys(batchStatus).length > 0 && (
-            <div className="w-full bg-blue-50 border border-blue-100 rounded-lg p-3 max-h-40 overflow-y-auto">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-bold text-blue-600">视频处理状态：</p>
-                  <div className="text-[10px] text-blue-500 mt-1 space-y-1">
-                    {videos.map(video => (
-                      <div key={video.id} className="flex justify-between items-center">
-                        <span className="truncate max-w-[200px]">{video.title}</span>
-                        <span className="text-blue-600 font-medium">
-                          {batchStatus[video.id] || '等待处理...'}
-                        </span>
-                      </div>
-                    ))}
+          
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
 
         {/* API Config Panel */}
         <AnimatePresence>
@@ -1400,20 +1141,20 @@ ${analysisResult}
                             )}
                             <button
                               onClick={handleAutoTranscribe}
-                              disabled={isDeepTranscribing}
+                              disabled={isDeepTranscribing[analyzingVideo?.id || '']}
                               className={cn(
                                 "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border",
-                                isDeepTranscribing
+                                isDeepTranscribing[analyzingVideo?.id || '']
                                   ? "bg-gray-100 text-gray-400 border-gray-200"
                                   : "bg-blue-600 text-white border-blue-700 hover:bg-blue-700 shadow-sm"
                               )}
                             >
-                              {isDeepTranscribing ? (
+                              {isDeepTranscribing[analyzingVideo?.id || ''] ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />
                               ) : (
                                 <Sparkles className="w-3 h-3" />
                               )}
-                              {isDeepTranscribing ? '正在自动识别...' : '一键识别台词'}
+                              {isDeepTranscribing[analyzingVideo?.id || ''] ? '正在自动识别...' : '一键识别台词'}
                             </button>
                           </div>
                         </div>
