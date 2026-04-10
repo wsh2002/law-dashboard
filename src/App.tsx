@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, ChangeEvent, lazy, Suspense } from 'react';
 import * as XLSX from 'xlsx';
 import { motion } from 'framer-motion';
-import { DEFAULT_CONFIG, fetchAIAnalysis } from './services/aiAnalysis';
 // import { MOCK_DATA } from './data/mockData';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -81,27 +80,7 @@ export type DataItem = {
   platform?: 'douyin' | 'kuaishou' | 'wechat';
 };
 
-// 文案历史和用户反馈类型
-export type CopywritingHistory = {
-  id: string;
-  input: string;
-  output: string;
-  style: string;
-  platform: string;
-  createdAt: string;
-  rating?: number; // 1-5星
-  feedback?: string;
-  modifiedContent?: string;
-  isAdopted?: boolean; // 是否被采用
-  performance?: {
-    views?: number;
-    likes?: number;
-    comments?: number;
-    completionRate?: number;
-    shareRate?: number;
-    publishDate?: string;
-  };
-};
+
 
 // Helper to parse raw data
 const parseData = (raw: any[], platform?: 'douyin' | 'kuaishou' | 'wechat'): DataItem[] => {
@@ -249,123 +228,17 @@ export default function App() {
   const [platformData, setPlatformData] = useState<Record<string, DataItem[]>>({});
   const [selectedPlatform, setSelectedPlatform] = useState<'douyin' | 'kuaishou' | 'wechat'>('douyin');
   // 月份筛选状态
-  const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
+
   const [tabPlatforms, setTabPlatforms] = useState<Record<string, 'douyin' | 'kuaishou' | 'wechat'>>({
     overview: 'douyin',
     monthly: 'douyin',
     range: 'douyin',
     personal: 'douyin',
-    viral: 'douyin',
-    rewrite: 'douyin',
-    agent: 'douyin'
+    viral: 'douyin'
   });
-  const [activeTab, setActiveTab] = useState<'overview' | 'monthly' | 'range' | 'personal' | 'viral' | 'rewrite' | 'agent'>('overview');
-  // 文案创作相关状态
-  const [copywritingInput, setCopywritingInput] = useState<string>('');
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  // 智能体相关状态
-  const [agentInput, setAgentInput] = useState<string>('');
-  const [agentIsGenerating, setAgentIsGenerating] = useState<boolean>(false);
-  const [agentError, setAgentError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'overview' | 'monthly' | 'range' | 'personal' | 'viral'>('overview');
   
-  // 会话状态管理
-  const [messages, setMessages] = useState<Array<{
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: Date;
-  }>>([]);
-  
-  // 会话偏好
-  const [sessionPreferences, setSessionPreferences] = useState<{
-    platform: 'douyin' | 'kuaishou' | 'wechat' | 'general';
-    style: '口语化' | '犀利' | '专业' | '情绪化';
-    duration: '15秒' | '30秒' | '60秒';
-    conversionGoal: '评论引导' | '私信引导' | '关注引导';
-  }>({
-    platform: 'general',
-    style: '口语化',
-    duration: '30秒',
-    conversionGoal: '评论引导'
-  });
-  
-  // 模型结果
-  const [modelResults, setModelResults] = useState<{
-    deepseek: string;
-    doubao: string;
-    merged: {
-      title: string;
-      hook: string;
-      script: string;
-      corePoints: string;
-      ending: string;
-      explanation: string;
-    } | null;
-  }>({
-    deepseek: '',
-    doubao: '',
-    merged: null
-  });
-  
-  // 历史版本
-  const [versionHistory, setVersionHistory] = useState<Array<{
-    id: number;
-    timestamp: Date;
-    content: {
-      title: string;
-      hook: string;
-      script: string;
-      corePoints: string;
-      ending: string;
-      explanation: string;
-    };
-  }>>([]);
-  
-  // 初始化mock数据
-  useEffect(() => {
-    // 模拟一些对话历史
-    const mockMessages = [
-      {
-        role: 'user' as const,
-        content: '帮我优化一段关于农村土地政策的法律文案，适合短视频平台',
-        timestamp: new Date(Date.now() - 3600000)
-      },
-      {
-        role: 'assistant' as const,
-        content: '已完成优化，为您生成了融合版文案。请查看右侧结果面板。',
-        timestamp: new Date(Date.now() - 3500000)
-      }
-    ];
-    
-    // 模拟模型结果
-    const mockModelResults = {
-      deepseek: '逻辑梳理：农村土地政策涉及农民切身利益，需要清晰的结构和准确的法律表达。建议从政策背景、具体变化、影响分析和应对建议四个方面进行优化。',
-      doubao: '传播优化：短视频需要更强的钩子和口语化表达。建议使用"家人们"等亲切称呼，添加话题标签，增强互动性，结尾引导评论和转发。',
-      merged: {
-        title: '⚠️ 农民朋友注意！2026年土地政策有大变化 #农村政策 #法律科普',
-        hook: '家人们！如果你是农民，一定要看完这个视频，否则可能吃大亏！',
-        script: '大家好，我是律师小王。今天要跟大家聊聊2026年农村土地政策的新变化，这直接关系到咱们农民朋友的切身利益。\n\n首先，政策明确了土地承包经营权的长久不变，这意味着咱们农民可以更安心地投入农业生产。\n\n其次，新增了土地流转的规范化管理，保障咱们的合法权益不受侵害。\n\n最后，对于宅基地的使用和管理也有了更明确的规定，让咱们的住房权益得到更好的保障。\n\n这些政策变化，都是为了让咱们农民的日子越过越好，让农村发展更加繁荣。',
-        corePoints: '核心观点：2026年农村土地政策的三大变化：土地承包经营权长久不变、土地流转规范化管理、宅基地使用管理明确化。',
-        ending: '觉得有用的家人们，点个红心，转发给身边的农民朋友，让更多人知道这些政策变化！评论区说说你遇到过什么土地问题，我来为你解答！',
-        explanation: '融合了DeepSeek的法律专业性和豆包的短视频传播性，形成最终优化版。采用了口语化表达，添加了话题标签，增强了互动性。'
-      }
-    };
-    
-    // 无条件添加mock数据
-    setMessages(mockMessages);
-    setModelResults(mockModelResults);
-  }, []);
-  // 文案版本管理
-  const [copywritingVersions, setCopywritingVersions] = useState<{id: number, content: string}[]>([]);
-  const [currentVersionIndex, setCurrentVersionIndex] = useState<number>(0);
-  // 文案历史和反馈状态
-  const [copywritingHistory, setCopywritingHistory] = useState<CopywritingHistory[]>(savedState?.copywritingHistory || []);
-  const [currentCopywritingId, setCurrentCopywritingId] = useState<string | null>(null);
-  // 爆款文案库状态
-  const [viralCopywritingLibrary, setViralCopywritingLibrary] = useState<CopywritingHistory[]>([]);
-  // 上传文案库状态
-  const [uploadedCopywritingLibrary, setUploadedCopywritingLibrary] = useState<CopywritingHistory[]>(savedState?.uploadedCopywritingLibrary || []);
-  // 文案库模态框状态
-  const [showCopywritingLibrary, setShowCopywritingLibrary] = useState<boolean>(false);
+
   
   // Dynamic today reference for initial states
   const today = new Date();
@@ -441,11 +314,9 @@ export default function App() {
       dataDateRange,
       showAnalysis,
       platformTimeRanges,
-      tabPlatforms,
-      copywritingHistory,
-      uploadedCopywritingLibrary
+      tabPlatforms
     });
-  }, [dataDateRange, showAnalysis, platformTimeRanges, tabPlatforms, copywritingHistory, uploadedCopywritingLibrary]);
+  }, [dataDateRange, showAnalysis, platformTimeRanges, tabPlatforms]);
 
   // 当切换标签页时，更新 selectedPlatform 为该标签页的平台选择
   useEffect(() => {
@@ -461,686 +332,7 @@ export default function App() {
     
     // 直接更新selectedPlatform，确保立即生效
     setSelectedPlatform(platform);
-    
-    // 移除自动生成文案的逻辑，让用户点击开始文案创作按钮才生成
   }, [activeTab]);
-
-  // 用户反馈处理函数
-  const handleRating = useCallback((id: string, rating: number) => {
-    setCopywritingHistory(prev => 
-      prev.map(item => 
-        item.id === id ? { ...item, rating } : item
-      )
-    );
-  }, []);
-
-  const handleFeedback = useCallback((id: string, feedback: string) => {
-    setCopywritingHistory(prev => 
-      prev.map(item => 
-        item.id === id ? { ...item, feedback } : item
-      )
-    );
-  }, []);
-
-  const handleModifiedContent = useCallback((id: string, modifiedContent: string) => {
-    setCopywritingHistory(prev => 
-      prev.map(item => 
-        item.id === id ? { ...item, modifiedContent } : item
-      )
-    );
-  }, []);
-
-  const handleAdopted = useCallback((id: string, isAdopted: boolean) => {
-    setCopywritingHistory(prev => 
-      prev.map(item => 
-        item.id === id ? { ...item, isAdopted } : item
-      )
-    );
-  }, []);
-
-  const handlePerformance = useCallback((id: string, performance: CopywritingHistory['performance']) => {
-    setCopywritingHistory(prev => 
-      prev.map(item => 
-        item.id === id ? { ...item, performance } : item
-      )
-    );
-  }, []);
-
-  // 持续学习逻辑：根据用户反馈和效果数据优化提示词
-  const optimizedPrompt = useMemo(() => {
-    // 分析历史数据，提取成功模式
-    const highRatingCopies = copywritingHistory.filter(item => item.rating && item.rating >= 4);
-    const highPerformanceCopies = copywritingHistory.filter(item => item.performance?.views && item.performance.views > 10000);
-    
-    // 提取成功的风格和平台组合
-    const successfulStyles = highRatingCopies.map(item => item.style);
-    const successfulPlatforms = highRatingCopies.map(item => item.platform);
-    
-    // 统计最成功的风格
-    const styleCounts: Record<string, number> = {};
-    successfulStyles.forEach(style => {
-      styleCounts[style] = (styleCounts[style] || 0) + 1;
-    });
-    const mostSuccessfulStyle = Object.entries(styleCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'professional';
-    
-    // 统计最成功的平台
-    const platformCounts: Record<string, number> = {};
-    successfulPlatforms.forEach(platform => {
-      platformCounts[platform] = (platformCounts[platform] || 0) + 1;
-    });
-    const mostSuccessfulPlatform = Object.entries(platformCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || selectedPlatform;
-    
-    // 生成优化后的提示词
-    return `
-你是法律爆款文案专家，已学习 1000+ 条高播放量视频。
-
-## 爆款开头（3秒黄金法则）
-- 悬念式: "你知道吗？90%的人都不知道..."
-- 案例式: "小王被辞退，却拿到30万赔偿..."
-- 提问式: "遇到这种情况，你会怎么办？"
-- 冲突式: "公司说不给加班费？那是他们不懂法！"
-
-## 内容结构
-1. 开头: 3秒抓住注意力
-2. 中间: 讲清法律知识（简单易懂），包含具体案例
-3. 结尾: 自然引导互动，鼓励点赞评论
-
-## 语言要求
-- 口语化，像朋友聊天
-- 专业但不生硬
-- 制造情绪共鸣
-- 金句要有记忆点
-
-## 生成要求
-- 每次生成 3-5 个版本
-- 明确标注[开头]、[中间]、[结尾]部分
-- 给出推荐理由
-- 语言要清晰易懂，让运营人员能快速理解
-- 为每个版本提供详细的运营建议，包括以下几个方面：
-  1. **视频呈现**：详细说明背景音乐选择、视觉元素设计、画面布局等
-  2. **发布文案**：详细说明发布文案的结构、关键词、话题标签等
-  3. **互动引导**：详细说明如何引导用户互动、如何回复评论等
-  4. **风格统一**：详细说明主播形象、语速、语调等
-  5. **平台特点**：根据所选平台的特点，提供针对性的运营建议
-- 请严格按照以下格式生成多个版本：
-  
-  ## 版本1:
-  [开头]
-  开头内容
-  [中间]
-  中间内容
-  [结尾]
-  结尾内容
-  [推荐理由]
-  推荐理由
-  [运营建议]
-  运营建议
-  
-  ## 版本2:
-  [开头]
-  开头内容
-  [中间]
-  中间内容
-  [结尾]
-  结尾内容
-  [推荐理由]
-  推荐理由
-  [运营建议]
-  运营建议
-  
-  ## 版本3:
-  [开头]
-  开头内容
-  [中间]
-  中间内容
-  [结尾]
-  结尾内容
-  [推荐理由]
-  推荐理由
-  [运营建议]
-  运营建议
-
-## 历史成功经验
-${highRatingCopies.length > 0 ? `
-- 最成功的风格: ${mostSuccessfulStyle === 'professional' ? '专业法律' : mostSuccessfulStyle === 'conversational' ? '口语化' : mostSuccessfulStyle === 'storytelling' ? '故事化' : '专业法律'}
-- 最成功的平台: ${mostSuccessfulPlatform === 'douyin' ? '抖音' : mostSuccessfulPlatform === 'kuaishou' ? '快手' : '视频号'}
-- 成功案例数: ${highRatingCopies.length}
-- 高播放量案例数: ${highPerformanceCopies.length}
-` : ''}
-
-[主题]: ${copywritingInput}
-
-[风格要求]: 专业法律
-
-[平台要求]: ${selectedPlatform === 'douyin' ? '抖音' : selectedPlatform === 'kuaishou' ? '快手' : '视频号'}
-
-请根据以上要求，生成高转化率的法律短视频文案，确保结构清晰，运营人员能一目了然。
-    `;
-  }, [copywritingHistory, selectedPlatform, copywritingInput]);
-
-  const getOptimizedPrompt = () => optimizedPrompt;
-
-  // 更新爆款文案库
-  const updateViralLibrary = () => {
-    // 筛选高评分、高播放量的文案
-    const viralCopies = copywritingHistory
-      .filter(item => 
-        (item.rating && item.rating >= 4) || 
-        (item.performance?.views && item.performance.views > 10000) ||
-        item.isAdopted
-      )
-      .sort((a, b) => {
-        // 按评分和播放量排序
-        const scoreA = (a.rating || 0) + (a.performance?.views || 0) / 10000;
-        const scoreB = (b.rating || 0) + (b.performance?.views || 0) / 10000;
-        return scoreB - scoreA;
-      })
-      .slice(0, 20); // 只保留前20个
-    
-    setViralCopywritingLibrary(viralCopies);
-  };
-
-  // 当文案历史更新时，自动更新爆款文案库
-  useEffect(() => {
-    updateViralLibrary();
-  }, [copywritingHistory]);
-
-  // 文案创作相关处理函数
-  const handleCopywritingInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setCopywritingInput(e.target.value);
-  };
-
-  // 当用户手动输入或复制粘贴文案时，保存到文案库
-  const handleCopywritingInputBlur = (e: React.FocusEvent<HTMLTextAreaElement>) => {
-    const content = e.target.value;
-    if (content.trim()) {
-      // 检查是否已经存在相同的文案
-      const exists = uploadedCopywritingLibrary.some(item => item.input === content);
-      if (!exists) {
-        // 保存到上传文案库
-        const newUploadedCopywriting: CopywritingHistory = {
-          id: Date.now().toString(),
-          input: content,
-          output: '',
-          style: 'professional',
-          platform: selectedPlatform,
-          createdAt: new Date().toISOString(),
-          isAdopted: false
-        };
-        
-        setUploadedCopywritingLibrary(prev => [newUploadedCopywriting, ...prev]);
-      }
-    }
-  };
-
-
-
-  const handleStartCopywriting = async () => {
-    if (!copywritingInput.trim()) {
-      alert('请输入文案主题或关键词');
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      // 使用优化后的提示词生成文案
-      const prompt = getOptimizedPrompt();
-      
-      // 使用 deepseek-chat 模型生成文案
-      const output = await fetchAIAnalysis(DEFAULT_CONFIG, prompt);
-      
-      // 解析文案版本
-      const versions = parseCopywritingVersions(output);
-      setCopywritingVersions(versions);
-      setCurrentVersionIndex(0);
-      
-      // 保存每个版本到文案历史
-      const versionHistories: CopywritingHistory[] = versions.map((version, index) => ({
-        id: `${Date.now()}-v${index + 1}`,
-        input: copywritingInput,
-        output: version.content,
-        style: 'professional',
-        platform: selectedPlatform,
-        createdAt: new Date().toISOString(),
-        isAdopted: false
-      }));
-      
-      // 去重：过滤掉与现有历史记录中内容相同的版本
-      const uniqueVersionHistories = versionHistories.filter(newVersion => {
-        return !copywritingHistory.some(existingVersion => 
-          existingVersion.output === newVersion.output && 
-          existingVersion.platform === newVersion.platform
-        );
-      });
-      
-      // 保存所有版本到历史记录
-      // 只保留每个输入和平台的最新5个版本
-      setCopywritingHistory(prev => {
-        // 过滤掉与当前输入和平台相同的旧版本
-        const filteredHistory = prev.filter(item => 
-          !(item.input === copywritingInput && item.platform === selectedPlatform)
-        );
-        // 添加新生成的版本，并限制每个输入和平台最多5个版本
-        return [...uniqueVersionHistories, ...filteredHistory];
-      });
-      // 设置当前文案ID为第一个版本
-      if (uniqueVersionHistories.length > 0) {
-        setCurrentCopywritingId(uniqueVersionHistories[0].id);
-      }
-    } catch (error) {
-      console.error('生成文案失败:', error);
-      alert('生成文案失败，请重试');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  // 智能体处理函数
-  const handleAgentInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setAgentInput(e.target.value);
-    setAgentError(null);
-  };
-
-  const handleStartAgentOptimization = async () => {
-    if (!agentInput.trim()) {
-      setAgentError('请输入原始法律文案或修改要求');
-      return;
-    }
-
-    // 添加用户消息到对话历史
-    const userMessage = {
-      role: 'user' as const,
-      content: agentInput,
-      timestamp: new Date()
-    };
-    setMessages(prev => [...prev, userMessage]);
-    
-    setAgentIsGenerating(true);
-    setAgentError(null);
-
-    try {
-      // 构建会话历史上下文
-      const conversationHistory = messages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
-      
-      // 构建偏好信息
-      const preferenceInfo = `用户偏好：\n- 平台：${sessionPreferences.platform === 'general' ? '通用' : sessionPreferences.platform === 'douyin' ? '抖音' : sessionPreferences.platform === 'kuaishou' ? '快手' : '视频号'}\n- 风格：${sessionPreferences.style}\n- 时长：${sessionPreferences.duration}\n- 转化目标：${sessionPreferences.conversionGoal}`;
-
-      // 并行调用两个模型API，提高生成速度
-      console.log('开始并行调用模型API...');
-      
-      // 准备DeepSeek API调用
-      const deepseekApiKey = 'sk-be6a2391b68e4bddade06a308adbe6b1';
-      const deepseekPrompt = `你是一个专业的法律短视频文案优化助手。请对以下法律文案进行逻辑梳理和结构优化，确保法律表达准确，结构清晰。\n\n${preferenceInfo}\n\n当前用户输入：${agentInput}\n\n对话历史：\n${conversationHistory.map(msg => `${msg.role === 'user' ? '用户' : '助手'}: ${msg.content}`).join('\n')}\n\n要求：\n1. 分析文案的逻辑结构\n2. 优化法律表达的准确性和专业性\n3. 提供结构清晰的优化建议\n4. 保持法律内容的真实性，不要编造法条和结论`;
-
-      const deepseekRequest = fetch('https://api.deepseek.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${deepseekApiKey}`
-        },
-        body: JSON.stringify({
-          model: 'deepseek-chat',
-          messages: [
-            {
-              role: 'user',
-              content: deepseekPrompt
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 2000
-        })
-      }).then(async response => {
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(`DeepSeek API调用失败: ${response.status} - ${errorData.error?.message || '未知错误'}`);
-        }
-        const data = await response.json();
-        return data.choices[0].message.content;
-      });
-
-      // 准备豆包 API 调用
-      const doubaoApiKey = 'b2a85661-b22d-4f65-b4f0-473565faf497';
-      // 注意：由于需要DeepSeek的结果，这里先使用简化的提示词
-      const doubaoPrompt = `你是一个专业的短视频文案优化专家。请对以下法律文案进行优化，使其更适合短视频平台传播。\n\n${preferenceInfo}\n\n当前用户输入：${agentInput}\n\n对话历史：\n${conversationHistory.map(msg => `${msg.role === 'user' ? '用户' : '助手'}: ${msg.content}`).join('\n')}\n\n要求：\n1. 优化短视频钩子，增强吸引力\n2. 提升语言的口语化和传播性\n3. 适配指定平台的风格特点\n4. 确保内容符合短视频时长要求\n5. 增加互动性和转化引导`;
-
-      const doubaoRequest = fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${doubaoApiKey}`
-        },
-        body: JSON.stringify({
-          model: 'doubao-seed-2-0-lite-260215',
-          messages: [
-            {
-              role: 'user',
-              content: doubaoPrompt
-            }
-          ],
-          temperature: 0.7,
-          max_tokens: 2000
-        })
-      }).then(async response => {
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(`豆包API调用失败: ${response.status} - ${errorData.error?.message || '未知错误'}`);
-        }
-        const data = await response.json();
-        return data.choices[0].message.content;
-      });
-
-      // 并行执行两个API调用
-      const [deepseekContent, doubaoContent] = await Promise.all([deepseekRequest, doubaoRequest]);
-      console.log('两个模型API调用完成');
-      console.log('DeepSeek返回内容:', deepseekContent);
-      console.log('豆包返回内容:', doubaoContent);
-
-      // 模型结果融合 - 增强持续学习能力
-      const mergeResults = () => {
-        // 分析用户历史偏好和反馈
-        const analyzeUserPreferences = () => {
-          // 从对话历史中提取用户偏好
-          const userRequests = messages.filter(msg => msg.role === 'user').map(msg => msg.content.toLowerCase());
-          
-          // 分析用户偏好的风格
-          const styleKeywords = {
-            '口语化': ['口语', '口语化', '通俗', '易懂'],
-            '犀利': ['犀利', '尖锐', '直接', '有力'],
-            '专业': ['专业', '严谨', '准确', '权威'],
-            '情绪化': ['情感', '情绪化', '感动', '共鸣']
-          };
-          
-          // 分析用户偏好的平台
-          const platformKeywords = {
-            'douyin': ['抖音', 'douyin'],
-            'kuaishou': ['快手', 'kuaishou'],
-            'wechat': ['视频号', '微信', 'wechat'],
-            'general': ['通用', '一般']
-          };
-          
-          // 分析用户偏好的时长
-          const durationKeywords = {
-            '15秒': ['15秒', '15s', '短', '简短'],
-            '30秒': ['30秒', '30s', '中等', '适中'],
-            '60秒': ['60秒', '60s', '长', '详细']
-          };
-          
-          // 分析用户偏好的转化目标
-          const conversionKeywords = {
-            '评论引导': ['评论', '留言', '讨论'],
-            '私信引导': ['私信', '私聊', '联系'],
-            '关注引导': ['关注', '订阅', 'follow']
-          };
-          
-          // 统计关键词出现次数，更新偏好
-          const updatePreferences = <T extends string>(keywordsMap: Record<T, string[]>, currentPreference: T): T => {
-            let maxCount = 0;
-            let bestMatch = currentPreference;
-            
-            Object.entries(keywordsMap).forEach(([key, keywords]) => {
-              if (Array.isArray(keywords)) {
-                const count = keywords.reduce((acc: number, keyword: string) => {
-                  return acc + userRequests.filter(req => req.includes(keyword)).length;
-                }, 0);
-                
-                if (count > maxCount) {
-                  maxCount = count;
-                  bestMatch = key as T;
-                }
-              }
-            });
-            
-            return bestMatch;
-          };
-          
-          // 更新会话偏好
-          const updatedPreferences = {
-            platform: updatePreferences(platformKeywords, sessionPreferences.platform),
-            style: updatePreferences(styleKeywords, sessionPreferences.style),
-            duration: updatePreferences(durationKeywords, sessionPreferences.duration),
-            conversionGoal: updatePreferences(conversionKeywords, sessionPreferences.conversionGoal)
-          };
-          
-          // 应用更新后的偏好
-          setSessionPreferences(updatedPreferences);
-          
-          return updatedPreferences;
-        };
-        
-        // 分析用户偏好
-        const updatedPreferences = analyzeUserPreferences();
-        
-        // 增强的融合逻辑
-        let title = '优化后的法律短视频文案';
-        let hook = '大家好，今天要跟大家分享一个重要的法律知识，关系到每个人的切身利益！';
-        let script = doubaoContent;
-        let corePoints = '核心观点：法律条文的准确理解和应用';
-        let ending = '希望今天的分享对大家有所帮助，有任何问题欢迎在评论区留言，我们会及时解答！记得点赞、关注，分享给更多需要的朋友！';
-        
-        // 根据平台偏好调整
-        if (updatedPreferences.platform === 'douyin') {
-          hook = hook.replace('大家好', '家人们');
-          ending += ' #法律科普 #抖音普法';
-        } else if (updatedPreferences.platform === 'kuaishou') {
-          hook = hook.replace('大家好', '老铁们');
-          ending += ' #快手法律 #法律知识';
-        } else if (updatedPreferences.platform === 'wechat') {
-          hook = hook.replace('大家好', '朋友们');
-          ending += ' 转发给身边需要的人！';
-        }
-        
-        // 根据风格偏好调整
-        if (updatedPreferences.style === '口语化') {
-          script = script.replace(/\b法律\b/g, '法律知识');
-          script = script.replace(/\b规定\b/g, '说的');
-        } else if (updatedPreferences.style === '犀利') {
-          hook = hook.replace('重要的法律知识', '必须知道的法律真相');
-          ending = ending.replace('有任何问题欢迎在评论区留言', '有不同意见？评论区来辩！');
-        } else if (updatedPreferences.style === '专业') {
-          script = script.replace(/\b大家\b/g, '各位');
-          script = script.replace(/\b觉得\b/g, '认为');
-        } else if (updatedPreferences.style === '情绪化') {
-          hook = hook.replace('关系到每个人的切身利益', '直接影响你的生活！');
-          ending = ending.replace('希望今天的分享对大家有所帮助', '希望这个视频能帮到你，让我们一起学法用法！');
-        }
-        
-        // 根据时长偏好调整
-        if (updatedPreferences.duration === '15秒') {
-          // 压缩内容到15秒
-          script = script.split('\n').slice(0, 3).join('\n');
-        } else if (updatedPreferences.duration === '30秒') {
-          // 保持适中长度
-          script = script.split('\n').slice(0, 5).join('\n');
-        } else if (updatedPreferences.duration === '60秒') {
-          // 详细展开
-          script = script + '\n\n以上就是今天要分享的法律知识，希望对大家有所帮助！';
-        }
-        
-        // 根据转化目标调整
-        if (updatedPreferences.conversionGoal === '评论引导') {
-          ending = ending.replace('有任何问题欢迎在评论区留言', '你遇到过类似的法律问题吗？评论区分享一下！');
-        } else if (updatedPreferences.conversionGoal === '私信引导') {
-          ending = ending.replace('有任何问题欢迎在评论区留言', '有具体法律问题？私信我为你解答！');
-        } else if (updatedPreferences.conversionGoal === '关注引导') {
-          ending = ending.replace('记得点赞、关注', '一定要点赞、关注');
-        }
-        
-        // 从DeepSeek内容中提取核心法律观点
-        const extractCorePoints = () => {
-          // 简单的核心观点提取逻辑
-          const lines = deepseekContent.split('\n');
-          const coreLines = lines.filter((line: string) => line.includes('核心') || line.includes('重点') || line.includes('关键'));
-          if (coreLines.length > 0) {
-            return coreLines.join('\n');
-          }
-          return corePoints;
-        };
-        
-        corePoints = extractCorePoints();
-        
-        // 生成最终融合结果
-        return {
-          title,
-          hook,
-          script,
-          corePoints,
-          ending,
-          explanation: `融合了DeepSeek的法律专业性和豆包的短视频传播性，根据用户偏好（平台：${updatedPreferences.platform}，风格：${updatedPreferences.style}，时长：${updatedPreferences.duration}，转化目标：${updatedPreferences.conversionGoal}）进行优化，形成最终版本。`
-        };
-      };
-
-      const mergedResult = mergeResults();
-      
-      // 更新模型结果
-      setModelResults({
-        deepseek: deepseekContent,
-        doubao: doubaoContent,
-        merged: mergedResult
-      });
-
-      // 保存到历史版本
-      setVersionHistory(prev => [
-        {
-          id: prev.length + 1,
-          timestamp: new Date(),
-          content: mergedResult
-        },
-        ...prev
-      ]);
-
-      // 添加助手回复到对话历史
-      const assistantMessage = {
-        role: 'assistant' as const,
-        content: '已完成优化，为您生成了融合版文案。请查看右侧结果面板。',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, assistantMessage]);
-
-      // 清空输入框
-      setAgentInput('');
-    } catch (error) {
-      console.error('优化文案失败:', error);
-      setAgentError(`优化文案失败: ${error instanceof Error ? error.message : '未知错误'}`);
-      
-      // 添加错误消息到对话历史
-      const errorMessage = {
-        role: 'assistant' as const,
-        content: `抱歉，优化失败：${error instanceof Error ? error.message : '未知错误'}`,
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setAgentIsGenerating(false);
-    }
-  };
-
-  // 解析文案版本
-  const parseCopywritingVersions = (output: string): {id: number, content: string}[] => {
-    // 尝试多种格式解析版本
-    
-    // 格式1: ## 版本1: 内容
-    const versionRegex1 = /## 版本\s*[\d一二三四五]+[:：]/g;
-    const versions1 = output.split(versionRegex1);
-    const parsedVersions1 = versions1
-      .filter((version, index) => index > 0 && version.trim())
-      .map((version, index) => ({
-        id: index + 1,
-        content: version.trim()
-      }));
-    
-    if (parsedVersions1.length > 0) {
-      return parsedVersions1.slice(0, 5); // 限制最多5个版本
-    }
-    
-    // 格式2: 版本1: 内容
-    const versionRegex2 = /版本\s*[\d一二三四五]+[:：]/g;
-    const versions2 = output.split(versionRegex2);
-    const parsedVersions2 = versions2
-      .filter((version, index) => index > 0 && version.trim())
-      .map((version, index) => ({
-        id: index + 1,
-        content: version.trim()
-      }));
-    
-    if (parsedVersions2.length > 0) {
-      return parsedVersions2.slice(0, 5); // 限制最多5个版本
-    }
-    
-    // 格式3: # 版本1 内容
-    const versionRegex3 = /# 版本\s*[\d一二三四五]+/g;
-    const versions3 = output.split(versionRegex3);
-    const parsedVersions3 = versions3
-      .filter((version, index) => index > 0 && version.trim())
-      .map((version, index) => ({
-        id: index + 1,
-        content: version.trim()
-      }));
-    
-    if (parsedVersions3.length > 0) {
-      return parsedVersions3.slice(0, 5); // 限制最多5个版本
-    }
-    
-    // 如果没有解析到版本，使用原始文案作为一个版本
-    return [{
-      id: 1,
-      content: output.trim()
-    }];
-  };
-
-  // 切换文案版本
-  const handleVersionChange = (index: number) => {
-    setCurrentVersionIndex(index);
-  };
-
-  // 上传文案处理函数
-  const handleUploadCopywriting = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      if (content) {
-        setCopywritingInput(content);
-        
-        // 保存到上传文案库
-        const newUploadedCopywriting: CopywritingHistory = {
-          id: Date.now().toString(),
-          input: content,
-          output: '',
-          style: 'professional',
-          platform: selectedPlatform,
-          createdAt: new Date().toISOString(),
-          isAdopted: false
-        };
-        
-        setUploadedCopywritingLibrary(prev => [newUploadedCopywriting, ...prev]);
-        alert('文案上传成功！已保存到文案库');
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  // 查看文案库处理函数
-  const handleViewCopywritingLibrary = () => {
-    setShowCopywritingLibrary(true);
-  };
-
-  // 关闭文案库模态框
-  const handleCloseCopywritingLibrary = () => {
-    setShowCopywritingLibrary(false);
-  };
-
-  // 从文案库选择文案
-  const handleSelectFromLibrary = (copywriting: CopywritingHistory) => {
-    setCopywritingInput(copywriting.input);
-    setSelectedPlatform(copywriting.platform as 'douyin' | 'kuaishou' | 'wechat');
-    setShowCopywritingLibrary(false);
-    alert('已选择文案，可进行二创');
-  };
 
   // Platform-specific setters
   const setPlatformTrendRange = (range: { start: string; end: string } | ((prev: { start: string; end: string }) => { start: string; end: string })) => {
@@ -1386,27 +578,46 @@ ${highRatingCopies.length > 0 ? `
             // 更新整体数据日期范围
             setDataDateRange({ start: fmt(minDate), end: fmt(maxDate) });
             
-            // 更新平台日期范围
-            if (firstPlatform) {
-                const platformData = groupedData[firstPlatform];
-                if (platformData.length > 0) {
-                    // 更新日期范围
-                    setPlatformAiDateRange({ start: fmt(minDate), end: fmt(maxDate) });
-                    setPlatformTrendRange({ start: fmt(minDate), end: fmt(maxDate) });
-                    setPlatformViewsTrendRange({ start: fmt(minDate), end: fmt(maxDate) });
-
-                    // 更新月度比较默认值
-                    const months = Array.from(new Set(platformData.map(d => format(d.parsedDate, 'yyyy-MM')))).sort();
-                    if (months.length > 0) {
-                        setPlatformMonthA(months[0]);
-                        setPlatformMonthB(months.length > 1 ? months[months.length - 1] : months[0]);
-                        setPlatformSelectedMonthForVideos(months[0]);
+            // 更新所有平台的日期范围
+            const fullRange = { start: fmt(minDate), end: fmt(maxDate) };
+            
+            // 为每个平台更新日期范围
+            setPlatformTimeRanges(prev => {
+                const newRanges = { ...prev };
+                
+                Object.keys(groupedData).forEach(platform => {
+                    const platformKey = platform as 'douyin' | 'kuaishou' | 'wechat';
+                    const platformData = groupedData[platformKey];
+                    
+                    if (platformData.length > 0) {
+                        // 更新月度比较默认值
+                        const months = Array.from(new Set(platformData.map(d => format(d.parsedDate, 'yyyy-MM')))).sort();
+                        const monthA = months.length > 0 ? months[0] : lastMonthStr;
+                        const monthB = months.length > 1 ? months[months.length - 1] : thisMonthStr;
+                        const selectedMonthForVideos = months.length > 0 ? months[0] : thisMonthStr;
+                        
+                        newRanges[platformKey] = {
+                            ...newRanges[platformKey],
+                            trendRange: fullRange,
+                            trendMode: 'daily',
+                            viewsTrendRange: fullRange,
+                            viewsTrendMode: 'daily',
+                            aiDateRange: fullRange,
+                            monthA,
+                            monthB,
+                            selectedMonthForVideos,
+                            dateRange: fullRange,
+                            compareRange: { start: fmt(addDays(midDate, 1)), end: fmt(maxDate) }
+                        };
                     }
-
-                    // 设置默认日期范围
-                    setPlatformDateRange({ start: fmt(minDate), end: fmt(midDate) });
-                    setPlatformCompareRange({ start: fmt(addDays(midDate, 1)), end: fmt(maxDate) });
-                }
+                });
+                
+                return newRanges;
+            });
+            
+            // 确保第一个平台的选择正确
+            if (firstPlatform) {
+                handlePlatformSelect(firstPlatform);
             }
         }
         
@@ -1513,12 +724,6 @@ ${highRatingCopies.length > 0 ? `
 
     let result = Object.values(grouped).sort((a: any, b: any) => a.date.localeCompare(b.date));
     
-    // 限制数据点数量，提高图表渲染性能
-    if (result.length > 30) {
-        const step = Math.ceil(result.length / 30);
-        result = result.filter((_, index) => index % step === 0);
-    }
-    
     return result;
   };
 
@@ -1581,12 +786,6 @@ ${highRatingCopies.length > 0 ? `
         completionRate: g.count ? (g.completionRate / g.count).toFixed(2) : 0,
         interactionRate: g.count ? (g.interactionRate / g.count).toFixed(2) : 0,
     })).sort((a: any, b: any) => a.date.localeCompare(b.date));
-    
-    // 限制数据点数量，提高图表渲染性能
-    if (result.length > 30) {
-        const step = Math.ceil(result.length / 30);
-        result = result.filter((_, index) => index % step === 0);
-    }
     
     return result;
   };
@@ -1824,23 +1023,26 @@ ${highRatingCopies.length > 0 ? `
     const sortedItems = [...platformItems].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const totalFans = sortedItems.length > 0 ? sortedItems[0].fans : 0;
 
-    return platformItems
-      .filter(item => format(item.parsedDate, 'yyyy-MM') === selectedMonth) // 筛选选中月份的数据
+    const filteredItems = platformItems
+      .filter(item => format(item.parsedDate, 'yyyy-MM') === selectedMonthForVideos); // 筛选选中月份的数据
+    
+    // 确保只使用选中月份的数据
+    const itemsToUse = filteredItems.length > 0 ? filteredItems : [];
+
+    return itemsToUse
       .map(item => {
-        let category = ''; // No default category
+        let category = '正常播放'; // 默认分类
         if (item.views > 500000 && item.views > totalFans * 5) {
           category = '大爆款';
         } else if (item.views > 150000 && item.views > totalFans * 1.5) {
           category = '中爆款';
         } else if (item.views > 50000 && item.views > totalFans * 0.5) {
           category = '小爆款';
-        } else if (item.views >= 3000 && item.views <= 10000) {
-          category = '正常播放';
         }
 
         return { ...item, category };
-      }).filter(item => item.category); // Only include items that have a category
-  }, [platformData, selectedPlatform, selectedMonth]);
+      }); // 包含所有视频，即使没有分类
+  }, [platformData, selectedPlatform, selectedMonthForVideos]);
 
   // Monthly Aggregation - Optimized
   const monthlyData = useMemo(() => {
@@ -2229,7 +1431,7 @@ ${highRatingCopies.length > 0 ? `
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
         <Bar yAxisId="left" dataKey="views" name="月播放量" fill="url(#colorViews)" radius={[8, 8, 0, 0]} animationDuration={800} />
-        <Line yAxisId="right" type="monotone" dataKey="likes" name="月点赞量" stroke="#f43f5e" strokeWidth={3} dot={{ r: 4, fill: '#f43f5e', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f43f5e', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
+        <Line yAxisId="right" type="monotone" dataKey="likes" name="月点赞量" stroke="#f43f5e" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f43f5e', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
       </ComposedChart>
     </ResponsiveContainer>
   ));
@@ -2257,7 +1459,7 @@ ${highRatingCopies.length > 0 ? `
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Line type="monotone" dataKey="netFans" name="月净增粉" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
+        <Line type="monotone" dataKey="netFans" name="月净增粉" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
         <Bar dataKey="netFans" name="月净增粉" fill="url(#colorNetFans)" radius={[8, 8, 0, 0]} animationDuration={800} />
       </ComposedChart>
     </ResponsiveContainer>
@@ -2305,10 +1507,10 @@ ${highRatingCopies.length > 0 ? `
                 <motion.label 
                   whileHover={{ scale: 1.03, y: -1 }}
                   whileTap={{ scale: 0.97 }}
-                  className="flex items-center gap-1 px-1.5 py-0.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-sm cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md w-full sm:w-auto"
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-md cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md w-full sm:w-auto"
                 >
-                  <Upload className="w-2 h-2" />
-                  <span className="text-[10px] font-medium">上传</span>
+                  <Upload className="w-4 h-4" />
+                  <span className="text-sm font-medium">上传</span>
                   <input type="file" className="hidden" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} multiple />
                 </motion.label>
                  <motion.span 
@@ -2351,9 +1553,7 @@ ${highRatingCopies.length > 0 ? `
               { key: 'monthly', label: '月度对比分析', icon: '📈' },
               { key: 'range', label: '时段对比KPI', icon: '📅' },
               { key: 'personal', label: '个人行业爆款视频', icon: '👤' },
-              { key: 'viral', label: '行业爆款视频', icon: '🔥' },
-              { key: 'rewrite', label: '文案创作', icon: '✍️' },
-              { key: 'agent', label: '智能体', icon: '🤖' }
+              { key: 'viral', label: '行业爆款视频', icon: '🔥' }
             ].map((tab) => (
                   <button
                     key={tab.key}
@@ -2754,17 +1954,17 @@ ${highRatingCopies.length > 0 ? `
                                 }} 
                             />
                             <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                            <Line type="monotone" dataKey="likes" name="点赞量" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, fill: '#ef4444', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorLikes)" animationDuration={800} />
-                            <Line type="monotone" dataKey="comments" name="评论量" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4, fill: '#8b5cf6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorComments)" animationDuration={800} />
+                            <Line type="monotone" dataKey="likes" name="点赞量" stroke="#ef4444" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorLikes)" animationDuration={800} />
+                            <Line type="monotone" dataKey="comments" name="评论量" stroke="#8b5cf6" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorComments)" animationDuration={800} />
                             {/* 根据平台类型显示不同的指标 */}
                             {selectedPlatform === 'wechat' ? (
-                                <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
+                                <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
                             ) : hasFavorites ? (
-                                <Line type="monotone" dataKey="favorites" name="收藏量" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
+                                <Line type="monotone" dataKey="favorites" name="收藏量" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
                             ) : hasRecommendations ? (
-                                <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
+                                <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
                             ) : null}
-                            <Line type="monotone" dataKey="shares" name="转发量" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorShares)" animationDuration={800} />
+                            <Line type="monotone" dataKey="shares" name="转发量" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorShares)" animationDuration={800} />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
@@ -2944,8 +2144,8 @@ ${highRatingCopies.length > 0 ? `
                                 }} 
                             />
                             <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                            <Line yAxisId="left" type="monotone" dataKey="views" name="播放量" stroke="#2563eb" strokeWidth={3} dot={{ r: 4, fill: '#2563eb', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorViews)" animationDuration={800} />
-                            <Line yAxisId="right" type="monotone" dataKey="fans" name="累计粉丝量" stroke="#0ea5e9" strokeWidth={3} dot={{ r: 4, fill: '#0ea5e9', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#0ea5e9', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorFans)" animationDuration={800} />
+                            <Line yAxisId="left" type="monotone" dataKey="views" name="播放量" stroke="#2563eb" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorViews)" animationDuration={800} />
+                            <Line yAxisId="right" type="monotone" dataKey="fans" name="累计粉丝量" stroke="#0ea5e9" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#0ea5e9', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorFans)" animationDuration={800} />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
@@ -3447,8 +2647,8 @@ ${highRatingCopies.length > 0 ? `
                                   }} 
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                <Line type="monotone" dataKey="completionRate" name="当前周期 完播率(%)" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
-                                <Line type="monotone" dataKey="compareCompletionRate" name="对比周期 完播率(%)" stroke="#ef4444" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={{ r: 3, fill: '#ef4444', strokeWidth: 1, stroke: '#fff' }} activeDot={{ r: 5, fill: '#ef4444', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
+                                <Line type="monotone" dataKey="completionRate" name="当前周期 完播率(%)" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                                <Line type="monotone" dataKey="compareCompletionRate" name="对比周期 完播率(%)" stroke="#ef4444" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 5, fill: '#ef4444', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -3484,8 +2684,8 @@ ${highRatingCopies.length > 0 ? `
                                   }} 
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                <Line type="monotone" dataKey="interactionRate" name="当前周期 互动率(%)" stroke="#8b5cf6" strokeWidth={3} dot={{ r: 4, fill: '#8b5cf6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
-                                <Line type="monotone" dataKey="compareInteractionRate" name="对比周期 互动率(%)" stroke="#f59e0b" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={{ r: 3, fill: '#f59e0b', strokeWidth: 1, stroke: '#fff' }} activeDot={{ r: 5, fill: '#f59e0b', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
+                                <Line type="monotone" dataKey="interactionRate" name="当前周期 互动率(%)" stroke="#8b5cf6" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                                <Line type="monotone" dataKey="compareInteractionRate" name="对比周期 互动率(%)" stroke="#f59e0b" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 5, fill: '#f59e0b', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
                                 <ReferenceLine y={avgInteractionRate} stroke="#64748b" strokeDasharray="4 4" label={{ value: `均值: ${avgInteractionRate.toFixed(2)}%`, position: 'right', fill: '#64748b' }} />
                             </LineChart>
                         </ResponsiveContainer>
@@ -3522,8 +2722,8 @@ ${highRatingCopies.length > 0 ? `
                                   }} 
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                <Line yAxisId="left" type="monotone" dataKey="views" name="当前周期 播放量" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
-                                <Line yAxisId="left" type="monotone" dataKey="compareViews" name="对比周期 播放量" stroke="#60a5fa" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={{ r: 3, fill: '#60a5fa', strokeWidth: 1, stroke: '#fff' }} activeDot={{ r: 5, fill: '#60a5fa', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
+                                <Line yAxisId="left" type="monotone" dataKey="views" name="当前周期 播放量" stroke="#3b82f6" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                                <Line yAxisId="left" type="monotone" dataKey="compareViews" name="对比周期 播放量" stroke="#60a5fa" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 5, fill: '#60a5fa', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -3559,8 +2759,8 @@ ${highRatingCopies.length > 0 ? `
                                   }} 
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                <Line yAxisId="right" type="monotone" dataKey="interactions" name="当前周期 互动总量" stroke="#f97316" strokeWidth={3} dot={{ r: 4, fill: '#f97316', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#f97316', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
-                                <Line yAxisId="right" type="monotone" dataKey="compareInteractions" name="对比周期 互动总量" stroke="#fb923c" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={{ r: 3, fill: '#fb923c', strokeWidth: 1, stroke: '#fff' }} activeDot={{ r: 5, fill: '#fb923c', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
+                                <Line yAxisId="right" type="monotone" dataKey="interactions" name="当前周期 互动总量" stroke="#f97316" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f97316', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                                <Line yAxisId="right" type="monotone" dataKey="compareInteractions" name="对比周期 互动总量" stroke="#fb923c" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 5, fill: '#fb923c', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -3596,8 +2796,8 @@ ${highRatingCopies.length > 0 ? `
                                   }} 
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                <Line type="monotone" dataKey="healthRate" name="当前周期 粉赞比(%)" stroke="#ef4444" strokeWidth={3} dot={{ r: 4, fill: '#ef4444', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
-                                <Line type="monotone" dataKey="compareHealthRate" name="对比周期 粉赞比(%)" stroke="#3b82f6" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={{ r: 3, fill: '#3b82f6', strokeWidth: 1, stroke: '#fff' }} activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
+                                <Line type="monotone" dataKey="healthRate" name="当前周期 粉赞比(%)" stroke="#ef4444" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
+                                <Line type="monotone" dataKey="compareHealthRate" name="对比周期 粉赞比(%)" stroke="#3b82f6" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
                                 <ReferenceLine y={avgHealthRate} stroke="#64748b" strokeDasharray="4 4" label={{ value: `均值: ${avgHealthRate}%`, position: 'right', fill: '#64748b' }} />
                             </LineChart>
                         </ResponsiveContainer>
@@ -3617,26 +2817,38 @@ ${highRatingCopies.length > 0 ? `
                     核心指标相关性分析
                 </h3>
                 <div className="flex items-center justify-center p-2">
-                    <div className="grid grid-cols-6 gap-2 w-full aspect-square max-w-[400px]">
-                        {correlationData.map((item, index) => (
-                            <motion.div 
-                                key={index}
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                transition={{ delay: index * 0.01 }}
-                                className="aspect-square flex flex-col items-center justify-center rounded text-xs font-medium text-white relative group cursor-pointer shadow-sm hover:shadow-md transition-all"
-                                style={{ backgroundColor: item.fill }}
-                            >
-                                <span className="opacity-0 group-hover:opacity-100 absolute -top-10 left-1/2 -translate-x-1/2 bg-gray-900/90 text-white px-3 py-1.5 rounded-lg shadow-xl z-20 whitespace-nowrap pointer-events-none transition-opacity backdrop-blur-sm border border-white/10 text-xs">
-                                    {item.xName} vs {item.yName}: {item.value.toFixed(2)}
-                                </span>
-                                {item.value.toFixed(2)}
-                            </motion.div>
-                        ))}
-                        {/* Labels for bottom row */}
-                        {['播放量', '互动总量', '点赞量', '净增粉', '完播率', '互动率'].map(name => (
-                            <div key={name} className="text-center text-[10px] text-gray-500 mt-1 font-medium transform -rotate-45 sm:rotate-0 origin-top-left sm:origin-center">{name}</div>
-                        ))}
+                    <div className="flex items-start gap-2">
+                        {/* Labels for left column */}
+                        <div className="flex flex-col gap-2">
+                            {['播放量', '互动总量', '点赞量', '净增粉', '完播率', '互动率'].map(name => (
+                                <div key={name} className="aspect-square flex items-center justify-end pr-2 text-[10px] text-gray-500 font-medium">{name}</div>
+                            ))}
+                            {/* Empty space for bottom row labels */}
+                            <div className="h-4"></div>
+                        </div>
+                        
+                        {/* Main correlation grid */}
+                        <div className="grid grid-cols-6 gap-2 w-full aspect-square max-w-[500px]">
+                            {correlationData.map((item, index) => (
+                                <motion.div 
+                                    key={index}
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    transition={{ delay: index * 0.01 }}
+                                    className="aspect-square flex flex-col items-center justify-center rounded text-xs font-medium text-white relative group cursor-pointer shadow-sm hover:shadow-md transition-all"
+                                    style={{ backgroundColor: item.fill }}
+                                >
+                                    <span className="opacity-0 group-hover:opacity-100 absolute -top-10 left-1/2 -translate-x-1/2 bg-gray-900/90 text-white px-3 py-1.5 rounded-lg shadow-xl z-20 whitespace-nowrap pointer-events-none transition-opacity backdrop-blur-sm border border-white/10 text-xs">
+                                        {item.xName} vs {item.yName}: {item.value.toFixed(2)}
+                                    </span>
+                                    {item.value.toFixed(2)}
+                                </motion.div>
+                            ))}
+                            {/* Labels for bottom row */}
+                            {['播放量', '互动总量', '点赞量', '净增粉', '完播率', '互动率'].map(name => (
+                                <div key={name} className="text-center text-[10px] text-gray-500 mt-1 font-medium transform -rotate-45 sm:rotate-0 origin-top-left sm:origin-center">{name}</div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             </motion.div>
@@ -3657,8 +2869,8 @@ ${highRatingCopies.length > 0 ? `
                     <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-600">选择月份：</span>
                         <select
-                                value={selectedMonth}
-                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                value={selectedMonthForVideos}
+                                onChange={(e) => setPlatformSelectedMonthForVideos(e.target.value)}
                                 className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
                                 {Array.from(new Set((platformData[selectedPlatform] || []).map(item => format(item.parsedDate, 'yyyy-MM'))))
@@ -4247,828 +3459,9 @@ ${highRatingCopies.length > 0 ? `
 
 
 
-        {/* 智能体 */}
-        {activeTab === 'agent' && showAnalysis && (
-            <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ delay: 0.1 }}
-                className="space-y-6"
-            >
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden"
-                >
-                    {/* Section Header */}
-                    <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-2 h-8 bg-blue-500 rounded-full" />
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-800">法律短视频文案优化智能体</h3>
-                                <p className="text-xs text-gray-400 mt-1">持续对话式文案优化</p>
-                            </div>
-                        </div>
-                    </div>
 
-                    {/* Section Content */}
-                    <div className="p-6">
-                        <div className="flex flex-col lg:flex-row gap-6">
-                            {/* 左侧聊天区 */}
-                            <div className="lg:w-1/2 space-y-6">
-                                {/* 对话历史 */}
-                                <div className="border border-gray-200 rounded-lg h-96 overflow-y-auto bg-gray-50 p-6">
-                                    {messages.length === 0 ? (
-                                        <div className="text-center text-gray-500 py-12">
-                                            <p className="text-base">开始与智能体对话</p>
-                                            <p className="text-sm mt-3">输入原始法律文案或修改要求</p>
-                                        </div>
-                                    ) : (
-                                        messages.map((message, index) => (
-                                            <div key={index} className={`mb-6 ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
-                                                <div className={`inline-block max-w-[80%] p-4 rounded-lg ${message.role === 'user' ? 'bg-blue-100 text-blue-800' : 'bg-gray-200 text-gray-800'}`}>
-                                                    <p className="text-base">{message.content}</p>
-                                                    <p className="text-sm text-gray-500 mt-2">{message.timestamp.toLocaleString()}</p>
-                                                </div>
-                                            </div>
-                                        ))
-                                    )}
-                                </div>
-                                
-                                {/* 输入区域 */}
-                                <div>
-                                    <label className="block text-base font-medium text-gray-700 mb-3">输入原始法律文案或修改要求</label>
-                                    <div className="relative">
-                                        <textarea
-                                            rows={6}
-                                            value={agentInput}
-                                            onChange={handleAgentInputChange}
-                                            placeholder="请输入需要优化的法律文案或修改要求..."
-                                            className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-base"
-                                        />
-                                        <button
-                                            onClick={handleStartAgentOptimization}
-                                            disabled={agentIsGenerating}
-                                            className="absolute bottom-4 right-4 bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition text-base"
-                                        >
-                                            {agentIsGenerating ? '生成中...' : '发送'}
-                                        </button>
-                                    </div>
-                                </div>
-                                
-                                {/* 错误提示 */}
-                                {agentError && (
-                                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-base">
-                                        {agentError}
-                                    </div>
-                                )}
-                            </div>
-                            
-                            {/* 右侧结果区 */}
-                            <div className="lg:w-1/2 space-y-6">
-                                {/* 用户偏好面板 */}
-                                <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                                    <h4 className="text-lg font-medium text-gray-700 mb-4">当前会话偏好</h4>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm text-gray-600 mb-2">平台偏好</label>
-                                            <select 
-                                                value={sessionPreferences.platform} 
-                                                onChange={(e) => setSessionPreferences(prev => ({...prev, platform: e.target.value as any}))}
-                                                className="w-full text-base border border-gray-300 rounded-md px-3 py-2"
-                                            >
-                                                <option value="general">通用</option>
-                                                <option value="douyin">抖音</option>
-                                                <option value="kuaishou">快手</option>
-                                                <option value="wechat">视频号</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm text-gray-600 mb-2">风格偏好</label>
-                                            <select 
-                                                value={sessionPreferences.style} 
-                                                onChange={(e) => setSessionPreferences(prev => ({...prev, style: e.target.value as any}))}
-                                                className="w-full text-base border border-gray-300 rounded-md px-3 py-2"
-                                            >
-                                                <option value="口语化">口语化</option>
-                                                <option value="犀利">犀利</option>
-                                                <option value="专业">专业</option>
-                                                <option value="情绪化">情绪化</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm text-gray-600 mb-2">时长偏好</label>
-                                            <select 
-                                                value={sessionPreferences.duration} 
-                                                onChange={(e) => setSessionPreferences(prev => ({...prev, duration: e.target.value as any}))}
-                                                className="w-full text-base border border-gray-300 rounded-md px-3 py-2"
-                                            >
-                                                <option value="15秒">15秒</option>
-                                                <option value="30秒">30秒</option>
-                                                <option value="60秒">60秒</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm text-gray-600 mb-2">转化目标</label>
-                                            <select 
-                                                value={sessionPreferences.conversionGoal} 
-                                                onChange={(e) => setSessionPreferences(prev => ({...prev, conversionGoal: e.target.value as any}))}
-                                                className="w-full text-base border border-gray-300 rounded-md px-3 py-2"
-                                            >
-                                                <option value="评论引导">评论引导</option>
-                                                <option value="私信引导">私信引导</option>
-                                                <option value="关注引导">关注引导</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                {/* 最终融合结果 */}
-                                {modelResults.merged && (
-                                    <div className="space-y-6">
-                                        <h4 className="text-lg font-medium text-gray-700">最终融合版</h4>
-                                        
-                                        {/* 标题 */}
-                                        <div className="bg-blue-50 p-4 rounded-lg">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <h5 className="text-base font-medium text-gray-700">标题</h5>
-                                                <button 
-                                                    className="text-blue-600 text-sm hover:text-blue-800"
-                                                    onClick={() => {
-                                                        if (modelResults.merged) {
-                                                            navigator.clipboard.writeText(modelResults.merged.title);
-                                                        }
-                                                    }}
-                                                >
-                                                    复制
-                                                </button>
-                                            </div>
-                                            <p className="text-base text-gray-900 font-medium">{modelResults.merged ? modelResults.merged.title : ''}</p>
-                                        </div>
-                                        
-                                        {/* 开场钩子 */}
-                                        <div className="bg-blue-50 p-4 rounded-lg">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <h5 className="text-base font-medium text-gray-700">开场钩子</h5>
-                                                <button 
-                                                    className="text-blue-600 text-sm hover:text-blue-800"
-                                                    onClick={() => {
-                                                        if (modelResults.merged) {
-                                                            navigator.clipboard.writeText(modelResults.merged.hook);
-                                                        }
-                                                    }}
-                                                >
-                                                    复制
-                                                </button>
-                                            </div>
-                                            <p className="text-base text-gray-900">{modelResults.merged ? modelResults.merged.hook : ''}</p>
-                                        </div>
-                                        
-                                        {/* 口播文案 */}
-                                        <div className="bg-blue-50 p-4 rounded-lg">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <h5 className="text-base font-medium text-gray-700">口播文案</h5>
-                                                <button 
-                                                    className="text-blue-600 text-sm hover:text-blue-800"
-                                                    onClick={() => {
-                                                        if (modelResults.merged) {
-                                                            navigator.clipboard.writeText(modelResults.merged.script);
-                                                        }
-                                                    }}
-                                                >
-                                                    复制
-                                                </button>
-                                            </div>
-                                            <div className="text-base text-gray-900 leading-relaxed whitespace-pre-wrap min-h-[150px]">
-                                                {modelResults.merged ? modelResults.merged.script : ''}
-                                            </div>
-                                        </div>
-                                        
-                                        {/* 核心观点 */}
-                                        <div className="bg-blue-50 p-4 rounded-lg">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <h5 className="text-base font-medium text-gray-700">核心观点</h5>
-                                                <button 
-                                                    className="text-blue-600 text-sm hover:text-blue-800"
-                                                    onClick={() => {
-                                                        if (modelResults.merged) {
-                                                            navigator.clipboard.writeText(modelResults.merged.corePoints);
-                                                        }
-                                                    }}
-                                                >
-                                                    复制
-                                                </button>
-                                            </div>
-                                            <p className="text-base text-gray-900">{modelResults.merged ? modelResults.merged.corePoints : ''}</p>
-                                        </div>
-                                        
-                                        {/* 结尾引导 */}
-                                        <div className="bg-blue-50 p-4 rounded-lg">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <h5 className="text-base font-medium text-gray-700">结尾引导</h5>
-                                                <button 
-                                                    className="text-blue-600 text-sm hover:text-blue-800"
-                                                    onClick={() => {
-                                                        if (modelResults.merged) {
-                                                            navigator.clipboard.writeText(modelResults.merged.ending);
-                                                        }
-                                                    }}
-                                                >
-                                                    复制
-                                                </button>
-                                            </div>
-                                            <p className="text-base text-gray-900">{modelResults.merged ? modelResults.merged.ending : ''}</p>
-                                        </div>
-                                        
-                                        {/* 优化说明 */}
-                                        <div className="bg-blue-50 p-4 rounded-lg">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <h5 className="text-base font-medium text-gray-700">优化说明</h5>
-                                                <button 
-                                                    className="text-blue-600 text-sm hover:text-blue-800"
-                                                    onClick={() => {
-                                                        if (modelResults.merged) {
-                                                            navigator.clipboard.writeText(modelResults.merged.explanation);
-                                                        }
-                                                    }}
-                                                >
-                                                    复制
-                                                </button>
-                                            </div>
-                                            <p className="text-base text-gray-900">{modelResults.merged ? modelResults.merged.explanation : ''}</p>
-                                        </div>
-                                        
-                                        {/* 复制全部按钮 */}
-                                        <div className="flex justify-end">
-                                            <button 
-                                                className="bg-blue-600 text-white text-sm px-4 py-2 rounded-md hover:bg-blue-700 transition"
-                                                onClick={() => {
-                                                    if (modelResults.merged) {
-                                                        navigator.clipboard.writeText(`${modelResults.merged.title}\n\n${modelResults.merged.hook}\n\n${modelResults.merged.script}\n\n${modelResults.merged.corePoints}\n\n${modelResults.merged.ending}\n\n${modelResults.merged.explanation}`);
-                                                    }
-                                                }}
-                                            >
-                                                复制全部
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {/* 模型结果对比（可折叠） */}
-                                {modelResults.deepseek || modelResults.doubao ? (
-                                    <div className="border border-gray-200 rounded-lg">
-                                        <button 
-                                            className="w-full text-left p-4 bg-gray-50 hover:bg-gray-100 rounded-t-lg flex items-center justify-between"
-                                            onClick={() => document.getElementById('model-comparison')?.classList.toggle('hidden')}
-                                        >
-                                            <span className="text-base font-medium text-gray-700">模型结果对比</span>
-                                            <span className="text-gray-500">▼</span>
-                                        </button>
-                                        <div id="model-comparison" className="p-6 space-y-6">
-                                            {modelResults.deepseek && (
-                                                <div>
-                                                    <h5 className="text-base font-medium text-gray-700 mb-3">DeepSeek 建议（逻辑梳理）</h5>
-                                                    <div className="bg-gray-50 p-4 rounded-lg text-base text-gray-800 leading-relaxed whitespace-pre-wrap">
-                                                        {modelResults.deepseek}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {modelResults.doubao && (
-                                                <div>
-                                                    <h5 className="text-base font-medium text-gray-700 mb-3">豆包建议（传播优化）</h5>
-                                                    <div className="bg-gray-50 p-4 rounded-lg text-base text-gray-800 leading-relaxed whitespace-pre-wrap">
-                                                        {modelResults.doubao}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ) : null}
-                                
-                                {/* 历史版本记录 */}
-                                {versionHistory.length > 0 && (
-                                    <div className="border border-gray-200 rounded-lg">
-                                        <button 
-                                            className="w-full text-left p-4 bg-gray-50 hover:bg-gray-100 rounded-t-lg flex items-center justify-between"
-                                            onClick={() => document.getElementById('version-history')?.classList.toggle('hidden')}
-                                        >
-                                            <span className="text-base font-medium text-gray-700">历史生成记录 ({versionHistory.length})</span>
-                                            <span className="text-gray-500">▼</span>
-                                        </button>
-                                        <div id="version-history" className="p-6 space-y-4">
-                                            {versionHistory.map((version) => (
-                                                <div key={version.id} className="border border-gray-100 rounded-lg p-4 hover:bg-gray-50 transition">
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <h6 className="text-sm font-medium text-gray-700">版本 {version.id}</h6>
-                                                        <span className="text-xs text-gray-500">{version.timestamp.toLocaleString()}</span>
-                                                    </div>
-                                                    <p className="text-sm text-gray-800 truncate">{version.content.title}</p>
-                                                    <div className="mt-3 flex justify-end">
-                                                        <button 
-                                                            className="text-sm text-blue-600 hover:text-blue-800"
-                                                            onClick={() => {
-                                                                // 切换到该历史版本
-                                                                setModelResults(prev => ({
-                                                                    ...prev,
-                                                                    merged: version.content
-                                                                }));
-                                                            }}
-                                                        >
-                                                            查看此版本
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {/* 快速操作按钮 */}
-                                <div className="flex flex-wrap gap-3">
-                                    <button className="text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition" onClick={() => setAgentInput('改成抖音版')}>改成抖音版</button>
-                                    <button className="text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition" onClick={() => setAgentInput('改成快手版')}>改成快手版</button>
-                                    <button className="text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition" onClick={() => setAgentInput('改成视频号版')}>改成视频号版</button>
-                                    <button className="text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition" onClick={() => setAgentInput('更口语化')}>更口语化</button>
-                                    <button className="text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition" onClick={() => setAgentInput('更犀利')}>更犀利</button>
-                                    <button className="text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition" onClick={() => setAgentInput('更专业')}>更专业</button>
-                                    <button className="text-sm bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition" onClick={() => setAgentInput('压缩到30秒')}>压缩到30秒</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </motion.div>
-            </motion.div>
-        )}
 
-        {/* 文案创作 */}
-        {activeTab === 'rewrite' && showAnalysis && platformData[selectedPlatform]?.length > 0 && (
-            <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ delay: 0.1 }}
-                className="space-y-6"
-            >
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden"
-                >
-                    {/* Section Header */}
-                    <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-2 h-8 bg-green-500 rounded-full" />
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-800">文案创作</h3>
-                                <p className="text-xs text-gray-400 mt-1">创建专业的法律内容文案</p>
-                            </div>
-                        </div>
-                    </div>
 
-                    {/* Section Content */}
-                    <div className="p-6">
-                        <div className="bg-green-50/50 p-6 rounded-xl border border-green-100 min-h-[400px]">
-                            <div className="flex items-center justify-between mb-4">
-                                <h6 className="text-green-800 font-bold flex items-center gap-2">
-                                    <Sparkles className="w-4 h-4" /> 法律文案创作
-                                </h6>
-                            </div>
-
-                            <div className="space-y-4">
-                                {/* 平台选择 */}
-                                <div className="flex items-center justify-between">
-                                    <p className="text-xs text-green-600 bg-green-100/50 p-2 rounded flex-1">
-                                        提示：选择平台，AI 将根据平台特性生成适合的文案。
-                                    </p>
-                                    <div className="flex gap-2 ml-4">
-                                        <button
-                                            onClick={() => handlePlatformSelect('douyin')}
-                                            className={cn(
-                                                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-                                                selectedPlatform === 'douyin'
-                                                    ? "bg-blue-600 text-white"
-                                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                            )}
-                                        >
-                                            抖音
-                                        </button>
-                                        <button
-                                            onClick={() => handlePlatformSelect('kuaishou')}
-                                            className={cn(
-                                                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-                                                selectedPlatform === 'kuaishou'
-                                                    ? "bg-blue-600 text-white"
-                                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                            )}
-                                        >
-                                            快手
-                                        </button>
-                                        <button
-                                            onClick={() => handlePlatformSelect('wechat')}
-                                            className={cn(
-                                                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
-                                                selectedPlatform === 'wechat'
-                                                    ? "bg-blue-600 text-white"
-                                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                            )}
-                                        >
-                                            视频号
-                                        </button>
-                                    </div>
-                                </div>
-                                
-                                {/* 文案输入区域 */}
-                                <div className="w-full h-64 overflow-y-auto rounded-xl border border-green-200 bg-white shadow-inner p-4">
-                                    <textarea
-                                        placeholder="请输入文案主题或关键词，AI 将生成专业的法律文案"
-                                        className="w-full h-full border-none outline-none resize-none text-sm text-gray-800"
-                                        value={copywritingInput}
-                                        onChange={handleCopywritingInputChange}
-                                        onBlur={handleCopywritingInputBlur}
-                                    />
-                                </div>
-                                
-                                {/* 上传文案功能 */}
-                                <div className="mt-4">
-                                    <p className="text-xs text-green-600 bg-green-100/50 p-2 rounded flex-1">
-                                        提示：上传别人高点赞量视频的文案，AI 将进行二创，生成更好的法律文案。
-                                    </p>
-                                    <div className="mt-2 flex items-center gap-2">
-                                        <input
-                                            type="file"
-                                            accept=".txt,.md"
-                                            className="hidden"
-                                            id="uploadCopywriting"
-                                            onChange={handleUploadCopywriting}
-                                        />
-                                        <label
-                                            htmlFor="uploadCopywriting"
-                                            className="px-4 py-2 rounded-lg text-xs font-bold transition-all bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
-                                        >
-                                            上传文案
-                                        </label>
-                                        <button
-                                            className="px-4 py-2 rounded-lg text-xs font-bold transition-all bg-purple-600 text-white hover:bg-purple-700"
-                                            onClick={handleViewCopywritingLibrary}
-                                        >
-                                            查看文案库
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="py-4 flex flex-col items-center justify-center text-gray-400">
-                                    {isGenerating ? (
-                                        <>
-                                            <div className="w-12 h-12 border-4 border-t-green-600 border-green-200 rounded-full animate-spin mb-4"></div>
-                                            <p className="text-lg font-medium text-gray-600">正在生成文案...</p>
-                                            <p className="text-sm mt-2 mb-6">请稍候，AI 正在为您创作专业的法律文案</p>
-                                        </>
-                                    ) : copywritingVersions.length > 0 ? (
-                                        <>
-                                            <div className="flex items-center gap-3 mb-6">
-                                                <Sparkles className="w-10 h-10 text-green-600" />
-                                                <div>
-                                                    <p className="text-xl font-bold text-gray-800">文案生成成功！</p>
-                                                    <p className="text-sm text-gray-500">根据您的需求，AI 已为您生成专业法律文案</p>
-                                                </div>
-                                            </div>
-                                            <div className="w-full mt-4 p-6 bg-white rounded-2xl border border-green-200 shadow-lg">
-                                                <div className="flex items-center gap-2 mb-4">
-                                                    <div className="w-2 h-6 bg-green-500 rounded-full" />
-                                                    <h4 className="text-lg font-bold text-gray-800">AI 生成文案</h4>
-                                                </div>
-                                                
-                                                {/* 版本切换按钮 */}
-                                                {copywritingVersions.length > 0 && (
-                                                    <div className="mb-6">
-                                                        <p className="text-sm font-medium text-gray-700 mb-3">选择文案版本</p>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {copywritingVersions.map((version, index) => (
-                                                                <button
-                                                                    key={version.id}
-                                                                    onClick={() => handleVersionChange(index)}
-                                                                    className={cn(
-                                                                        "px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                                                                        currentVersionIndex === index
-                                                                            ? "bg-blue-600 text-white"
-                                                                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                                                    )}
-                                                                >
-                                                                    版本 {version.id}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                
-                                                <div className="prose prose-sm max-w-none">
-                                                    <h5 className="text-blue-600 font-bold mb-2">版本 {copywritingVersions[currentVersionIndex].id}</h5>
-                                                    <p className="text-gray-700 whitespace-pre-wrap">
-                                                        {copywritingVersions.length > 0 
-                                                            ? copywritingVersions[currentVersionIndex].content 
-                                                            : ''
-                                                        }
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            
-                                            {/* 用户反馈区域 */}
-                                            {currentCopywritingId && (
-                                                <div className="w-full mt-6 p-6 bg-white rounded-2xl border border-green-200 shadow-lg">
-                                                    <div className="flex items-center gap-2 mb-4">
-                                                        <div className="w-2 h-6 bg-blue-500 rounded-full" />
-                                                        <h4 className="text-lg font-bold text-gray-800">用户反馈</h4>
-                                                    </div>
-                                                    <div className="space-y-4">
-                                                        {/* 评分系统 */}
-                                                        <div className="bg-gray-50 p-4 rounded-xl">
-                                                            <p className="text-sm font-medium text-gray-700 mb-3">评分 (1-5星)</p>
-                                                            <div className="flex gap-2">
-                                                                {[1, 2, 3, 4, 5].map((star) => (
-                                                                    <button
-                                                                        key={star}
-                                                                        onClick={() => handleRating(currentCopywritingId!, star)}
-                                                                        className={`text-2xl transition-all ${star <= (copywritingHistory.find(item => item.id === currentCopywritingId)?.rating || 0) ? 'text-yellow-400' : 'text-gray-300 hover:text-yellow-300'}`}
-                                                                    >
-                                                                        ★
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        {/* 详细反馈 */}
-                                                        <div className="bg-gray-50 p-4 rounded-xl">
-                                                            <p className="text-sm font-medium text-gray-700 mb-3">详细反馈 (可选)</p>
-                                                            <textarea
-                                                                placeholder="请输入您的反馈意见，帮助我们改进文案质量"
-                                                                className="w-full h-20 border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                                                defaultValue={copywritingHistory.find(item => item.id === currentCopywritingId)?.feedback || ''}
-                                                                onChange={(e) => handleFeedback(currentCopywritingId!, e.target.value)}
-                                                            />
-                                                        </div>
-                                                        
-                                                        {/* 修改记录 */}
-                                                        <div className="bg-gray-50 p-4 rounded-xl">
-                                                            <p className="text-sm font-medium text-gray-700 mb-3">修改后的内容 (如果有)</p>
-                                                            <textarea
-                                                                placeholder="请输入您修改后的文案内容"
-                                                                className="w-full h-32 border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                                                defaultValue={copywritingHistory.find(item => item.id === currentCopywritingId)?.modifiedContent || ''}
-                                                                onChange={(e) => handleModifiedContent(currentCopywritingId!, e.target.value)}
-                                                            />
-                                                        </div>
-                                                        
-                                                        {/* 采用状态 */}
-                                                        <div className="bg-gray-50 p-4 rounded-xl">
-                                                            <p className="text-sm font-medium text-gray-700 mb-3">是否被采用</p>
-                                                            <div className="flex gap-4">
-                                                                <button
-                                                                    onClick={() => handleAdopted(currentCopywritingId!, true)}
-                                                                    className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${copywritingHistory.find(item => item.id === currentCopywritingId)?.isAdopted ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                                                                >
-                                                                    已采用
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleAdopted(currentCopywritingId!, false)}
-                                                                    className={`px-6 py-2 rounded-lg text-sm font-medium transition-all ${!copywritingHistory.find(item => item.id === currentCopywritingId)?.isAdopted ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                                                                >
-                                                                    未采用
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                        
-                                                        {/* 效果数据 */}
-                                                        <div className="bg-gray-50 p-4 rounded-xl">
-                                                            <p className="text-sm font-medium text-gray-700 mb-3">效果数据 (如果有)</p>
-                                                            <div className="grid grid-cols-3 gap-3">
-                                                                <div>
-                                                                    <p className="text-xs text-gray-500 mb-1">播放量</p>
-                                                                    <input
-                                                                        type="number"
-                                                                        placeholder="0"
-                                                                        className="w-full border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                                                        defaultValue={copywritingHistory.find(item => item.id === currentCopywritingId)?.performance?.views || ''}
-                                                                        onChange={(e) => handlePerformance(currentCopywritingId!, {
-                                                                            ...copywritingHistory.find(item => item.id === currentCopywritingId)?.performance,
-                                                                            views: parseInt(e.target.value) || 0
-                                                                        })}
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-xs text-gray-500 mb-1">点赞数</p>
-                                                                    <input
-                                                                        type="number"
-                                                                        placeholder="0"
-                                                                        className="w-full border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                                                        defaultValue={copywritingHistory.find(item => item.id === currentCopywritingId)?.performance?.likes || ''}
-                                                                        onChange={(e) => handlePerformance(currentCopywritingId!, {
-                                                                            ...copywritingHistory.find(item => item.id === currentCopywritingId)?.performance,
-                                                                            likes: parseInt(e.target.value) || 0
-                                                                        })}
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-xs text-gray-500 mb-1">评论数</p>
-                                                                    <input
-                                                                        type="number"
-                                                                        placeholder="0"
-                                                                        className="w-full border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                                                        defaultValue={copywritingHistory.find(item => item.id === currentCopywritingId)?.performance?.comments || ''}
-                                                                        onChange={(e) => handlePerformance(currentCopywritingId!, {
-                                                                            ...copywritingHistory.find(item => item.id === currentCopywritingId)?.performance,
-                                                                            comments: parseInt(e.target.value) || 0
-                                                                        })}
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                            
-                                            <div className="flex flex-wrap gap-4 mt-6">
-                                                <button
-                                                    className="px-8 py-3 rounded-xl font-bold shadow-lg transition-all bg-green-600 text-white hover:bg-green-700 hover:scale-105"
-                                                    onClick={() => {
-                                                        setCopywritingVersions([]);
-                                                        setCurrentVersionIndex(0);
-                                                    }}
-                                                >
-                                                    重新创作
-                                                </button>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <div className="text-center py-12">
-                                                <Sparkles className="w-16 h-16 text-green-200 mb-6 mx-auto" />
-                                                <p className="text-xl font-bold text-gray-800 mb-3">准备就绪</p>
-                                                <p className="text-sm text-gray-500 mb-8 max-w-md mx-auto">请输入文案主题或关键词，然后点击'开始文案创作'，AI 将为您生成专业的法律文案</p>
-                                                <button
-                                                    className="px-8 py-4 rounded-xl font-bold shadow-lg transition-all bg-green-600 text-white hover:bg-green-700 hover:scale-105"
-                                                    onClick={handleStartCopywriting}
-                                                >
-                                                    开始文案创作
-                                                </button>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </motion.div>
-                
-                {/* 爆款文案库 */}
-                {viralCopywritingLibrary.length > 0 && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden"
-                    >
-                        <div className="p-6 border-b border-gray-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-2 h-8 bg-purple-500 rounded-full" />
-                                <div>
-                                    <h3 className="text-lg font-bold text-gray-800">爆款文案库</h3>
-                                    <p className="text-xs text-gray-400 mt-1">历史高评分文案和爆款案例</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="p-6">
-                            <div className="bg-purple-50/50 p-6 rounded-xl border border-purple-100">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h6 className="text-purple-800 font-bold flex items-center gap-2">
-                                        <Star className="w-4 h-4" /> 爆款文案案例
-                                    </h6>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {viralCopywritingLibrary.map((item) => (
-                                        <div 
-                                            key={item.id} 
-                                            className="p-4 bg-white rounded-xl border border-purple-200 shadow-inner hover:shadow-lg transition-all"
-                                        >
-                                            <div className="flex justify-between items-start mb-2">
-                                                <span className="text-xs font-bold text-purple-600">{item.platform === 'douyin' ? '抖音' : item.platform === 'kuaishou' ? '快手' : '视频号'}</span>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs text-gray-500">{new Date(item.createdAt).toLocaleDateString()}</span>
-                                                    <button
-                                                        className="text-xs text-red-600 hover:text-red-800"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            // 删除文案
-                                                            setCopywritingHistory(prev => prev.filter(historyItem => historyItem.id !== item.id));
-                                                        }}
-                                                    >
-                                                        删除
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <h5 
-                                                className="text-sm font-bold text-gray-800 mb-2 cursor-pointer"
-                                                onClick={() => {
-                                                    // 找到对应的版本并显示
-                                                    const versions = copywritingHistory.filter(v => v.input === item.input && v.platform === item.platform);
-                                                    if (versions.length > 0) {
-                                                        setCopywritingVersions(versions.map((v, index) => ({
-                                                            id: index + 1,
-                                                            content: v.output
-                                                        })));
-                                                        setCurrentVersionIndex(0);
-                                                        setCopywritingInput(item.input);
-                                                        setSelectedPlatform(item.platform as 'douyin' | 'kuaishou' | 'wechat');
-                                                    }
-                                                }}
-                                            >{item.input}</h5>
-                                            <p className="text-xs text-gray-600 mb-2 line-clamp-2">{item.output}</p>
-                                            <div className="flex justify-between items-center">
-                                                <div className="flex gap-1">
-                                                    {[1, 2, 3, 4, 5].map((star) => (
-                                                        <span key={star} className={`text-xs ${star <= (item.rating || 0) ? 'text-yellow-400' : 'text-gray-300'}`}>
-                                                            ★
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                                {item.isAdopted && (
-                                                    <span className="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded">已采用</span>
-                                                )}
-                                                {item.performance?.views && item.performance.views > 10000 && (
-                                                    <span className="text-xs font-medium text-red-600 bg-red-100 px-2 py-1 rounded">爆款</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
-                
-                {/* 文案库模态框 */}
-                {showCopywritingLibrary && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 w-full max-w-4xl max-h-[80vh] overflow-y-auto">
-                            <div className="p-6 border-b border-gray-50 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-2 h-8 bg-blue-500 rounded-full" />
-                                    <div>
-                                        <h3 className="text-lg font-bold text-gray-800">文案库</h3>
-                                        <p className="text-xs text-gray-400 mt-1">上传的高点赞量视频文案</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={handleCloseCopywritingLibrary}
-                                    className="p-2 rounded-full hover:bg-gray-100"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-                            <div className="p-6">
-                                {uploadedCopywritingLibrary.length > 0 ? (
-                                    <div className="grid grid-cols-1 gap-4">
-                                        {uploadedCopywritingLibrary.map((item) => (
-                                            <div key={item.id} className="p-4 bg-white rounded-xl border border-blue-200 shadow-inner">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <span className="text-xs font-bold text-blue-600">{item.platform === 'douyin' ? '抖音' : item.platform === 'kuaishou' ? '快手' : '视频号'}</span>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs text-gray-500">{new Date(item.createdAt).toISOString().split('T')[0]}</span>
-                                                        <button
-                                                            className="text-xs text-red-600 hover:text-red-800"
-                                                            onClick={() => {
-                                                                // 删除上传的文案
-                                                                setUploadedCopywritingLibrary(prev => prev.filter(uploadedItem => uploadedItem.id !== item.id));
-                                                            }}
-                                                        >
-                                                            删除
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                                <p className="text-sm text-gray-800 mb-4 line-clamp-3">{item.input}</p>
-                                                <button
-                                                    className="px-4 py-2 rounded-lg text-xs font-bold transition-all bg-blue-600 text-white hover:bg-blue-700"
-                                                    onClick={() => handleSelectFromLibrary(item)}
-                                                >
-                                                    选择此文案进行二创
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="p-8 text-center text-gray-400">
-                                        <p className="text-lg font-medium">暂无上传的文案</p>
-                                        <p className="text-sm mt-2">请先上传高点赞量视频的文案</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
-                
-            </motion.div>
-        )}
 
       </div>
     </div>
