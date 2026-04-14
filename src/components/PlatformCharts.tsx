@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
-import { BarChart3, TrendingUp } from 'lucide-react';
+import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Radar } from 'lucide-react';
 
 interface PlatformData {
   platform: string;
@@ -21,42 +21,7 @@ interface PlatformChartsProps {
   platformCompareMode: 'overall' | 'monthly';
 }
 
-const PlatformChartsComponent = ({ platformData, platformCompareMode }: PlatformChartsProps) => {
-  // 准备柱状图数据
-  const barChartData = useMemo(() => {
-    return platformData.map(item => ({
-      platform: item.platform === 'douyin' ? '抖音' : item.platform === 'kuaishou' ? '快手' : '视频号',
-      views: item.totalViews,
-      likes: item.totalLikes,
-      comments: item.totalComments,
-      shares: item.totalShares,
-      avgInteractionRate: item.avgInteractionRate,
-      avgCompletionRate: item.avgCompletionRate,
-      videoCount: item.videoCount,
-    }));
-  }, [platformData]);
-
-  // 准备饼图数据（播放量占比）
-  const pieChartData = useMemo(() => {
-    const totalViews = platformData.reduce((sum, item) => sum + item.totalViews, 0);
-    return platformData.map(item => ({
-      name: item.platform === 'douyin' ? '抖音' : item.platform === 'kuaishou' ? '快手' : '视频号',
-      value: item.totalViews,
-      percentage: totalViews > 0 ? (item.totalViews / totalViews * 100) : 0
-    }));
-  }, [platformData]);
-
-  // 饼图颜色
-  const COLORS = ['#FF0000', '#FE2C55', '#07C160'];
-
-  // 互动率对比数据
-  const interactionChartData = useMemo(() => {
-    return platformData.map(item => ({
-      platform: item.platform === 'douyin' ? '抖音' : item.platform === 'kuaishou' ? '快手' : '视频号',
-      interactionRate: item.avgInteractionRate,
-      completionRate: item.avgCompletionRate
-    }));
-  }, [platformData]);
+const PlatformChartsComponent = ({ platformData }: PlatformChartsProps) => {
 
   if (platformData.length === 0) {
     return (
