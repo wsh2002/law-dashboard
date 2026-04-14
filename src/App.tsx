@@ -6,11 +6,20 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, ComposedChart, ScatterChart, Scatter, ZAxis, ReferenceLine
 } from 'recharts';
-import { Upload, Calendar, ArrowUp, ArrowDown, FileSpreadsheet, TrendingUp, Activity, Heart, GitMerge, Sparkles, Play, MessageCircle, Share2, Users, Star, ThumbsUp, Search } from 'lucide-react';
+import { Upload, Calendar, ArrowUp, ArrowDown, FileSpreadsheet, TrendingUp, Activity, Heart, GitMerge, Sparkles, Play, MessageCircle, Share2, Users, Search } from 'lucide-react';
 // @ts-ignore
 import ReactWordcloud from 'react-wordcloud';
 import { format, parse, addDays, isValid, startOfDay, subDays, startOfMonth, subMonths, startOfWeek, endOfWeek, eachWeekOfInterval } from 'date-fns';
 import { cn } from './lib/utils';
+
+// #region agent log
+fetch('http://127.0.0.1:7326/ingest/4128a6f9-7968-4d25-bca1-4be3c1d59841',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'13a9be'},body:JSON.stringify({sessionId:'13a9be',runId:'pre-fix',hypothesisId:'H5',location:'App.tsx:module-scope',message:'module loaded',data:{href:typeof window!=='undefined'?window.location.href:'unknown'},timestamp:Date.now()})}).catch(()=>{});
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', (event) => {
+    fetch('http://127.0.0.1:7326/ingest/4128a6f9-7968-4d25-bca1-4be3c1d59841',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'13a9be'},body:JSON.stringify({sessionId:'13a9be',runId:'pre-fix',hypothesisId:'H6',location:'App.tsx:window-error',message:'global runtime error captured',data:{message:event.message,filename:event.filename,lineno:event.lineno,colno:event.colno},timestamp:Date.now()})}).catch(()=>{});
+  });
+}
+// #endregion
 
 // 懒加载组件
 const ViralVideosSection = lazy(() => import('./components/ViralVideosSection'));
@@ -18,6 +27,7 @@ const AARRRAnalysis = lazy(() => import('./components/AARRRAnalysis'));
 const AIAnalysisCard = lazy(() => import('./components/AIAnalysisCard'));
 const AnimatedBackground = lazy(() => import('./components/AnimatedBackground'));
 const Login = lazy(() => import('./components/Login'));
+const PlatformChartsWrapper = lazy(() => import('./components/PlatformChartsWrapper'));
 
 // Custom Tooltip for comparison charts
 const ComparisonTooltip = React.memo(({ active, payload, label }: any) => {
@@ -236,7 +246,7 @@ export default function App() {
     personal: 'douyin',
     viral: 'douyin'
   });
-  const [activeTab, setActiveTab] = useState<'overview' | 'monthly' | 'range' | 'personal' | 'viral'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'monthly' | 'range' | 'personal' | 'viral' | 'platform'>('overview');
   
 
   
@@ -305,7 +315,7 @@ export default function App() {
   });
 
   // Get current platform's time ranges
-  const currentTimeRanges = platformTimeRanges[selectedPlatform];
+  const currentTimeRanges = platformTimeRanges[selectedPlatform] || platformTimeRanges.douyin;
   const { trendRange, trendMode, viewsTrendRange, viewsTrendMode, aiDateRange, monthA, monthB, selectedMonthForVideos, dateRange, compareRange } = currentTimeRanges;
 
   // 当状态变化时保存到 localStorage
@@ -337,11 +347,12 @@ export default function App() {
   // Platform-specific setters
   const setPlatformTrendRange = (range: { start: string; end: string } | ((prev: { start: string; end: string }) => { start: string; end: string })) => {
     setPlatformTimeRanges(prev => {
-      const newRange = typeof range === 'function' ? range(prev[selectedPlatform].trendRange) : range;
+      const currentPlatformData = prev[selectedPlatform] || prev.douyin;
+      const newRange = typeof range === 'function' ? range(currentPlatformData.trendRange) : range;
       return {
         ...prev,
         [selectedPlatform]: {
-          ...prev[selectedPlatform],
+          ...currentPlatformData,
           trendRange: newRange
         }
       };
@@ -366,22 +377,26 @@ export default function App() {
   }, [selectedPlatform, platformData]);
 
   const setPlatformTrendMode = (mode: 'daily' | 'weekly' | 'monthly' | 'quarterly') => {
-    setPlatformTimeRanges(prev => ({
-      ...prev,
-      [selectedPlatform]: {
-        ...prev[selectedPlatform],
-        trendMode: mode
-      }
-    }));
+    setPlatformTimeRanges(prev => {
+      const currentPlatformData = prev[selectedPlatform] || prev.douyin;
+      return {
+        ...prev,
+        [selectedPlatform]: {
+          ...currentPlatformData,
+          trendMode: mode
+        }
+      };
+    });
   };
 
   const setPlatformViewsTrendRange = (range: { start: string; end: string } | ((prev: { start: string; end: string }) => { start: string; end: string })) => {
     setPlatformTimeRanges(prev => {
-      const newRange = typeof range === 'function' ? range(prev[selectedPlatform].viewsTrendRange) : range;
+      const currentPlatformData = prev[selectedPlatform] || prev.douyin;
+      const newRange = typeof range === 'function' ? range(currentPlatformData.viewsTrendRange) : range;
       return {
         ...prev,
         [selectedPlatform]: {
-          ...prev[selectedPlatform],
+          ...currentPlatformData,
           viewsTrendRange: newRange
         }
       };
@@ -389,22 +404,26 @@ export default function App() {
   };
 
   const setPlatformViewsTrendMode = (mode: 'daily' | 'weekly' | 'monthly' | 'quarterly') => {
-    setPlatformTimeRanges(prev => ({
-      ...prev,
-      [selectedPlatform]: {
-        ...prev[selectedPlatform],
-        viewsTrendMode: mode
-      }
-    }));
+    setPlatformTimeRanges(prev => {
+      const currentPlatformData = prev[selectedPlatform] || prev.douyin;
+      return {
+        ...prev,
+        [selectedPlatform]: {
+          ...currentPlatformData,
+          viewsTrendMode: mode
+        }
+      };
+    });
   };
 
   const setPlatformAiDateRange = (range: { start: string; end: string } | ((prev: { start: string; end: string }) => { start: string; end: string })) => {
     setPlatformTimeRanges(prev => {
-      const newRange = typeof range === 'function' ? range(prev[selectedPlatform].aiDateRange) : range;
+      const currentPlatformData = prev[selectedPlatform] || prev.douyin;
+      const newRange = typeof range === 'function' ? range(currentPlatformData.aiDateRange) : range;
       return {
         ...prev,
         [selectedPlatform]: {
-          ...prev[selectedPlatform],
+          ...currentPlatformData,
           aiDateRange: newRange
         }
       };
@@ -413,43 +432,53 @@ export default function App() {
 
   // Month comparison setters
   const setPlatformMonthA = (month: string) => {
-    setPlatformTimeRanges(prev => ({
-      ...prev,
-      [selectedPlatform]: {
-        ...prev[selectedPlatform],
-        monthA: month
-      }
-    }));
+    setPlatformTimeRanges(prev => {
+      const currentPlatformData = prev[selectedPlatform] || prev.douyin;
+      return {
+        ...prev,
+        [selectedPlatform]: {
+          ...currentPlatformData,
+          monthA: month
+        }
+      };
+    });
   };
 
   const setPlatformMonthB = (month: string) => {
-    setPlatformTimeRanges(prev => ({
-      ...prev,
-      [selectedPlatform]: {
-        ...prev[selectedPlatform],
-        monthB: month
-      }
-    }));
+    setPlatformTimeRanges(prev => {
+      const currentPlatformData = prev[selectedPlatform] || prev.douyin;
+      return {
+        ...prev,
+        [selectedPlatform]: {
+          ...currentPlatformData,
+          monthB: month
+        }
+      };
+    });
   };
 
   const setPlatformSelectedMonthForVideos = (month: string) => {
-    setPlatformTimeRanges(prev => ({
-      ...prev,
-      [selectedPlatform]: {
-        ...prev[selectedPlatform],
-        selectedMonthForVideos: month
-      }
-    }));
+    setPlatformTimeRanges(prev => {
+      const currentPlatformData = prev[selectedPlatform] || prev.douyin;
+      return {
+        ...prev,
+        [selectedPlatform]: {
+          ...currentPlatformData,
+          selectedMonthForVideos: month
+        }
+      };
+    });
   };
 
   // Date range setters
   const setPlatformDateRange = (range: { start: string; end: string } | ((prev: { start: string; end: string }) => { start: string; end: string })) => {
     setPlatformTimeRanges(prev => {
-      const newRange = typeof range === 'function' ? range(prev[selectedPlatform].dateRange) : range;
+      const currentPlatformData = prev[selectedPlatform] || prev.douyin;
+      const newRange = typeof range === 'function' ? range(currentPlatformData.dateRange) : range;
       return {
         ...prev,
         [selectedPlatform]: {
-          ...prev[selectedPlatform],
+          ...currentPlatformData,
           dateRange: newRange
         }
       };
@@ -458,11 +487,12 @@ export default function App() {
 
   const setPlatformCompareRange = (range: { start: string; end: string } | ((prev: { start: string; end: string }) => { start: string; end: string })) => {
     setPlatformTimeRanges(prev => {
-      const newRange = typeof range === 'function' ? range(prev[selectedPlatform].compareRange) : range;
+      const currentPlatformData = prev[selectedPlatform] || prev.douyin;
+      const newRange = typeof range === 'function' ? range(currentPlatformData.compareRange) : range;
       return {
         ...prev,
         [selectedPlatform]: {
-          ...prev[selectedPlatform],
+          ...currentPlatformData,
           compareRange: newRange
         }
       };
@@ -470,6 +500,28 @@ export default function App() {
   };
 
   const [topVideosMode, setTopVideosMode] = useState<'range' | 'month'>('range');
+  const [showPlatformComparison, setShowPlatformComparison] = useState<boolean>(false);
+  const [comparePlatform, setComparePlatform] = useState<'douyin' | 'kuaishou' | 'wechat'>('douyin');
+  const [platformCompareMode, setPlatformCompareMode] = useState<'overall' | 'monthly'>('overall');
+  const [selectedCompareMonth, setSelectedCompareMonth] = useState<string>('');
+
+  // 计算可用的月份
+  const availableMonths = useMemo(() => {
+    const allMonths = new Set<string>();
+    Object.values(platformData).forEach(items => {
+      items.forEach(item => {
+        allMonths.add(format(item.parsedDate, 'yyyy-MM'));
+      });
+    });
+    return Array.from(allMonths).sort().reverse();
+  }, [platformData]);
+
+  // 当可用月份变化时，更新选中的月份
+  useEffect(() => {
+    if (availableMonths.length > 0 && !selectedCompareMonth) {
+      setSelectedCompareMonth(availableMonths[0]);
+    }
+  }, [availableMonths, selectedCompareMonth]);
 
   const [detailTrendMode, setDetailTrendMode] = useState<'daily' | 'weekly' | 'monthly' | 'quarterly'>('daily');
 
@@ -1151,6 +1203,198 @@ export default function App() {
           .slice(0, 10); // Top 10
   }, [data, selectedMonthForVideos, selectedPlatform]);
 
+  // 对比平台的Top 10视频（分析周期）
+  const compareTop10ExplosiveVideos = useMemo(() => {
+    const compareData = platformData[comparePlatform] || [];
+    return [...compareData]
+      .sort((a, b) => b.views - a.views)
+      .slice(0, 10);
+  }, [platformData, comparePlatform]);
+
+  // 对比平台的Top 10视频（月度）
+  const compareMonthlyTop10Videos = useMemo(() => {
+      return data
+          .filter(d => {
+              const dateMatch = format(d.parsedDate, 'yyyy-MM') === selectedMonthForVideos;
+              const platformMatch = d.platform === comparePlatform;
+              return dateMatch && platformMatch;
+          })
+          .sort((a, b) => b.views - a.views)
+          .slice(0, 10); // Top 10
+  }, [data, selectedMonthForVideos, comparePlatform]);
+
+  // 平台数据对比 - 计算各平台的整体数据
+  const platformComparisonData = useMemo(() => {
+    const platforms = ['douyin', 'kuaishou', 'wechat'];
+    return platforms.map(platform => {
+      const platformItems = platformData[platform] || [];
+      if (platformItems.length === 0) return null;
+      
+      const totalViews = platformItems.reduce((sum, item) => sum + item.views, 0);
+      const totalLikes = platformItems.reduce((sum, item) => sum + item.likes, 0);
+      const totalComments = platformItems.reduce((sum, item) => sum + item.comments, 0);
+      const totalShares = platformItems.reduce((sum, item) => sum + item.shares, 0);
+      const totalFavorites = platformItems.reduce((sum, item) => sum + (item.favorites || 0), 0);
+      
+      // 安全计算平均完播率
+      const validCompletionRates = platformItems.map(item => {
+        try {
+          return typeof item.completionRate === 'string' ? parseFloat(item.completionRate.replace('%', '')) : 0;
+        } catch {
+          return 0;
+        }
+      }).filter(rate => !isNaN(rate));
+      const avgCompletionRate = validCompletionRates.length > 0 ? validCompletionRates.reduce((sum, rate) => sum + rate, 0) / validCompletionRates.length : 0;
+      
+      // 安全计算平均互动率
+      const validInteractionRates = platformItems.map(item => {
+        try {
+          return typeof item.interactionRate === 'number' ? item.interactionRate : 0;
+        } catch {
+          return 0;
+        }
+      });
+      const avgInteractionRate = validInteractionRates.length > 0 ? validInteractionRates.reduce((sum, rate) => sum + rate, 0) / validInteractionRates.length : 0;
+      
+      // 获取最新粉丝数
+      const sortedItems = [...platformItems].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const latestFans = sortedItems.length > 0 ? sortedItems[0].fans : 0;
+      
+      // 计算综合评分（基于各项指标的加权平均）
+      const calculateScore = () => {
+        // 标准化各项指标（0-100分）
+        const viewsScore = Math.min((totalViews / 1000000) * 100, 100); // 100万播放量=100分
+        const likesScore = Math.min((totalLikes / 10000) * 100, 100); // 1万点赞=100分
+        const interactionScore = Math.min(avgInteractionRate * 10, 100); // 10%互动率=100分
+        const completionScore = Math.min(avgCompletionRate, 100); // 100%完播率=100分
+        const contentScore = Math.min(platformItems.length * 2, 100); // 50个视频=100分
+        
+        // 加权平均
+        const weights = {
+          views: 0.3,
+          likes: 0.25,
+          interaction: 0.2,
+          completion: 0.15,
+          content: 0.1
+        };
+        
+        return Math.round(
+          viewsScore * weights.views +
+          likesScore * weights.likes +
+          interactionScore * weights.interaction +
+          completionScore * weights.completion +
+          contentScore * weights.content
+        );
+      };
+      
+      const overallScore = calculateScore();
+      
+      return {
+        platform,
+        videoCount: platformItems.length,
+        totalViews,
+        totalLikes,
+        totalComments,
+        totalShares,
+        totalFavorites,
+        avgCompletionRate,
+        avgInteractionRate,
+        latestFans,
+        avgViews: Math.round(totalViews / platformItems.length),
+        avgLikes: Math.round(totalLikes / platformItems.length),
+        overallScore
+      };
+    }).filter(Boolean);
+  }, [platformData]);
+
+  // 平台数据对比 - 计算各平台的月度数据
+  const monthlyPlatformComparisonData = useMemo(() => {
+    if (!selectedCompareMonth) return [];
+    
+    const platforms = ['douyin', 'kuaishou', 'wechat'];
+    return platforms.map(platform => {
+      const platformItems = platformData[platform] || [];
+      const monthlyItems = platformItems.filter(item => format(item.parsedDate, 'yyyy-MM') === selectedCompareMonth);
+      
+      if (monthlyItems.length === 0) return null;
+      
+      const totalViews = monthlyItems.reduce((sum, item) => sum + item.views, 0);
+      const totalLikes = monthlyItems.reduce((sum, item) => sum + item.likes, 0);
+      const totalComments = monthlyItems.reduce((sum, item) => sum + item.comments, 0);
+      const totalShares = monthlyItems.reduce((sum, item) => sum + item.shares, 0);
+      const totalFavorites = monthlyItems.reduce((sum, item) => sum + (item.favorites || 0), 0);
+      
+      // 安全计算平均完播率
+      const validCompletionRates = monthlyItems.map(item => {
+        try {
+          return typeof item.completionRate === 'string' ? parseFloat(item.completionRate.replace('%', '')) : 0;
+        } catch {
+          return 0;
+        }
+      }).filter(rate => !isNaN(rate));
+      const avgCompletionRate = validCompletionRates.length > 0 ? validCompletionRates.reduce((sum, rate) => sum + rate, 0) / validCompletionRates.length : 0;
+      
+      // 安全计算平均互动率
+      const validInteractionRates = monthlyItems.map(item => {
+        try {
+          return typeof item.interactionRate === 'number' ? item.interactionRate : 0;
+        } catch {
+          return 0;
+        }
+      });
+      const avgInteractionRate = validInteractionRates.length > 0 ? validInteractionRates.reduce((sum, rate) => sum + rate, 0) / validInteractionRates.length : 0;
+      
+      // 获取该月最新粉丝数
+      const sortedItems = [...monthlyItems].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const latestFans = sortedItems.length > 0 ? sortedItems[0].fans : 0;
+      
+      // 计算综合评分（基于各项指标的加权平均）
+      const calculateScore = () => {
+        // 标准化各项指标（0-100分）
+        const viewsScore = Math.min((totalViews / 500000) * 100, 100); // 50万播放量=100分
+        const likesScore = Math.min((totalLikes / 5000) * 100, 100); // 5000点赞=100分
+        const interactionScore = Math.min(avgInteractionRate * 10, 100); // 10%互动率=100分
+        const completionScore = Math.min(avgCompletionRate, 100); // 100%完播率=100分
+        const contentScore = Math.min(monthlyItems.length * 5, 100); // 20个视频=100分
+        
+        // 加权平均
+        const weights = {
+          views: 0.3,
+          likes: 0.25,
+          interaction: 0.2,
+          completion: 0.15,
+          content: 0.1
+        };
+        
+        return Math.round(
+          viewsScore * weights.views +
+          likesScore * weights.likes +
+          interactionScore * weights.interaction +
+          completionScore * weights.completion +
+          contentScore * weights.content
+        );
+      };
+      
+      const overallScore = calculateScore();
+      
+      return {
+        platform,
+        videoCount: monthlyItems.length,
+        totalViews,
+        totalLikes,
+        totalComments,
+        totalShares,
+        totalFavorites,
+        avgCompletionRate,
+        avgInteractionRate,
+        latestFans,
+        avgViews: Math.round(totalViews / monthlyItems.length),
+        avgLikes: Math.round(totalLikes / monthlyItems.length),
+        overallScore
+      };
+    }).filter(Boolean);
+  }, [platformData, selectedCompareMonth]);
+
   // Interaction rate average for reference line
   const avgInteractionRate = useMemo(() => {
     if (!finalDetailTrend.length) return 0;
@@ -1474,13 +1718,11 @@ export default function App() {
         
         {/* Header */}
         <div className="relative max-w-3xl mx-auto">
-          {/* 触发区域 */}
-          <div className="absolute top-0 left-0 right-0 h-12 cursor-pointer"></div>
           
           {/* 头部内容 */}
-          <motion.div 
-            initial={{ opacity: 0, y: -20, height: 0 }}
-            whileHover={{ opacity: 1, y: 0, height: 'auto' }}
+          <motion.div
+            initial={{ opacity: 1, y: 0, height: 'auto' }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-white/50 overflow-hidden"
           >
@@ -1528,61 +1770,73 @@ export default function App() {
 
         {/* Tab Navigation */}
         <div className="fixed left-4 top-20 z-50">
-          <div 
-            className="relative group"
+          <div
+            className="bg-white/80 backdrop-blur-md border border-white/50 rounded-xl shadow-lg p-2"
           >
-            {/* 触发区域 */}
-            <div className="bg-white/80 backdrop-blur-md border border-white/50 rounded-xl shadow-lg p-2 cursor-pointer hover:shadow-xl transition-all duration-300">
-              <span className="text-xl">📊</span>
-            </div>
-            
+
             {/* 导航菜单 */}
-            <motion.div 
-              initial={{ opacity: 0, x: -10, width: 0 }}
-              whileHover={{ 
-                opacity: 1, 
-                x: 0, 
-                width: 'auto' 
-              }}
+            <motion.div
+              initial={{ opacity: 1 }}
+              animate={{ opacity: 1 }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="absolute left-full top-0 ml-2 bg-white/90 backdrop-blur-md border border-white/50 rounded-xl shadow-lg p-2 min-w-[180px] overflow-hidden z-50"
+              className="bg-white/90 backdrop-blur-md border border-white/50 rounded-xl shadow-lg p-2 min-w-[180px] overflow-hidden flex flex-col"
             >
-              <div className="flex flex-col items-start gap-1 min-w-[180px]">
-                {[
+              <div className="flex flex-col gap-1">
+                {
+              [
               { key: 'overview', label: '数据概览和AI诊断', icon: '📊' },
+              { key: 'platform', label: '平台数据对比', icon: '🔄' },
               { key: 'monthly', label: '月度对比分析', icon: '📈' },
               { key: 'range', label: '时段对比KPI', icon: '📅' },
               { key: 'personal', label: '个人行业爆款视频', icon: '👤' },
-              { key: 'viral', label: '行业爆款视频', icon: '🔥' }
+              { key: 'viral', label: '行业爆款视频', icon: '🔥' },
+              { key: 'coze', label: 'Coze智能体', icon: '🤖', url: 'https://www.coze.cn/store/agent/7626943462554435603?bot_id=true' }
             ].map((tab) => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key as any)}
-                    className={cn(
-                      "relative w-full px-3 py-1.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2",
-                      activeTab === tab.key
-                        ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md"
-                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-800"
-                    )}
-                  >
-                    <span>{tab.icon}</span>
-                    <span>{tab.label}</span>
-                    {activeTab === tab.key && (
-                      <motion.div 
-                        layoutId="activeTab"
-                        className="absolute right-0 top-0 bottom-0 w-0.5 bg-white"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                      />
-                    )}
-                  </button>
+                  tab.url ? (
+                    <a
+                      key={tab.key}
+                      href={tab.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        "relative px-3 py-1.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2",
+                        "text-gray-600 hover:bg-gray-100 hover:text-gray-800"
+                      )}
+                    >
+                      <span>{tab.icon}</span>
+                      <span>{tab.label}</span>
+                    </a>
+                  ) : (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key as any)}
+                      className={cn(
+                        "relative px-3 py-1.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2",
+                        activeTab === tab.key
+                          ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md"
+                          : "text-gray-600 hover:bg-gray-100 hover:text-gray-800"
+                      )}
+                    >
+                      <span>{tab.icon}</span>
+                      <span>{tab.label}</span>
+                      {activeTab === tab.key && (
+                        <motion.div 
+                          layoutId="activeTab"
+                          className="absolute right-0 top-0 bottom-0 w-0.5 bg-white"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                        />
+                      )}
+                    </button>
+                  )
                 ))}
               </div>
             </motion.div>
           </div>
         </div>
 
-        {data.length > 0 ? (
+        <div className="ml-24">
+          {data.length > 0 ? (
           <>
 
         {/* --- SECTION 0: OVERALL TREND --- */}
@@ -2301,266 +2555,51 @@ export default function App() {
         </motion.div>
         )}
 
-        {/* KPI Cards */}
-        {activeTab === 'range' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
-            whileHover={{ scale: 1.05, translateY: -5 }}
-            className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs opacity-80 font-medium">总播放量</span>
-              <Play className="w-5 h-5 opacity-80" />
-            </div>
-            <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.views.toLocaleString()}</div>
-            <div className="flex items-center gap-2 text-xs opacity-70">
-              <span>当前周期</span>
-              {compareKPIs.views > 0 && (
-                <span className={currentKPIs.views > compareKPIs.views ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
-                  {currentKPIs.views > compareKPIs.views ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                  {Math.abs(((currentKPIs.views - compareKPIs.views) / compareKPIs.views) * 100).toFixed(1)}%
-                </span>
-              )}
-            </div>
-          </motion.div>
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
-            whileHover={{ scale: 1.05, translateY: -5 }}
-            className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs opacity-80 font-medium">总点赞量</span>
-              <Heart className="w-5 h-5 opacity-80" />
-            </div>
-            <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.likes.toLocaleString()}</div>
-            <div className="flex items-center gap-2 text-xs opacity-70">
-              <span>当前周期</span>
-              {compareKPIs.likes > 0 && (
-                <span className={currentKPIs.likes > compareKPIs.likes ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
-                  {currentKPIs.likes > compareKPIs.likes ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                  {Math.abs(((currentKPIs.likes - compareKPIs.likes) / compareKPIs.likes) * 100).toFixed(1)}%
-                </span>
-              )}
-            </div>
-          </motion.div>
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
-            whileHover={{ scale: 1.05, translateY: -5 }}
-            className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs opacity-80 font-medium">粉丝净增</span>
-              <Users className="w-5 h-5 opacity-80" />
-            </div>
-            <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.netFans.toLocaleString()}</div>
-            <div className="flex items-center gap-2 text-xs opacity-70">
-              <span>当前周期</span>
-              {compareKPIs.netFans > 0 && (
-                <span className={currentKPIs.netFans > compareKPIs.netFans ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
-                  {currentKPIs.netFans > compareKPIs.netFans ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                  {Math.abs(((currentKPIs.netFans - compareKPIs.netFans) / compareKPIs.netFans) * 100).toFixed(1)}%
-                </span>
-              )}
-            </div>
-          </motion.div>
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: 0.3 }}
-            whileHover={{ scale: 1.05, translateY: -5 }}
-            className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs opacity-80 font-medium">总评论量</span>
-              <MessageCircle className="w-5 h-5 opacity-80" />
-            </div>
-            <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.comments.toLocaleString()}</div>
-            <div className="flex items-center gap-2 text-xs opacity-70">
-              <span>当前周期</span>
-              {compareKPIs.comments > 0 && (
-                <span className={currentKPIs.comments > compareKPIs.comments ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
-                  {currentKPIs.comments > compareKPIs.comments ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                  {Math.abs(((currentKPIs.comments - compareKPIs.comments) / compareKPIs.comments) * 100).toFixed(1)}%
-                </span>
-              )}
-            </div>
-          </motion.div>
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: 0.4 }}
-            whileHover={{ scale: 1.05, translateY: -5 }}
-            className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs opacity-80 font-medium">总转发量</span>
-              <Share2 className="w-5 h-5 opacity-80" />
-            </div>
-            <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.shares.toLocaleString()}</div>
-            <div className="flex items-center gap-2 text-xs opacity-70">
-              <span>当前周期</span>
-              {compareKPIs.shares > 0 && (
-                <span className={currentKPIs.shares > compareKPIs.shares ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
-                  {currentKPIs.shares > compareKPIs.shares ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                  {Math.abs(((currentKPIs.shares - compareKPIs.shares) / compareKPIs.shares) * 100).toFixed(1)}%
-                </span>
-              )}
-            </div>
-          </motion.div>
-          {selectedPlatform === 'wechat' ? (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: 0.5 }}
-              whileHover={{ scale: 1.05, translateY: -5 }}
-              className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs opacity-80 font-medium">总推荐量</span>
-                <ThumbsUp className="w-5 h-5 opacity-80" />
-              </div>
-              <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.recommendations.toLocaleString()}</div>
-              <div className="flex items-center gap-2 text-xs opacity-70">
-                <span>当前周期</span>
-                {compareKPIs.recommendations > 0 && (
-                  <span className={currentKPIs.recommendations > compareKPIs.recommendations ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
-                    {currentKPIs.recommendations > compareKPIs.recommendations ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                    {Math.abs(((currentKPIs.recommendations - compareKPIs.recommendations) / compareKPIs.recommendations) * 100).toFixed(1)}%
-                  </span>
-                )}
-              </div>
-            </motion.div>
-          ) : hasFavorites ? (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: 0.5 }}
-              whileHover={{ scale: 1.05, translateY: -5 }}
-              className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs opacity-80 font-medium">总收藏量</span>
-                <Star className="w-5 h-5 opacity-80" />
-              </div>
-              <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.favorites.toLocaleString()}</div>
-              <div className="flex items-center gap-2 text-xs opacity-70">
-                <span>当前周期</span>
-                {compareKPIs.favorites > 0 && (
-                  <span className={currentKPIs.favorites > compareKPIs.favorites ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
-                    {currentKPIs.favorites > compareKPIs.favorites ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                    {Math.abs(((currentKPIs.favorites - compareKPIs.favorites) / compareKPIs.favorites) * 100).toFixed(1)}%
-                  </span>
-                )}
-              </div>
-            </motion.div>
-          ) : hasRecommendations ? (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: 0.5 }}
-              whileHover={{ scale: 1.05, translateY: -5 }}
-              className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs opacity-80 font-medium">总推荐量</span>
-                <ThumbsUp className="w-5 h-5 opacity-80" />
-              </div>
-              <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.recommendations.toLocaleString()}</div>
-              <div className="flex items-center gap-2 text-xs opacity-70">
-                <span>当前周期</span>
-                {compareKPIs.recommendations > 0 && (
-                  <span className={currentKPIs.recommendations > compareKPIs.recommendations ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
-                    {currentKPIs.recommendations > compareKPIs.recommendations ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                    {Math.abs(((currentKPIs.recommendations - compareKPIs.recommendations) / compareKPIs.recommendations) * 100).toFixed(1)}%
-                  </span>
-                )}
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: 0.5 }}
-              whileHover={{ scale: 1.05, translateY: -5 }}
-              className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
-            >
-              <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs opacity-80 font-medium">互动率</span>
-                <Activity className="w-5 h-5 opacity-80" />
-              </div>
-              <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.avgInteractionRate}%</div>
-              <div className="flex items-center gap-2 text-xs opacity-70">
-                <span>当前周期</span>
-                {compareKPIs.avgInteractionRate > 0 && (
-                  <span className={currentKPIs.avgInteractionRate > compareKPIs.avgInteractionRate ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
-                    {currentKPIs.avgInteractionRate > compareKPIs.avgInteractionRate ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                    {Math.abs(((currentKPIs.avgInteractionRate - compareKPIs.avgInteractionRate) / compareKPIs.avgInteractionRate) * 100).toFixed(1)}%
-                  </span>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </div>
-        )}
+
+          
 
         {activeTab === 'range' && (
           <div id="analysis-content" className="space-y-6">
             
             {/* View Mode Toggle */}
-            <div className="flex justify-end">
-                <div className="bg-gray-100 p-1 rounded-lg inline-flex">
+            <div className="flex justify-end mt-4 mb-4 pr-4">
+                <div className="bg-white border border-gray-200 rounded-lg inline-flex shadow-sm">
                     <button
                         onClick={() => setDetailTrendMode('daily')}
-                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                        className={`px-3 py-1.5 text-sm font-medium rounded-l-md transition-all ${
                             detailTrendMode === 'daily' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
+                            ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-500' 
+                            : 'text-gray-600 hover:bg-gray-50'
                         }`}
                     >
                         按日
                     </button>
                     <button
                         onClick={() => setDetailTrendMode('weekly')}
-                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                        className={`px-3 py-1.5 text-sm font-medium transition-all ${
                             detailTrendMode === 'weekly' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
+                            ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-500' 
+                            : 'text-gray-600 hover:bg-gray-50'
                         }`}
                     >
                         按周
                     </button>
                     <button
                         onClick={() => setDetailTrendMode('monthly')}
-                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                        className={`px-3 py-1.5 text-sm font-medium transition-all ${
                             detailTrendMode === 'monthly' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
+                            ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-500' 
+                            : 'text-gray-600 hover:bg-gray-50'
                         }`}
                     >
                         按月
                     </button>
                     <button
                         onClick={() => setDetailTrendMode('quarterly')}
-                        className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+                        className={`px-3 py-1.5 text-sm font-medium rounded-r-md transition-all ${
                             detailTrendMode === 'quarterly' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-gray-500 hover:text-gray-700'
+                            ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-500' 
+                            : 'text-gray-600 hover:bg-gray-50'
                         }`}
                     >
                         按季度
@@ -2569,7 +2608,7 @@ export default function App() {
             </div>
 
             {/* Advanced Charts Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                  {/* Fan Growth Trend (Dual Axis) */}
                 <motion.div 
                     initial={{ opacity: 0, y: 20 }}
@@ -2582,22 +2621,22 @@ export default function App() {
                         <TrendingUp className="w-5 h-5 text-orange-500" />
                         粉丝增长趋势 (双轴)
                     </h3>
-                    <div className="h-56">
+                    <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={finalDetailTrend}>
+                            <BarChart data={finalDetailTrend} margin={{ top: 5, right: 30, left: 10, bottom: 5 }} barSize={4}>
                                 <defs>
                                   <linearGradient id="colorNetFansCurrent" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#f97316" stopOpacity={0.8}/>
-                                    <stop offset="100%" stopColor="#f97316" stopOpacity={0.1}/>
+                                    <stop offset="0%" stopColor="#f97316" stopOpacity={0.85}/>
+                                    <stop offset="100%" stopColor="#f97316" stopOpacity={0.2}/>
                                   </linearGradient>
                                   <linearGradient id="colorNetFansCompare" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.8}/>
-                                    <stop offset="100%" stopColor="#94a3b8" stopOpacity={0.1}/>
+                                    <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.85}/>
+                                    <stop offset="100%" stopColor="#94a3b8" stopOpacity={0.2}/>
                                   </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                 <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-                                <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f97316" label={{ value: '日增粉丝', angle: 90, position: 'insideRight' }} />
+                                <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f97316" tickLine={false} axisLine={{ stroke: '#f97316', strokeWidth: 1 }} label={{ value: '日增粉丝', angle: 90, position: 'insideRight', offset: 8, style: { fill: '#f97316', fontSize: 12 } }} />
                                 <Tooltip 
                                   content={<ComparisonTooltip />}
                                   contentStyle={{ 
@@ -2610,8 +2649,8 @@ export default function App() {
                                   }} 
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                <Bar yAxisId="right" dataKey="netFans" name="当前周期 日增粉丝" fill="url(#colorNetFansCurrent)" radius={[8, 8, 0, 0]} barSize={20} animationDuration={1500} />
-                                <Bar yAxisId="right" dataKey="compareNetFans" name="对比周期 日增粉丝" fill="url(#colorNetFansCompare)" radius={[8, 8, 0, 0]} barSize={20} animationDuration={1500} />
+                                <Bar yAxisId="right" dataKey="compareNetFans" name="对比周期 日增粉丝" fill="url(#colorNetFansCompare)" radius={[1, 1, 0, 0]} barSize={6} animationDuration={1500} />
+                                <Bar yAxisId="right" dataKey="netFans" name="当前周期 日增粉丝" fill="url(#colorNetFansCurrent)" radius={[1, 1, 0, 0]} barSize={6} animationDuration={1500} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -2629,7 +2668,7 @@ export default function App() {
                         <Activity className="w-5 h-5 text-green-500" />
                         用户粘性指标 (完播率)
                     </h3>
-                    <div className="h-56">
+                    <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={finalDetailTrend}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -2666,7 +2705,7 @@ export default function App() {
                         <Activity className="w-5 h-5 text-purple-500" />
                         用户粘性指标 (互动率)
                     </h3>
-                    <div className="h-56">
+                    <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={finalDetailTrend}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -2704,7 +2743,7 @@ export default function App() {
                         <TrendingUp className="w-5 h-5 text-blue-500" />
                         内容热度趋势 (播放量)
                     </h3>
-                    <div className="h-56">
+                    <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={finalDetailTrend}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -2741,7 +2780,7 @@ export default function App() {
                         <TrendingUp className="w-5 h-5 text-orange-500" />
                         内容热度趋势 (互动总量)
                     </h3>
-                    <div className="h-56">
+                    <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={finalDetailTrend}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -2778,7 +2817,7 @@ export default function App() {
                         <Heart className="w-5 h-5 text-pink-500" />
                         粉丝健康度 (点赞量/粉丝量)
                     </h3>
-                    <div className="h-56">
+                    <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={fanHealthData}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -3279,6 +3318,39 @@ export default function App() {
                                 </select>
                             )}
                             
+                            {/* 平台对比选择 */}
+                            <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
+                                <button onClick={() => setShowPlatformComparison(!showPlatformComparison)} className={cn("px-3 py-1 rounded-md transition-all", showPlatformComparison ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500')}>平台对比</button>
+                            </div>
+                            {showPlatformComparison && (
+                                <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
+                                    {platformData.douyin?.length > 0 && (
+                                        <button 
+                                            onClick={() => setComparePlatform('douyin')}
+                                            className={cn("px-3 py-1 rounded-md transition-all", comparePlatform === 'douyin' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500')}
+                                        >
+                                            抖音
+                                        </button>
+                                    )}
+                                    {platformData.kuaishou?.length > 0 && (
+                                        <button 
+                                            onClick={() => setComparePlatform('kuaishou')}
+                                            className={cn("px-3 py-1 rounded-md transition-all", comparePlatform === 'kuaishou' ? 'bg-pink-500 text-white shadow-sm' : 'text-gray-500')}
+                                        >
+                                            快手
+                                        </button>
+                                    )}
+                                    {platformData.wechat?.length > 0 && (
+                                        <button 
+                                            onClick={() => setComparePlatform('wechat')}
+                                            className={cn("px-3 py-1 rounded-md transition-all", comparePlatform === 'wechat' ? 'bg-green-500 text-white shadow-sm' : 'text-gray-500')}
+                                        >
+                                            视频号
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                            
                             {/* 平台搜索框 */}
                             <div className="relative w-full sm:w-64">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: selectedPlatform === 'douyin' ? '#ff0000' : selectedPlatform === 'kuaishou' ? '#fe2c55' : '#07C160' }} />
@@ -3350,55 +3422,104 @@ export default function App() {
                                     {hasFavorites ? <th className="px-6 py-4">收藏</th> : hasRecommendations ? <th className="px-6 py-4">推荐</th> : null}
                                     <th className="px-6 py-4">转发</th>
                                     <th className="px-6 py-4">完播率</th>
+                                    {showPlatformComparison && (
+                                        <>
+                                            <th className="px-6 py-4">{comparePlatform === 'douyin' ? '抖音' : comparePlatform === 'kuaishou' ? '快手' : '视频号'}播放量</th>
+                                            <th className="px-6 py-4">{comparePlatform === 'douyin' ? '抖音' : comparePlatform === 'kuaishou' ? '快手' : '视频号'}点赞</th>
+                                            <th className="px-6 py-4">{comparePlatform === 'douyin' ? '抖音' : comparePlatform === 'kuaishou' ? '快手' : '视频号'}互动率</th>
+                                            <th className="px-6 py-4">播放量差异</th>
+                                            <th className="px-6 py-4">点赞差异</th>
+                                            <th className="px-6 py-4">互动率差异</th>
+                                        </>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody>
-                                {(topVideosMode === 'range' ? top10ExplosiveVideos : monthlyTop10Videos).map((item, index) => (
-                                    <motion.tr 
-                                        key={index} 
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        transition={{ delay: index * 0.1 }}
-                                        className="bg-white border-b hover:bg-gray-50"
-                                    >
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : index === 2 ? 'bg-amber-700' : 'bg-gray-200 text-gray-700'}`}>
-                                                {index + 1}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{item.date}</td>
-                                        <td className="px-6 py-4 max-w-xs truncate" title={item.title}>
-                                            <div className="font-medium text-gray-800 hover:text-blue-600 transition-colors">{item.title}</div>
-                                        </td>
-                                        <td className="px-6 py-4 font-bold text-blue-600">{item.views.toLocaleString()}</td>
-                                        <td className="px-6 py-4">{item.likes.toLocaleString()}</td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-purple-600 font-medium">{item.interactionRate.toFixed(2)}%</span>
-                                                <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
-                                                    <div 
-                                                        className="h-full bg-purple-500 rounded-full" 
-                                                        style={{ width: `${Math.min(item.interactionRate * 2, 100)}%` }}
-                                                    ></div>
+                                {(topVideosMode === 'range' ? top10ExplosiveVideos : monthlyTop10Videos).map((item, index) => {
+                                    // 获取对比平台的对应排名视频
+                                    const compareVideos = topVideosMode === 'range' ? compareTop10ExplosiveVideos : compareMonthlyTop10Videos;
+                                    const compareItem = compareVideos[index];
+                                    
+                                    // 计算差异
+                                    const viewsDiff = compareItem ? item.views - compareItem.views : null;
+                                    const likesDiff = compareItem ? item.likes - compareItem.likes : null;
+                                    const interactionRateDiff = compareItem ? item.interactionRate - compareItem.interactionRate : null;
+                                    
+                                    return (
+                                        <motion.tr 
+                                            key={index} 
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: index * 0.1 }}
+                                            className="bg-white border-b hover:bg-gray-50"
+                                        >
+                                            <td className="px-6 py-4">
+                                                <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-white ${index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : index === 2 ? 'bg-amber-700' : 'bg-gray-200 text-gray-700'}`}>
+                                                    {index + 1}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{item.date}</td>
+                                            <td className="px-6 py-4 max-w-xs truncate" title={item.title}>
+                                                <div className="font-medium text-gray-800 hover:text-blue-600 transition-colors">{item.title}</div>
+                                            </td>
+                                            <td className="px-6 py-4 font-bold text-blue-600">{item.views.toLocaleString()}</td>
+                                            <td className="px-6 py-4">{item.likes.toLocaleString()}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-purple-600 font-medium">{item.interactionRate.toFixed(2)}%</span>
+                                                    <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                                        <div 
+                                                            className="h-full bg-purple-500 rounded-full" 
+                                                            style={{ width: `${Math.min(item.interactionRate * 2, 100)}%` }}
+                                                        ></div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">{item.comments}</td>
-                                        {hasFavorites ? <td className="px-6 py-4">{item.favorites}</td> : hasRecommendations ? <td className="px-6 py-4">{item.recommendationsCount}</td> : null}
-                                        <td className="px-6 py-4">{item.shares}</td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-green-600 font-medium">{item.completionRate}</span>
-                                                <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
-                                                    <div 
-                                                        className="h-full bg-green-500 rounded-full" 
-                                                        style={{ width: `${parseFloat(item.completionRate) || 0}%` }}
-                                                    ></div>
+                                            </td>
+                                            <td className="px-6 py-4">{item.comments}</td>
+                                            {hasFavorites ? <td className="px-6 py-4">{item.favorites}</td> : hasRecommendations ? <td className="px-6 py-4">{item.recommendationsCount}</td> : null}
+                                            <td className="px-6 py-4">{item.shares}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-green-600 font-medium">{item.completionRate}</span>
+                                                    <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                                        <div 
+                                                            className="h-full bg-green-500 rounded-full" 
+                                                            style={{ width: `${parseFloat(item.completionRate) || 0}%` }}
+                                                        ></div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </td>
-                                    </motion.tr>
-                                ))}
+                                            </td>
+                                            {showPlatformComparison && (
+                                                <>
+                                                    <td className="px-6 py-4">{compareItem ? compareItem.views.toLocaleString() : '-'}</td>
+                                                    <td className="px-6 py-4">{compareItem ? compareItem.likes.toLocaleString() : '-'}</td>
+                                                    <td className="px-6 py-4">{compareItem ? compareItem.interactionRate.toFixed(2) + '%' : '-'}</td>
+                                                    <td className="px-6 py-4">
+                                                        {viewsDiff !== null ? (
+                                                            <span className={`font-medium ${viewsDiff > 0 ? 'text-green-600' : viewsDiff < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                                                                {viewsDiff > 0 ? '+' : ''}{viewsDiff.toLocaleString()}
+                                                            </span>
+                                                        ) : '-'}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {likesDiff !== null ? (
+                                                            <span className={`font-medium ${likesDiff > 0 ? 'text-green-600' : likesDiff < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                                                                {likesDiff > 0 ? '+' : ''}{likesDiff.toLocaleString()}
+                                                            </span>
+                                                        ) : '-'}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        {interactionRateDiff !== null ? (
+                                                            <span className={`font-medium ${interactionRateDiff > 0 ? 'text-green-600' : interactionRateDiff < 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                                                                {interactionRateDiff > 0 ? '+' : ''}{interactionRateDiff.toFixed(2)}%
+                                                            </span>
+                                                        ) : '-'}
+                                                    </td>
+                                                </>
+                                            )}
+                                        </motion.tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -3457,12 +3578,300 @@ export default function App() {
             </motion.div>
         )}
 
+        {/* 平台数据对比 */}
+        {activeTab === 'platform' && showAnalysis && (
+            <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ delay: 0.1 }}
+                className="space-y-6"
+            >
+                {platformComparisonData.length > 0 ? (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
+                        transition={{ delay: 0.3 }}
+                        className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                    >
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+                            <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                                <Activity className="w-5 h-5 text-indigo-500" />
+                                平台数据对比概览
+                            </h3>
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-600">对比模式：</span>
+                                <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
+                                    <button 
+                                        onClick={() => setPlatformCompareMode('overall')}
+                                        className={`px-3 py-1 rounded-md transition-all ${platformCompareMode === 'overall' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
+                                    >
+                                        整体数据
+                                    </button>
+                                    <button 
+                                        onClick={() => setPlatformCompareMode('monthly')}
+                                        className={`px-3 py-1 rounded-md transition-all ${platformCompareMode === 'monthly' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
+                                    >
+                                        月度对比
+                                    </button>
+                                </div>
+                                {platformCompareMode === 'monthly' && (
+                                    <select
+                                        value={selectedCompareMonth}
+                                        onChange={(e) => setSelectedCompareMonth(e.target.value)}
+                                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    >
+                                        {availableMonths.map(month => (
+                                            <option key={month} value={month}>
+                                                {month}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
+                            </div>
+                        </div>
+                        
+                        {/* 平台卡片 */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            {(platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).length > 0 ? (
+                                (platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).map((item, index) => (
+                                    <motion.div
+                                        key={item!.platform}
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        whileInView={{ opacity: 1, scale: 1 }}
+                                        viewport={{ once: true }}
+                                        transition={{ delay: index * 0.1 }}
+                                        className="bg-gradient-to-br from-white to-gray-50 p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+                                    >
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="font-bold text-lg" style={{ color: item!.platform === 'douyin' ? '#ff0000' : item!.platform === 'kuaishou' ? '#fe2c55' : '#07C160' }}>
+                                                {item!.platform === 'douyin' ? '抖音' : item!.platform === 'kuaishou' ? '快手' : '视频号'}
+                                            </h4>
+                                            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                                                {item!.videoCount} 个视频
+                                            </span>
+                                        </div>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">{platformCompareMode === 'overall' ? '总播放量' : '月播放量'}</span>
+                                                <span className="font-medium text-blue-600">{item!.totalViews.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">{platformCompareMode === 'overall' ? '总点赞量' : '月点赞量'}</span>
+                                                <span className="font-medium text-red-500">{item!.totalLikes.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">{platformCompareMode === 'overall' ? '总评论量' : '月评论量'}</span>
+                                                <span className="font-medium text-purple-500">{item!.totalComments.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">{platformCompareMode === 'overall' ? '总转发量' : '月转发量'}</span>
+                                                <span className="font-medium text-green-500">{item!.totalShares.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">平均互动率</span>
+                                                <span className="font-medium text-orange-500">{item!.avgInteractionRate.toFixed(2)}%</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">平均完播率</span>
+                                                <span className="font-medium text-teal-500">{item!.avgCompletionRate.toFixed(2)}%</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-600">最新粉丝数</span>
+                                                <span className="font-medium text-pink-500">{item!.latestFans.toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                ))
+                            ) : (
+                                <div className="col-span-full flex flex-col items-center justify-center p-12 bg-gray-50 rounded-xl">
+                                    <Activity className="w-12 h-12 text-gray-400 mb-4" />
+                                    <h4 className="font-medium text-gray-700 mb-2">暂无数据</h4>
+                                    <p className="text-gray-500 text-center">{platformCompareMode === 'overall' ? '请先上传各平台的数据' : '请选择有数据的月份'}</p>
+                                </div>
+                            )}
+                        </div>
 
+                        {/* 数据对比表格 */}
+                        <h4 className="font-bold text-gray-700 mb-4">详细数据对比</h4>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left text-gray-500">
+                                <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-4">平台</th>
+                                        <th className="px-6 py-4">视频数</th>
+                                        <th className="px-6 py-4">{platformCompareMode === 'overall' ? '总播放量' : '月播放量'}</th>
+                                        <th className="px-6 py-4">{platformCompareMode === 'overall' ? '总点赞' : '月点赞'}</th>
+                                        <th className="px-6 py-4">{platformCompareMode === 'overall' ? '总评论' : '月评论'}</th>
+                                        <th className="px-6 py-4">{platformCompareMode === 'overall' ? '总转发' : '月转发'}</th>
+                                        <th className="px-6 py-4">平均播放量</th>
+                                        <th className="px-6 py-4">平均点赞</th>
+                                        <th className="px-6 py-4">互动率</th>
+                                        <th className="px-6 py-4">完播率</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).length > 0 ? (
+                                        (platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).map((item, index) => (
+                                            <motion.tr
+                                                key={item!.platform}
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: index * 0.1 }}
+                                                className="bg-white border-b hover:bg-gray-50"
+                                            >
+                                                <td className="px-6 py-4 font-medium text-gray-900">
+                                                    <span style={{ color: item!.platform === 'douyin' ? '#ff0000' : item!.platform === 'kuaishou' ? '#fe2c55' : '#07C160' }}>
+                                                        {item!.platform === 'douyin' ? '抖音' : item!.platform === 'kuaishou' ? '快手' : '视频号'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">{item!.videoCount}</td>
+                                                <td className="px-6 py-4 font-medium text-blue-600">{item!.totalViews.toLocaleString()}</td>
+                                                <td className="px-6 py-4">{item!.totalLikes.toLocaleString()}</td>
+                                                <td className="px-6 py-4">{item!.totalComments.toLocaleString()}</td>
+                                                <td className="px-6 py-4">{item!.totalShares.toLocaleString()}</td>
+                                                <td className="px-6 py-4">{item!.avgViews.toLocaleString()}</td>
+                                                <td className="px-6 py-4">{item!.avgLikes.toLocaleString()}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-purple-600 font-medium">{item!.avgInteractionRate.toFixed(2)}%</span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-green-600 font-medium">{item!.avgCompletionRate.toFixed(2)}%</span>
+                                                </td>
+                                            </motion.tr>
+                                        ))
+                                    ) : (
+                                        <tr className="bg-white border-b">
+                                            <td colSpan={10} className="px-6 py-12 text-center">
+                                                <Activity className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                                                <p className="text-gray-500">{platformCompareMode === 'overall' ? '暂无平台数据' : '该月份暂无数据'}</p>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
 
+                        {/* 平台对比图表 */}
+                        <h4 className="font-bold text-gray-700 mb-4 mt-8">可视化对比</h4>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* 播放量对比 */}
+                            <div className="bg-gray-50 p-4 rounded-xl">
+                                <h5 className="font-medium text-gray-700 mb-4 text-center">各平台{platformCompareMode === 'overall' ? '总播放量' : '月播放量'}对比</h5>
+                                <div className="space-y-3">
+                                    {(platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).length > 0 ? (
+                                        (platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).map((item) => {
+                                            const currentData = platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData;
+                                            const maxViews = Math.max(...currentData.map(p => p!.totalViews));
+                                            const percentage = (item!.totalViews / maxViews) * 100;
+                                            return (
+                                                <div key={item!.platform} className="flex items-center gap-3">
+                                                    <span className="w-16 text-sm font-medium" style={{ color: item!.platform === 'douyin' ? '#ff0000' : item!.platform === 'kuaishou' ? '#fe2c55' : '#07C160' }}>
+                                                        {item!.platform === 'douyin' ? '抖音' : item!.platform === 'kuaishou' ? '快手' : '视频号'}
+                                                    </span>
+                                                    <div className="flex-1 bg-gray-200 rounded-full h-6 overflow-hidden">
+                                                        <div 
+                                                            className="h-full rounded-full flex items-center justify-end pr-2 text-white text-xs font-medium"
+                                                            style={{ 
+                                                                width: `${percentage}%`,
+                                                                backgroundColor: item!.platform === 'douyin' ? '#ff0000' : item!.platform === 'kuaishou' ? '#fe2c55' : '#07C160'
+                                                            }}
+                                                        >
+                                                            {item!.totalViews.toLocaleString()}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center py-8">
+                                            <Activity className="w-8 h-8 text-gray-400 mb-2" />
+                                            <p className="text-gray-500">{platformCompareMode === 'overall' ? '暂无平台数据' : '该月份暂无数据'}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
 
+                            {/* 互动率对比 */}
+                            <div className="bg-gray-50 p-4 rounded-xl">
+                                <h5 className="font-medium text-gray-700 mb-4 text-center">各平台平均互动率对比</h5>
+                                <div className="space-y-3">
+                                    {(platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).length > 0 ? (
+                                        (platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).map((item) => {
+                                            const currentData = platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData;
+                                            const maxInteraction = Math.max(...currentData.map(p => p!.avgInteractionRate));
+                                            const percentage = (item!.avgInteractionRate / maxInteraction) * 100;
+                                            return (
+                                                <div key={item!.platform} className="flex items-center gap-3">
+                                                    <span className="w-16 text-sm font-medium" style={{ color: item!.platform === 'douyin' ? '#ff0000' : item!.platform === 'kuaishou' ? '#fe2c55' : '#07C160' }}>
+                                                        {item!.platform === 'douyin' ? '抖音' : item!.platform === 'kuaishou' ? '快手' : '视频号'}
+                                                    </span>
+                                                    <div className="flex-1 bg-gray-200 rounded-full h-6 overflow-hidden">
+                                                        <div 
+                                                            className="h-full rounded-full flex items-center justify-end pr-2 text-white text-xs font-medium"
+                                                            style={{ 
+                                                                width: `${percentage}%`,
+                                                                backgroundColor: item!.platform === 'douyin' ? '#ff0000' : item!.platform === 'kuaishou' ? '#fe2c55' : '#07C160'
+                                                            }}
+                                                        >
+                                                            {item!.avgInteractionRate.toFixed(2)}%
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center py-8">
+                                            <Activity className="w-8 h-8 text-gray-400 mb-2" />
+                                            <p className="text-gray-500">{platformCompareMode === 'overall' ? '暂无平台数据' : '该月份暂无数据'}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
 
+                            {/* 综合评分雷达图 */}
+                            <div className="bg-gray-50 p-4 rounded-xl lg:col-span-2">
+                                <h5 className="font-medium text-gray-700 mb-4 text-center">各平台综合评分雷达图</h5>
+                                {(platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).length > 0 ? (
+                                    <div className="h-96">
+                                        <Suspense fallback={
+  <div className="flex justify-center items-center h-96">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+  </div>
+}>
+  <PlatformChartsWrapper
+    platformData={(platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).filter(Boolean) as any}
+    platformCompareMode={platformCompareMode}
+  />
+</Suspense>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-8">
+                                        <Activity className="w-8 h-8 text-gray-400 mb-2" />
+                                        <p className="text-gray-500">{platformCompareMode === 'overall' ? '暂无平台数据' : '该月份暂无数据'}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </motion.div>
+                ) : (
+                    <div className="bg-white/80 backdrop-blur-md p-12 rounded-xl shadow-lg border border-white/50 flex flex-col items-center justify-center">
+                        <Activity className="w-16 h-16 text-gray-400 mb-4" />
+                        <h3 className="text-lg font-bold text-gray-700 mb-2">暂无平台数据</h3>
+                        <p className="text-gray-500 text-center mb-6">请先上传Excel文件数据，然后再查看平台数据对比</p>
+                        <button
+                            onClick={() => document.getElementById('fileInput')?.click()}
+                            className="px-6 py-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors font-medium"
+                        >
+                            上传数据
+                        </button>
+                    </div>
+                )}
+            </motion.div>
+        )}
 
-
+        </div>
       </div>
     </div>
   );
