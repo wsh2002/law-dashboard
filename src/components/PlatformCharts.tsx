@@ -1,7 +1,6 @@
-import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { Radar } from 'lucide-react';
+import { Radar as RadarIcon } from 'lucide-react';
 
 interface PlatformData {
   platform: string;
@@ -45,7 +44,7 @@ const PlatformChartsComponent = ({ platformData }: PlatformChartsProps) => {
         className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
       >
         <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <Radar className="w-5 h-5 text-orange-500" />
+          <RadarIcon className="w-5 h-5 text-orange-500" />
           综合表现雷达图
         </h3>
         <div className="h-96">
