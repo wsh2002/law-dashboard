@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertCircle, Settings, Play, ThumbsUp, Clock, User, MessageCircle, X, Sparkles, Loader2, BarChart2, Book, Copy, Trash2 } from 'lucide-react';
+import { AlertCircle, Settings, Play, ThumbsUp, Clock, User, MessageCircle, X, Sparkles, Loader2, BarChart2, Book, Copy, Trash2, FileSpreadsheet, Upload } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { DEFAULT_CONFIG, analyzeDocument } from '../services/aiAnalysis';
 import ReactMarkdown from 'react-markdown';
@@ -1329,12 +1329,80 @@ ${analysisResult}
                   <p className="text-xs text-blue-100 opacity-80">已保存的视频文案集合</p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowScriptLibrary(false)}
-                className="p-2 hover:bg-white/10 rounded-full transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    // 导出文案库数据
+                    const exportData = {
+                      version: '1.0',
+                      exportTime: new Date().toISOString(),
+                      data: scriptLibrary
+                    };
+                    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `文案库导出_${new Date().toISOString().split('T')[0]}.json`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  导出
+                </button>
+                <input
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  id="script-import"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        try {
+                          const content = event.target?.result as string;
+                          const importData = JSON.parse(content);
+                          if (importData.data && Array.isArray(importData.data)) {
+                            // 导入数据到文案库
+                            importData.data.forEach((item: any) => {
+                              // 生成新的ID，避免冲突
+                              const newItem = {
+                                ...item,
+                                id: Date.now().toString() + Math.random().toString(36).slice(2, 11),
+                                imported: true
+                              };
+                              firebase.push('script_library', newItem);
+                            });
+                            alert(`成功导入 ${importData.data.length} 条文案`);
+                          } else {
+                            alert('导入文件格式错误');
+                          }
+                        } catch (error) {
+                          alert('导入失败：' + (error as Error).message);
+                        }
+                      };
+                      reader.readAsText(file);
+                    }
+                  }}
+                />
+                <label
+                  htmlFor="script-import"
+                  className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <Upload className="w-4 h-4" />
+                  导入
+                </label>
+                <button
+                  onClick={() => setShowScriptLibrary(false)}
+                  className="p-2 hover:bg-white/10 rounded-full transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
             </div>
 
             {/* Modal Content */}
