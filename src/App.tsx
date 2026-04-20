@@ -3025,6 +3025,12 @@ export default function App() {
 
 
         {/* 月度对比分析 */}
+        {activeTab === 'monthly' && showAnalysis && !(platformData[selectedPlatform]?.length > 0) && (
+          <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-3">
+            <span className="text-4xl">📂</span>
+            <p className="text-sm">当前平台暂无数据，请先上传 <strong>{selectedPlatform}</strong> 的数据文件</p>
+          </div>
+        )}
         {activeTab === 'monthly' && showAnalysis && platformData[selectedPlatform]?.length > 0 && (
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
@@ -3295,6 +3301,12 @@ export default function App() {
         )}
 
         {/* 个人行业爆款视频 */}
+        {activeTab === 'personal' && showAnalysis && !(platformData[selectedPlatform]?.length > 0) && (
+          <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-3">
+            <span className="text-4xl">📂</span>
+            <p className="text-sm">当前平台暂无数据，请先上传 <strong>{selectedPlatform}</strong> 的数据文件</p>
+          </div>
+        )}
         {activeTab === 'personal' && showAnalysis && platformData[selectedPlatform]?.length > 0 && (
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
@@ -3604,7 +3616,7 @@ export default function App() {
         )}
 
         {/* Daily Viral Videos Monitor */}
-        {activeTab === 'viral' && showAnalysis && platformData[selectedPlatform]?.length > 0 && (
+        {activeTab === 'viral' && (
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
