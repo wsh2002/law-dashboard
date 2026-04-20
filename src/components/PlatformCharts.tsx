@@ -74,7 +74,7 @@ const PlatformChartsComponent = ({ platformData }: PlatformChartsProps) => {
           )}
           <Legend wrapperStyle={{ paddingTop: '8px', fontSize: '13px' }} />
           <Tooltip
-            formatter={(value: number, name: string) => [`${value} 分`, name]}
+            formatter={(value: number | undefined, name: string) => [`${value ?? 0} 分`, name]}
             contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', fontSize: '13px', border: '1px solid #e0e0e0' }}
           />
         </RadarChart>
