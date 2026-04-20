@@ -239,12 +239,15 @@ const parseData = (raw: any[], platform?: 'douyin' | 'kuaishou' | 'wechat'): Dat
 
     const formatPercentage = (val: any): string => {
         if (typeof val === 'number') {
-            // Check if it's a decimal (e.g. 0.5) or percentage value (e.g. 50)
-            // Heuristic: if <= 1, assume decimal. If > 1, assume percentage value? 
-            // Actually, in Excel, 50% is stored as 0.5. So multiplying by 100 is usually correct.
-            // But if user entered 50 manually, it might be 50.
-            // Let's assume standard Excel behavior: 0.5 -> 50%
-            return (val * 100).toFixed(2) + '%';
+            // Excel stores % as decimal (0.17 = 17%). If value > 1, it's likely already a percentage.
+            const pct = val <= 1 ? val * 100 : val;
+            return pct.toFixed(2) + '%';
+        }
+        if (typeof val === 'string') {
+            const cleaned = val.trim();
+            if (cleaned.endsWith('%')) return cleaned;
+            const n = parseFloat(cleaned);
+            if (!isNaN(n)) return (n <= 1 ? n * 100 : n).toFixed(2) + '%';
         }
         return val ? String(val) : '0%';
     };
@@ -3862,23 +3865,22 @@ export default function App() {
                             </div>
 
                             {/* 综合评分雷达图 */}
-                            <div className="bg-gray-50 p-4 rounded-xl lg:col-span-2">
-                                <h5 className="font-medium text-gray-700 mb-4 text-center">各平台综合评分雷达图</h5>
+                            <div className="bg-gray-50 p-4 rounded-xl lg:col-span-2" style={{ height: '420px' }}>
                                 {(platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).length > 0 ? (
-                                    <div className="h-96">
+                                    <div style={{ width: '100%', height: '100%' }}>
                                         <Suspense fallback={
-  <div className="flex justify-center items-center h-96">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-  </div>
-}>
-  <PlatformChartsWrapper
-    platformData={(platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).filter(Boolean) as any}
-    platformCompareMode={platformCompareMode}
-  />
-</Suspense>
+                                            <div className="flex justify-center items-center h-full">
+                                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                                            </div>
+                                        }>
+                                            <PlatformChartsWrapper
+                                                platformData={(platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).filter(Boolean) as any}
+                                                platformCompareMode={platformCompareMode}
+                                            />
+                                        </Suspense>
                                     </div>
                                 ) : (
-                                    <div className="flex flex-col items-center justify-center py-8">
+                                    <div className="flex flex-col items-center justify-center h-full">
                                         <Activity className="w-8 h-8 text-gray-400 mb-2" />
                                         <p className="text-gray-500">{platformCompareMode === 'overall' ? '暂无平台数据' : '该月份暂无数据'}</p>
                                     </div>

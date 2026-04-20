@@ -1,4 +1,3 @@
-import { motion } from 'framer-motion';
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Radar as RadarIcon } from 'lucide-react';
 
@@ -21,119 +20,67 @@ interface PlatformChartsProps {
 }
 
 const PlatformChartsComponent = ({ platformData }: PlatformChartsProps) => {
-
   if (platformData.length === 0) {
     return (
-      <div className="col-span-full flex items-center justify-center p-12 bg-gray-50 rounded-xl">
-        <div className="text-center">
-          <div className="text-gray-400 mb-2">暂无数据</div>
-          <p className="text-gray-500 text-sm">请先上传各平台的数据</p>
-        </div>
+      <div className="flex items-center justify-center" style={{ height: 360 }}>
+        <p className="text-gray-400 text-sm">暂无平台数据</p>
       </div>
     );
   }
 
+  const get = (platform: string) => platformData.find(p => p?.platform === platform);
+
+  // Normalize each metric relative to the max across all platforms → [0, 100]
+  const norm = (values: number[]) => {
+    const max = Math.max(...values, 1);
+    return values.map(v => Math.round((v / max) * 100));
+  };
+
+  const [dy, ks, wx] = [get('douyin'), get('kuaishou'), get('wechat')];
+
+  const views   = norm([dy?.totalViews || 0,   ks?.totalViews || 0,   wx?.totalViews || 0]);
+  const inter   = norm([dy?.avgInteractionRate || 0, ks?.avgInteractionRate || 0, wx?.avgInteractionRate || 0]);
+  const compl   = norm([dy?.avgCompletionRate || 0,  ks?.avgCompletionRate || 0,  wx?.avgCompletionRate || 0]);
+  const content = norm([dy?.videoCount || 0,   ks?.videoCount || 0,   wx?.videoCount || 0]);
+  const fans    = norm([dy?.latestFans || 0,   ks?.latestFans || 0,   wx?.latestFans || 0]);
+
+  const radarData = [
+    { subject: '播放量', 抖音: views[0],   快手: views[1],   视频号: views[2] },
+    { subject: '互动率', 抖音: inter[0],   快手: inter[1],   视频号: inter[2] },
+    { subject: '完播率', 抖音: compl[0],   快手: compl[1],   视频号: compl[2] },
+    { subject: '内容量', 抖音: content[0], 快手: content[1], 视频号: content[2] },
+    { subject: '粉丝数', 抖音: fans[0],    快手: fans[1],    视频号: fans[2] },
+  ];
+
   return (
-    <div className="space-y-8">
-      {/* 综合表现雷达图 */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ delay: 0.1 }}
-        className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
-      >
-        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <RadarIcon className="w-5 h-5 text-orange-500" />
-          综合表现雷达图
-        </h3>
-        <div className="h-96">
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart outerRadius="65%" data={[
-              {
-                subject: '播放量',
-                抖音: (platformData.find(p => p?.platform === 'douyin')?.totalViews || 0) / 10000,
-                快手: (platformData.find(p => p?.platform === 'kuaishou')?.totalViews || 0) / 10000,
-                视频号: (platformData.find(p => p?.platform === 'wechat')?.totalViews || 0) / 10000,
-              },
-              {
-                subject: '互动率',
-                抖音: (platformData.find(p => p?.platform === 'douyin')?.avgInteractionRate || 0) * 10,
-                快手: (platformData.find(p => p?.platform === 'kuaishou')?.avgInteractionRate || 0) * 10,
-                视频号: (platformData.find(p => p?.platform === 'wechat')?.avgInteractionRate || 0) * 10,
-              },
-              {
-                subject: '完播率',
-                抖音: platformData.find(p => p?.platform === 'douyin')?.avgCompletionRate || 0,
-                快手: platformData.find(p => p?.platform === 'kuaishou')?.avgCompletionRate || 0,
-                视频号: platformData.find(p => p?.platform === 'wechat')?.avgCompletionRate || 0,
-              },
-              {
-                subject: '内容量',
-                抖音: Math.min((platformData.find(p => p?.platform === 'douyin')?.videoCount || 0) / 2, 100),
-                快手: Math.min((platformData.find(p => p?.platform === 'kuaishou')?.videoCount || 0) / 2, 100),
-                视频号: Math.min((platformData.find(p => p?.platform === 'wechat')?.videoCount || 0) / 2, 100),
-              },
-              {
-                subject: '粉丝数',
-                抖音: (platformData.find(p => p?.platform === 'douyin')?.latestFans || 0) / 10000,
-                快手: (platformData.find(p => p?.platform === 'kuaishou')?.latestFans || 0) / 10000,
-                视频号: (platformData.find(p => p?.platform === 'wechat')?.latestFans || 0) / 10000,
-              },
-            ]}>
-              <PolarGrid stroke="#e0e0e0" />
-              <PolarAngleAxis dataKey="subject" tick={{ fill: '#666', fontSize: 14 }} />
-              <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#999', fontSize: 12 }} />
-
-              <Radar
-                name="抖音"
-                dataKey="抖音"
-                stroke="#ff0000"
-                fill="#ff0000"
-                fillOpacity={0.2}
-                strokeWidth={2}
-              />
-              <Radar
-                name="快手"
-                dataKey="快手"
-                stroke="#fe2c55"
-                fill="#fe2c55"
-                fillOpacity={0.2}
-                strokeWidth={2}
-              />
-              <Radar
-                name="视频号"
-                dataKey="视频号"
-                stroke="#07C160"
-                fill="#07C160"
-                fillOpacity={0.2}
-                strokeWidth={2}
-              />
-
-              <Legend
-                wrapperStyle={{
-                  paddingTop: '20px',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  gap: '20px',
-                  fontSize: '14px'
-                }}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                  borderRadius: '8px',
-                  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
-                  border: '1px solid #e0e0e0',
-                  fontSize: '14px'
-                }}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
-        </div>
-      </motion.div>
+    <div style={{ width: '100%' }}>
+      <div className="flex items-center gap-2 mb-2 px-2">
+        <RadarIcon className="w-4 h-4 text-orange-500" />
+        <span className="text-sm font-bold text-gray-700">综合表现雷达图（相对评分）</span>
+      </div>
+      <ResponsiveContainer width="100%" height={340}>
+        <RadarChart outerRadius={110} data={radarData}>
+          <PolarGrid stroke="#e0e0e0" />
+          <PolarAngleAxis dataKey="subject" tick={{ fill: '#555', fontSize: 13 }} />
+          <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+          {ks && (
+            <Radar name="快手" dataKey="快手" stroke="#f97316" fill="#f97316" fillOpacity={0.5} strokeWidth={2.5} dot={{ r: 5, fill: '#f97316', strokeWidth: 0 }} isAnimationActive={false} />
+          )}
+          {dy && (
+            <Radar name="抖音" dataKey="抖音" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.45} strokeWidth={2.5} dot={{ r: 5, fill: '#3b82f6', strokeWidth: 0 }} isAnimationActive={false} />
+          )}
+          {wx && (
+            <Radar name="视频号" dataKey="视频号" stroke="#07C160" fill="#07C160" fillOpacity={0.45} strokeWidth={2.5} dot={{ r: 5, fill: '#07C160', strokeWidth: 0 }} isAnimationActive={false} />
+          )}
+          <Legend wrapperStyle={{ paddingTop: '8px', fontSize: '13px' }} />
+          <Tooltip
+            formatter={(value: number, name: string) => [`${value} 分`, name]}
+            contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', fontSize: '13px', border: '1px solid #e0e0e0' }}
+          />
+        </RadarChart>
+      </ResponsiveContainer>
     </div>
   );
-}
+};
 
 export default PlatformChartsComponent;
