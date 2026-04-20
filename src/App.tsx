@@ -421,7 +421,7 @@ export default function App() {
     if (!hasCurrent) {
       const fallback = allKeys.find(p => platformData[p]?.length > 0);
       if (fallback) {
-        setTabPlatforms(() => Object.fromEntries(allKeys.map(k => [k, fallback])) as Record<string, 'douyin' | 'kuaishou' | 'wechat'>);
+        setTabPlatforms(prev => Object.fromEntries(Object.keys(prev).map(k => [k, fallback])) as Record<string, 'douyin' | 'kuaishou' | 'wechat'>);
         setSelectedPlatform(fallback);
         return;
       }
