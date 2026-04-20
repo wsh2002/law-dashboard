@@ -348,6 +348,8 @@ const ViralVideosSection = () => {
                     timestamp: scriptItem.timestamp
                   });
                   console.log(`视频 "${currentVideo.title}" 已保存到文案库`);
+                  // 主动刷新文案库，不依赖 Realtime 推送
+                  loadScriptLibrary(setScriptLibrary);
                 } catch (firebaseError) {
                   console.error(`保存到文案库失败:`, firebaseError);
                 }
@@ -685,6 +687,8 @@ ${analysisResult}
                                 subtitles: scriptItem.subtitles,
                                 timestamp: scriptItem.timestamp
                               });
+                              // 主动刷新文案库
+                              loadScriptLibrary(setScriptLibrary);
 
                               // 显示成功提示
                               alert('文案识别成功，已保存到文案库！');
@@ -1243,6 +1247,8 @@ ${analysisResult}
                            const { error } = await supabase.from('script_library').insert(scriptItem);
                            if (error) throw error;
                            setSavedToLibrary(true);
+                           // 主动刷新文案库，不依赖 Realtime 推送
+                           loadScriptLibrary(setScriptLibrary);
                          } catch (e) {
                            alert('保存失败，请重试');
                          } finally {
