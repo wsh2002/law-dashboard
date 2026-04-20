@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, ChangeEvent, lazy, Suspense } from 'react';
+﻿import React, { useState, useMemo, useEffect, useCallback, ChangeEvent, lazy, Suspense } from 'react';
 import * as XLSX from 'xlsx';
 import { motion } from 'framer-motion';
 import { Session } from '@supabase/supabase-js';
@@ -14,14 +14,6 @@ import ReactWordcloud from 'react-wordcloud';
 import { format, parse, addDays, isValid, startOfDay, subDays, startOfMonth, subMonths, startOfWeek, endOfWeek, eachWeekOfInterval } from 'date-fns';
 import { cn } from './lib/utils';
 
-// #region agent log
-fetch('http://127.0.0.1:7326/ingest/4128a6f9-7968-4d25-bca1-4be3c1d59841',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'13a9be'},body:JSON.stringify({sessionId:'13a9be',runId:'pre-fix',hypothesisId:'H5',location:'App.tsx:module-scope',message:'module loaded',data:{href:typeof window!=='undefined'?window.location.href:'unknown'},timestamp:Date.now()})}).catch(()=>{});
-if (typeof window !== 'undefined') {
-  window.addEventListener('error', (event) => {
-    fetch('http://127.0.0.1:7326/ingest/4128a6f9-7968-4d25-bca1-4be3c1d59841',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'13a9be'},body:JSON.stringify({sessionId:'13a9be',runId:'pre-fix',hypothesisId:'H6',location:'App.tsx:window-error',message:'global runtime error captured',data:{message:event.message,filename:event.filename,lineno:event.lineno,colno:event.colno},timestamp:Date.now()})}).catch(()=>{});
-  });
-}
-// #endregion
 
 // 懒加载组件
 const ViralVideosSection = lazy(() => import('./components/ViralVideosSection'));
@@ -1526,6 +1518,19 @@ export default function App() {
     return fanHealthData.length ? (sum / fanHealthData.length).toFixed(2) : 0;
   }, [fanHealthData]);
 
+  const currentPlatformMonths = useMemo(() => {
+    return Array.from(new Set((platformData[selectedPlatform] || []).map(item => format(item.parsedDate, 'yyyy-MM'))))
+      .sort((a, b) => b.localeCompare(a));
+  }, [platformData, selectedPlatform]);
+
+  const barChartData = useMemo(() => {
+    return finalDetailTrend.map((d: any) => ({
+      ...d,
+      netFans: Math.max(0, d.netFans || 0),
+      compareNetFans: Math.max(0, d.compareNetFans || 0)
+    }));
+  }, [finalDetailTrend]);
+
   if (authLoading) {
     return (
       <div className="flex justify-center items-center h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -1570,8 +1575,8 @@ export default function App() {
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAViews)" radius={[8, 8, 0, 0]} animationDuration={800} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBViews)" radius={[8, 8, 0, 0]} animationDuration={800} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAViews)" radius={[8, 8, 0, 0]} animationDuration={300} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBViews)" radius={[8, 8, 0, 0]} animationDuration={300} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -1603,8 +1608,8 @@ export default function App() {
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAKPIs)" radius={[8, 8, 0, 0]} animationDuration={800} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBKPIs)" radius={[8, 8, 0, 0]} animationDuration={800} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAKPIs)" radius={[8, 8, 0, 0]} animationDuration={300} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBKPIs)" radius={[8, 8, 0, 0]} animationDuration={300} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -1636,8 +1641,8 @@ export default function App() {
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAComment)" radius={[8, 8, 0, 0]} animationDuration={800} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBComment)" radius={[8, 8, 0, 0]} animationDuration={800} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAComment)" radius={[8, 8, 0, 0]} animationDuration={300} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBComment)" radius={[8, 8, 0, 0]} animationDuration={300} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -1669,8 +1674,8 @@ export default function App() {
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorARate)" radius={[8, 8, 0, 0]} animationDuration={800} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBRate)" radius={[8, 8, 0, 0]} animationDuration={800} />
+        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorARate)" radius={[8, 8, 0, 0]} animationDuration={300} />
+        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBRate)" radius={[8, 8, 0, 0]} animationDuration={300} />
       </BarChart>
     </ResponsiveContainer>
   ));
@@ -1700,8 +1705,8 @@ export default function App() {
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar yAxisId="left" dataKey="views" name="月播放量" fill="url(#colorViews)" radius={[8, 8, 0, 0]} animationDuration={800} />
-        <Line yAxisId="right" type="monotone" dataKey="likes" name="月点赞量" stroke="#f43f5e" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f43f5e', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
+        <Bar yAxisId="left" dataKey="views" name="月播放量" fill="url(#colorViews)" radius={[8, 8, 0, 0]} animationDuration={300} />
+        <Line yAxisId="right" type="monotone" dataKey="likes" name="月点赞量" stroke="#f43f5e" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f43f5e', stroke: '#fff', strokeWidth: 2 }} animationDuration={300} />
       </ComposedChart>
     </ResponsiveContainer>
   ));
@@ -1729,8 +1734,8 @@ export default function App() {
           }} 
         />
         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Line type="monotone" dataKey="netFans" name="月净增粉" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
-        <Bar dataKey="netFans" name="月净增粉" fill="url(#colorNetFans)" radius={[8, 8, 0, 0]} animationDuration={800} />
+        <Line type="monotone" dataKey="netFans" name="月净增粉" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={300} />
+        <Bar dataKey="netFans" name="月净增粉" fill="url(#colorNetFans)" radius={[8, 8, 0, 0]} animationDuration={300} />
       </ComposedChart>
     </ResponsiveContainer>
   ));
@@ -2245,17 +2250,17 @@ export default function App() {
                                 }} 
                             />
                             <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                            <Line type="monotone" dataKey="likes" name="点赞量" stroke="#ef4444" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorLikes)" animationDuration={800} />
-                            <Line type="monotone" dataKey="comments" name="评论量" stroke="#8b5cf6" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorComments)" animationDuration={800} />
+                            <Line type="monotone" dataKey="likes" name="点赞量" stroke="#ef4444" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorLikes)" animationDuration={300} />
+                            <Line type="monotone" dataKey="comments" name="评论量" stroke="#8b5cf6" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorComments)" animationDuration={300} />
                             {/* 根据平台类型显示不同的指标 */}
                             {selectedPlatform === 'wechat' ? (
-                                <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
+                                <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={300} />
                             ) : hasFavorites ? (
-                                <Line type="monotone" dataKey="favorites" name="收藏量" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
+                                <Line type="monotone" dataKey="favorites" name="收藏量" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={300} />
                             ) : hasRecommendations ? (
-                                <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={800} />
+                                <Line type="monotone" dataKey="recommendations" name="推荐量" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f59e0b', stroke: '#fff', strokeWidth: 2 }} animationDuration={300} />
                             ) : null}
-                            <Line type="monotone" dataKey="shares" name="转发量" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorShares)" animationDuration={800} />
+                            <Line type="monotone" dataKey="shares" name="转发量" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorShares)" animationDuration={300} />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
@@ -2435,8 +2440,8 @@ export default function App() {
                                 }} 
                             />
                             <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                            <Line yAxisId="left" type="monotone" dataKey="views" name="播放量" stroke="#2563eb" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorViews)" animationDuration={800} />
-                            <Line yAxisId="right" type="monotone" dataKey="fans" name="累计粉丝量" stroke="#0ea5e9" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#0ea5e9', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorFans)" animationDuration={800} />
+                            <Line yAxisId="left" type="monotone" dataKey="views" name="播放量" stroke="#2563eb" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#2563eb', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorViews)" animationDuration={300} />
+                            <Line yAxisId="right" type="monotone" dataKey="fans" name="累计粉丝量" stroke="#0ea5e9" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#0ea5e9', stroke: '#fff', strokeWidth: 2 }} fillOpacity={1} fill="url(#colorFans)" animationDuration={300} />
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
@@ -2660,7 +2665,7 @@ export default function App() {
                     </h3>
                     <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={finalDetailTrend.map((d: any) => ({ ...d, netFans: Math.max(0, d.netFans || 0), compareNetFans: Math.max(0, d.compareNetFans || 0) }))} margin={{ top: 5, right: 30, left: 10, bottom: 20 }} barSize={4}>
+                            <BarChart data={barChartData} margin={{ top: 5, right: 30, left: 10, bottom: 20 }} barSize={4}>
                                 <defs>
                                   <linearGradient id="colorNetFansCurrent" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%" stopColor="#f97316" stopOpacity={0.85}/>
@@ -2686,8 +2691,8 @@ export default function App() {
                                   }} 
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                <Bar yAxisId="right" dataKey="compareNetFans" name="对比周期 日增粉丝" fill="url(#colorNetFansCompare)" radius={[1, 1, 0, 0]} barSize={6} animationDuration={1500} />
-                                <Bar yAxisId="right" dataKey="netFans" name="当前周期 日增粉丝" fill="url(#colorNetFansCurrent)" radius={[1, 1, 0, 0]} barSize={6} animationDuration={1500} />
+                                <Bar yAxisId="right" dataKey="compareNetFans" name="对比周期 日增粉丝" fill="url(#colorNetFansCompare)" radius={[1, 1, 0, 0]} barSize={6} animationDuration={300} />
+                                <Bar yAxisId="right" dataKey="netFans" name="当前周期 日增粉丝" fill="url(#colorNetFansCurrent)" radius={[1, 1, 0, 0]} barSize={6} animationDuration={300} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -2723,8 +2728,8 @@ export default function App() {
                                   }} 
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                <Line type="monotone" dataKey="completionRate" name="当前周期 完播率(%)" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
-                                <Line type="monotone" dataKey="compareCompletionRate" name="对比周期 完播率(%)" stroke="#ef4444" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 5, fill: '#ef4444', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
+                                <Line type="monotone" dataKey="completionRate" name="当前周期 完播率(%)" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={300} />
+                                <Line type="monotone" dataKey="compareCompletionRate" name="对比周期 完播率(%)" stroke="#ef4444" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 5, fill: '#ef4444', stroke: '#fff', strokeWidth: 1 }} animationDuration={300} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -2760,8 +2765,8 @@ export default function App() {
                                   }} 
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                <Line type="monotone" dataKey="interactionRate" name="当前周期 互动率(%)" stroke="#8b5cf6" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
-                                <Line type="monotone" dataKey="compareInteractionRate" name="对比周期 互动率(%)" stroke="#f59e0b" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 5, fill: '#f59e0b', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
+                                <Line type="monotone" dataKey="interactionRate" name="当前周期 互动率(%)" stroke="#8b5cf6" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#8b5cf6', stroke: '#fff', strokeWidth: 2 }} animationDuration={300} />
+                                <Line type="monotone" dataKey="compareInteractionRate" name="对比周期 互动率(%)" stroke="#f59e0b" strokeDasharray="3 3" strokeWidth={2} strokeOpacity={0.7} dot={false} activeDot={{ r: 5, fill: '#f59e0b', stroke: '#fff', strokeWidth: 1 }} animationDuration={300} />
                                 <ReferenceLine y={avgInteractionRate} stroke="#64748b" strokeDasharray="4 4" label={{ value: `均值: ${avgInteractionRate.toFixed(2)}%`, position: 'right', fill: '#64748b' }} />
                             </LineChart>
                         </ResponsiveContainer>
@@ -2798,8 +2803,8 @@ export default function App() {
                                   }} 
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                <Line yAxisId="left" type="monotone" dataKey="views" name="当前周期 播放量" stroke="#3b82f6" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
-                                <Line yAxisId="left" type="monotone" dataKey="compareViews" name="对比周期 播放量" stroke="#60a5fa" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 5, fill: '#60a5fa', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
+                                <Line yAxisId="left" type="monotone" dataKey="views" name="当前周期 播放量" stroke="#3b82f6" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} animationDuration={300} />
+                                <Line yAxisId="left" type="monotone" dataKey="compareViews" name="对比周期 播放量" stroke="#60a5fa" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 5, fill: '#60a5fa', stroke: '#fff', strokeWidth: 1 }} animationDuration={300} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -2835,8 +2840,8 @@ export default function App() {
                                   }} 
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                <Line yAxisId="right" type="monotone" dataKey="interactions" name="当前周期 互动总量" stroke="#f97316" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f97316', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
-                                <Line yAxisId="right" type="monotone" dataKey="compareInteractions" name="对比周期 互动总量" stroke="#fb923c" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 5, fill: '#fb923c', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
+                                <Line yAxisId="right" type="monotone" dataKey="interactions" name="当前周期 互动总量" stroke="#f97316" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f97316', stroke: '#fff', strokeWidth: 2 }} animationDuration={300} />
+                                <Line yAxisId="right" type="monotone" dataKey="compareInteractions" name="对比周期 互动总量" stroke="#fb923c" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 5, fill: '#fb923c', stroke: '#fff', strokeWidth: 1 }} animationDuration={300} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -2872,8 +2877,8 @@ export default function App() {
                                   }} 
                                 />
                                 <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                                <Line type="monotone" dataKey="healthRate" name="当前周期 粉赞比(%)" stroke="#ef4444" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }} animationDuration={1500} />
-                                <Line type="monotone" dataKey="compareHealthRate" name="对比周期 粉赞比(%)" stroke="#3b82f6" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 1 }} animationDuration={1500} />
+                                <Line type="monotone" dataKey="healthRate" name="当前周期 粉赞比(%)" stroke="#ef4444" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }} animationDuration={300} />
+                                <Line type="monotone" dataKey="compareHealthRate" name="对比周期 粉赞比(%)" stroke="#3b82f6" strokeDasharray="5 5" strokeWidth={2} strokeOpacity={0.6} dot={false} activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 1 }} animationDuration={300} />
                                 <ReferenceLine y={avgHealthRate} stroke="#64748b" strokeDasharray="4 4" label={{ value: `均值: ${avgHealthRate}%`, position: 'right', fill: '#64748b' }} />
                             </LineChart>
                         </ResponsiveContainer>
@@ -2910,7 +2915,7 @@ export default function App() {
                                     key={index}
                                     initial={{ scale: 0 }}
                                     animate={{ scale: 1 }}
-                                    transition={{ delay: index * 0.01 }}
+                                    transition={{ duration: 0.1 }}
                                     className="aspect-square flex flex-col items-center justify-center rounded text-xs font-medium text-white relative group cursor-pointer shadow-sm hover:shadow-md transition-all"
                                     style={{ backgroundColor: item.fill }}
                                 >
@@ -2949,9 +2954,7 @@ export default function App() {
                                 onChange={(e) => setPlatformSelectedMonthForVideos(e.target.value)}
                                 className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
-                                {Array.from(new Set((platformData[selectedPlatform] || []).map(item => format(item.parsedDate, 'yyyy-MM'))))
-                                    .sort((a, b) => b.localeCompare(a)) // 按月份降序排列
-                                    .map(month => (
+                                {currentPlatformMonths.map(month => (
                                         <option key={month} value={month}>
                                             {month}
                                         </option>
@@ -3487,7 +3490,7 @@ export default function App() {
                                             key={index} 
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: index * 0.1 }}
+                                            transition={{ duration: 0.15 }}
                                             className="bg-white border-b hover:bg-gray-50"
                                         >
                                             <td className="px-6 py-4">
@@ -3672,13 +3675,13 @@ export default function App() {
                         {/* 平台卡片 */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                             {(platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).length > 0 ? (
-                                (platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).map((item, index) => (
+                                (platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).map((item) => (
                                     <motion.div
                                         key={item!.platform}
                                         initial={{ opacity: 0, scale: 0.9 }}
                                         whileInView={{ opacity: 1, scale: 1 }}
                                         viewport={{ once: true }}
-                                        transition={{ delay: index * 0.1 }}
+                                        transition={{ duration: 0.15 }}
                                         className="bg-gradient-to-br from-white to-gray-50 p-5 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow"
                                     >
                                         <div className="flex items-center justify-between mb-4">
@@ -3750,12 +3753,12 @@ export default function App() {
                                 </thead>
                                 <tbody>
                                     {(platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).length > 0 ? (
-                                        (platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).map((item, index) => (
+                                        (platformCompareMode === 'overall' ? platformComparisonData : monthlyPlatformComparisonData).map((item) => (
                                             <motion.tr
                                                 key={item!.platform}
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: index * 0.1 }}
+                                                transition={{ duration: 0.15 }}
                                                 className="bg-white border-b hover:bg-gray-50"
                                             >
                                                 <td className="px-6 py-4 font-medium text-gray-900">
