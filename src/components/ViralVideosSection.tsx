@@ -4,103 +4,15 @@ import { AlertCircle, Settings, Play, ThumbsUp, Clock, User, MessageCircle, X, S
 import { cn } from '../lib/utils';
 import { DEFAULT_CONFIG, analyzeDocument } from '../services/aiAnalysis';
 import ReactMarkdown from 'react-markdown';
+import { supabase } from '../services/supabase';
 
-// 模拟Firebase实时数据库
-class MockFirebase {
-  private data: any = {};
-  private listeners: any = {};
-
-  constructor() {
-    const saved = localStorage.getItem('mock_firebase_data');
-    if (saved) {
-      try {
-        this.data = JSON.parse(saved);
-      } catch (e) {
-        this.data = {};
-      }
-    }
-  }
-
-  private saveData() {
-    localStorage.setItem('mock_firebase_data', JSON.stringify(this.data));
-  }
-
-  on(path: string, callback: (data: any) => void) {
-    if (!this.listeners[path]) {
-      this.listeners[path] = [];
-    }
-    this.listeners[path].push(callback);
-    const data = this.getData(path);
-    callback(data);
-    return () => {
-      this.listeners[path] = this.listeners[path].filter((cb: any) => cb !== callback);
-    };
-  }
-
-  getData(path: string) {
-    const parts = path.split('/').filter(p => p);
-    let current = this.data;
-    for (const part of parts) {
-      if (!current[part]) {
-        return null;
-      }
-      current = current[part];
-    }
-    return current;
-  }
-
-  setData(path: string, data: any) {
-    const parts = path.split('/').filter(p => p);
-    let current = this.data;
-    for (let i = 0; i < parts.length - 1; i++) {
-      const part = parts[i];
-      if (!current[part]) {
-        current[part] = {};
-      }
-      current = current[part];
-    }
-    current[parts[parts.length - 1]] = data;
-    this.saveData();
-    this.triggerListeners(path, data);
-  }
-
-  private triggerListeners(path: string, data: any) {
-    if (this.listeners[path]) {
-      this.listeners[path].forEach((callback: any) => {
-        callback(data);
-      });
-    }
-    const parentPath = path.split('/').slice(0, -1).join('/');
-    if (parentPath) {
-      const parentData = this.getData(parentPath);
-      this.triggerListeners(parentPath, parentData);
-    }
-  }
-
-  push(path: string, data: any) {
-    const id = Date.now().toString();
-    const newPath = `${path}/${id}`;
-    this.setData(newPath, { ...data, id });
-    return id;
-  }
-
-  remove(path: string) {
-    const parts = path.split('/').filter(p => p);
-    let current = this.data;
-    for (let i = 0; i < parts.length - 1; i++) {
-      const part = parts[i];
-      if (!current[part]) {
-        return;
-      }
-      current = current[part];
-    }
-    delete current[parts[parts.length - 1]];
-    this.saveData();
-    this.triggerListeners(path, null);
-  }
-}
-
-const firebase = new MockFirebase();
+const loadScriptLibrary = async (setter: (data: any[]) => void) => {
+  const { data } = await supabase
+    .from('script_library')
+    .select('*')
+    .order('timestamp', { ascending: false });
+  if (data) setter(data.map((row: any) => ({ ...row, videoId: row.video_id })));
+};
 
 // Types for the viral video data
 export interface ViralVideo {
@@ -247,19 +159,16 @@ const ViralVideosSection = () => {
 
   // 文案库数据
   useEffect(() => {
-    // 使用Firebase监听文案库数据变化
-    const unsubscribe = firebase.on('script_library', (data: any) => {
-      if (data) {
-        // 将对象转换为数组
-        const scriptArray = Object.values(data);
-        setScriptLibrary(scriptArray);
-      } else {
-        setScriptLibrary([]);
-      }
-    });
+    loadScriptLibrary(setScriptLibrary);
 
-    // 组件卸载时取消监听
-    return () => unsubscribe();
+    const channel = supabase
+      .channel('script_library_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'script_library' }, () => {
+        loadScriptLibrary(setScriptLibrary);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
 
@@ -396,9 +305,18 @@ const ViralVideosSection = () => {
                   timestamp: new Date().toISOString()
                 };
 
-                // 使用Firebase保存数据
+                // 保存到 Supabase 文案库
                 try {
-                  firebase.push('script_library', scriptItem);
+                  await supabase.from('script_library').insert({
+                    id: scriptItem.id,
+                    video_id: scriptItem.videoId,
+                    title: scriptItem.title,
+                    author: scriptItem.author,
+                    platform: scriptItem.platform,
+                    content: scriptItem.content,
+                    subtitles: scriptItem.subtitles,
+                    timestamp: scriptItem.timestamp
+                  });
                   console.log(`视频 "${currentVideo.title}" 已保存到文案库`);
                 } catch (firebaseError) {
                   console.error(`保存到文案库失败:`, firebaseError);
@@ -721,8 +639,17 @@ ${analysisResult}
                                 timestamp: new Date().toISOString()
                               };
 
-                              // 使用Firebase保存数据
-                              firebase.push('script_library', scriptItem);
+                              // 保存到 Supabase 文案库
+                              await supabase.from('script_library').insert({
+                                id: scriptItem.id,
+                                video_id: scriptItem.videoId,
+                                title: scriptItem.title,
+                                author: scriptItem.author,
+                                platform: scriptItem.platform,
+                                content: scriptItem.content,
+                                subtitles: scriptItem.subtitles,
+                                timestamp: scriptItem.timestamp
+                              });
 
                               // 显示成功提示
                               alert('文案识别成功，已保存到文案库！');
@@ -1368,16 +1295,19 @@ ${analysisResult}
                           const importData = JSON.parse(content);
                           if (importData.data && Array.isArray(importData.data)) {
                             // 导入数据到文案库
-                            importData.data.forEach((item: any) => {
-                              // 生成新的ID，避免冲突
-                              const newItem = {
-                                ...item,
-                                id: Date.now().toString() + Math.random().toString(36).slice(2, 11),
-                                imported: true
-                              };
-                              firebase.push('script_library', newItem);
+                            const rows = importData.data.map((item: any) => ({
+                              id: Date.now().toString() + Math.random().toString(36).slice(2, 11),
+                              video_id: item.videoId || item.video_id || '',
+                              title: item.title || '',
+                              author: item.author || '',
+                              platform: item.platform || 'douyin',
+                              content: item.content || '',
+                              subtitles: item.subtitles || [],
+                              timestamp: item.timestamp || new Date().toISOString()
+                            }));
+                            supabase.from('script_library').insert(rows).then(() => {
+                              alert(`成功导入 ${importData.data.length} 条文案`);
                             });
-                            alert(`成功导入 ${importData.data.length} 条文案`);
                           } else {
                             alert('导入文件格式错误');
                           }
@@ -1466,8 +1396,8 @@ ${analysisResult}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              // 使用Firebase删除数据
-                              firebase.remove(`script_library/${item.id}`);
+                              // 从 Supabase 删除数据
+                              supabase.from('script_library').delete().eq('id', item.id);
                             }}
                             className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           >

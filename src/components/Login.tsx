@@ -1,26 +1,41 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, User, ChevronRight, ShieldCheck, Users } from 'lucide-react';
+import { Lock, Mail, ChevronRight, ShieldCheck, Users } from 'lucide-react';
 import AnimatedBackground from './AnimatedBackground';
+import { supabase } from '../services/supabase';
 
 interface LoginProps {
-    onLogin: () => void;
+    onLogin?: () => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
-    const [username, setUsername] = useState('');
+const errorMap: Record<string, string> = {
+    'Invalid login credentials': '邮箱或密码错误',
+    'Email not confirmed': '邮箱尚未验证，请联系管理员',
+    'Too many requests': '尝试次数过多，请稍后再试',
+    'User not found': '该邮箱未注册',
+    'Invalid email': '邮箱格式不正确',
+};
+
+const Login: React.FC<LoginProps> = () => {
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Simple client-side validation
-        // In a real app, this would verify against a backend
-        if (username === 'admin' && password === 'admin123') {
-            onLogin();
-        } else {
-            setError('用户名或密码错误 (默认 admin / admin123)');
+        setError('');
+        setLoading(true);
+
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+        setLoading(false);
+
+        if (error) {
+            const msg = errorMap[error.message] || `登录失败：${error.message}`;
+            setError(msg);
         }
+        // 登录成功后 onAuthStateChange 会自动触发，无需手动跳转
     };
 
     return (
@@ -44,15 +59,16 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
                     <form onSubmit={handleLogin} className="space-y-4">
                         <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700 ml-1">用户名</label>
+                            <label className="text-sm font-medium text-gray-700 ml-1">邮箱</label>
                             <div className="relative">
-                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                                 <input 
-                                    type="text" 
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
+                                    type="email" 
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
                                     className="w-full pl-10 pr-4 py-2.5 bg-white/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                                    placeholder="请输入用户名"
+                                    placeholder="请输入邮箱地址"
+                                    required
                                 />
                             </div>
                         </div>
@@ -67,6 +83,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="w-full pl-10 pr-4 py-2.5 bg-white/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
                                     placeholder="请输入密码"
+                                    required
                                 />
                             </div>
                         </div>
@@ -83,10 +100,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
                         <button 
                             type="submit"
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2 mt-2"
+                            disabled={loading}
+                            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-2.5 rounded-xl shadow-lg shadow-blue-600/30 transition-all flex items-center justify-center gap-2 mt-2"
                         >
-                            登录平台
-                            <ChevronRight className="w-4 h-4" />
+                            {loading ? '登录中...' : '登录平台'}
+                            {!loading && <ChevronRight className="w-4 h-4" />}
                         </button>
                     </form>
 

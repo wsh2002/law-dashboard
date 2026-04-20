@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useEffect, useCallback, ChangeEvent, lazy, Suspense } from 'react';
 import * as XLSX from 'xlsx';
 import { motion } from 'framer-motion';
+import { Session } from '@supabase/supabase-js';
+import { supabase } from './services/supabase';
 // import { MOCK_DATA } from './data/mockData';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -208,10 +210,28 @@ const parseData = (raw: any[], platform?: 'douyin' | 'kuaishou' | 'wechat'): Dat
 
 
 export default function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const userId = session?.user?.id ?? 'guest';
+  const stateKey = `lawDashboardState_${userId}`;
+
   // 从 localStorage 加载状态，如果没有则使用默认值
   const loadState = () => {
     try {
-      const savedState = localStorage.getItem('lawDashboardState');
+      const savedState = localStorage.getItem(stateKey);
       if (savedState) {
         return JSON.parse(savedState);
       }
@@ -224,7 +244,7 @@ export default function App() {
   // 保存状态到 localStorage
   const saveState = (state: any) => {
     try {
-      localStorage.setItem('lawDashboardState', JSON.stringify(state));
+      localStorage.setItem(stateKey, JSON.stringify(state));
     } catch (error) {
       console.error('Error saving state to localStorage:', error);
     }
@@ -232,8 +252,6 @@ export default function App() {
 
   // 加载保存的状态或使用默认值
   const savedState = loadState();
-
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [data, setData] = useState<DataItem[]>([]);
   const [platformData, setPlatformData] = useState<Record<string, DataItem[]>>({});
   const [selectedPlatform, setSelectedPlatform] = useState<'douyin' | 'kuaishou' | 'wechat'>('douyin');
@@ -1508,12 +1526,20 @@ export default function App() {
     return fanHealthData.length ? (sum / fanHealthData.length).toFixed(2) : 0;
   }, [fanHealthData]);
 
-  if (!isLoggedIn) {
-      return (
-        <Suspense fallback={<div className="flex justify-center items-center h-screen">加载中...</div>}>
-          <Login onLogin={() => setIsLoggedIn(true)} />
-        </Suspense>
-      );
+  if (authLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+        <div className="text-slate-500 text-sm">加载中...</div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <Suspense fallback={<div className="flex justify-center items-center h-screen">加载中...</div>}>
+        <Login />
+      </Suspense>
+    );
   }
 
   // Chart Components with Memo
@@ -1763,6 +1789,17 @@ export default function App() {
                  >
                    200MB • CSV, XLSX, XLS
                  </motion.span>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[10px] text-gray-400 truncate max-w-[160px]">{session.user.email}</span>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => supabase.auth.signOut()}
+                  className="flex items-center gap-1 px-2.5 py-1 text-xs text-gray-500 hover:text-red-500 border border-gray-200 hover:border-red-200 rounded-lg transition-all"
+                >
+                  退出登录
+                </motion.button>
               </div>
             </div>
           </motion.div>

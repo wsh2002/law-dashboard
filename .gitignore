@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# 环境变量（含密钥，不提交到 git）
+.env
+.env.*
+!.env.example
