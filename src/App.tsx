@@ -14,6 +14,81 @@ import ReactWordcloud from 'react-wordcloud';
 import { format, parse, addDays, isValid, startOfDay, subDays, startOfMonth, subMonths, startOfWeek, endOfWeek, eachWeekOfInterval } from 'date-fns';
 import { cn } from './lib/utils';
 
+// ---- 月度对比图表组件（定义在 App 外部，避免每次渲染重建组件类型导致图表空白）----
+const tooltipStyle = { borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255,255,255,0.95)', padding: '12px', fontSize: '14px' };
+
+const MonthlyViewsChart = React.memo(({ data, monthA, monthB }: { data: any[]; monthA: string; monthB: string }) => (
+  <ResponsiveContainer width="100%" height="100%">
+    <BarChart data={data} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+      <defs>
+        <linearGradient id="colorAViews" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/><stop offset="100%" stopColor="#3b82f6" stopOpacity={0.1}/></linearGradient>
+        <linearGradient id="colorBViews" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/><stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/></linearGradient>
+      </defs>
+      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+      <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+      <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
+      <Tooltip contentStyle={tooltipStyle} />
+      <Legend wrapperStyle={{ paddingTop: '10px' }} />
+      <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAViews)" radius={[8,8,0,0]} animationDuration={300} />
+      <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBViews)" radius={[8,8,0,0]} animationDuration={300} />
+    </BarChart>
+  </ResponsiveContainer>
+));
+
+const MonthlyOtherKPIsChart = React.memo(({ data, monthA, monthB }: { data: any[]; monthA: string; monthB: string }) => (
+  <ResponsiveContainer width="100%" height="100%">
+    <BarChart data={data} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+      <defs>
+        <linearGradient id="colorAKPIs" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#6366f1" stopOpacity={0.8}/><stop offset="100%" stopColor="#6366f1" stopOpacity={0.1}/></linearGradient>
+        <linearGradient id="colorBKPIs" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/><stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/></linearGradient>
+      </defs>
+      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+      <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+      <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
+      <Tooltip contentStyle={tooltipStyle} />
+      <Legend wrapperStyle={{ paddingTop: '10px' }} />
+      <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAKPIs)" radius={[8,8,0,0]} animationDuration={300} />
+      <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBKPIs)" radius={[8,8,0,0]} animationDuration={300} />
+    </BarChart>
+  </ResponsiveContainer>
+));
+
+const MonthlyCommentChart = React.memo(({ data, monthA, monthB }: { data: any[]; monthA: string; monthB: string }) => (
+  <ResponsiveContainer width="100%" height="100%">
+    <BarChart data={data} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+      <defs>
+        <linearGradient id="colorAComment" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#eab308" stopOpacity={0.8}/><stop offset="100%" stopColor="#eab308" stopOpacity={0.1}/></linearGradient>
+        <linearGradient id="colorBComment" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/><stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/></linearGradient>
+      </defs>
+      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+      <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+      <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
+      <Tooltip contentStyle={tooltipStyle} />
+      <Legend wrapperStyle={{ paddingTop: '10px' }} />
+      <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAComment)" radius={[8,8,0,0]} animationDuration={300} />
+      <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBComment)" radius={[8,8,0,0]} animationDuration={300} />
+    </BarChart>
+  </ResponsiveContainer>
+));
+
+const MonthlyRateChart = React.memo(({ data, monthA, monthB }: { data: any[]; monthA: string; monthB: string }) => (
+  <ResponsiveContainer width="100%" height="100%">
+    <BarChart data={data} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+      <defs>
+        <linearGradient id="colorARate" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#ef4444" stopOpacity={0.8}/><stop offset="100%" stopColor="#ef4444" stopOpacity={0.1}/></linearGradient>
+        <linearGradient id="colorBRate" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/><stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/></linearGradient>
+      </defs>
+      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+      <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+      <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
+      <Tooltip contentStyle={tooltipStyle} />
+      <Legend wrapperStyle={{ paddingTop: '10px' }} />
+      <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorARate)" radius={[8,8,0,0]} animationDuration={300} />
+      <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBRate)" radius={[8,8,0,0]} animationDuration={300} />
+    </BarChart>
+  </ResponsiveContainer>
+));
+// ---- 月度对比图表组件结束 ----
 
 // 懒加载组件
 const ViralVideosSection = lazy(() => import('./components/ViralVideosSection'));
@@ -1581,137 +1656,6 @@ export default function App() {
   }
 
   // Chart Components with Memo
-  const MonthlyViewsChart = React.memo(() => (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={monthViewsComparisonData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-        <defs>
-          <linearGradient id="colorAViews" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.1}/>
-          </linearGradient>
-          <linearGradient id="colorBViews" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/>
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-        <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
-        <Tooltip 
-          contentStyle={{ 
-            borderRadius: '8px', 
-            border: 'none', 
-            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
-            background: 'rgba(255, 255, 255, 0.95)',
-            padding: '12px',
-            fontSize: '14px'
-          }} 
-        />
-        <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAViews)" radius={[8, 8, 0, 0]} animationDuration={300} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBViews)" radius={[8, 8, 0, 0]} animationDuration={300} />
-      </BarChart>
-    </ResponsiveContainer>
-  ));
-
-  const MonthlyOtherKPIsChart = React.memo(() => (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={monthComparisonChartData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-        <defs>
-          <linearGradient id="colorAKPIs" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#6366f1" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#6366f1" stopOpacity={0.1}/>
-          </linearGradient>
-          <linearGradient id="colorBKPIs" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/>
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-        <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
-        <Tooltip 
-          contentStyle={{ 
-            borderRadius: '8px', 
-            border: 'none', 
-            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
-            background: 'rgba(255, 255, 255, 0.95)',
-            padding: '12px',
-            fontSize: '14px'
-          }} 
-        />
-        <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAKPIs)" radius={[8, 8, 0, 0]} animationDuration={300} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBKPIs)" radius={[8, 8, 0, 0]} animationDuration={300} />
-      </BarChart>
-    </ResponsiveContainer>
-  ));
-
-  const MonthlyCommentChart = React.memo(() => (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={monthCommentComparisonData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-        <defs>
-          <linearGradient id="colorAComment" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#eab308" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#eab308" stopOpacity={0.1}/>
-          </linearGradient>
-          <linearGradient id="colorBComment" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/>
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-        <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
-        <Tooltip 
-          contentStyle={{ 
-            borderRadius: '8px', 
-            border: 'none', 
-            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
-            background: 'rgba(255, 255, 255, 0.95)',
-            padding: '12px',
-            fontSize: '14px'
-          }} 
-        />
-        <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorAComment)" radius={[8, 8, 0, 0]} animationDuration={300} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBComment)" radius={[8, 8, 0, 0]} animationDuration={300} />
-      </BarChart>
-    </ResponsiveContainer>
-  ));
-
-  const MonthlyRateChart = React.memo(() => (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={monthRateComparisonData} barSize={60} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-        <defs>
-          <linearGradient id="colorARate" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ef4444" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#ef4444" stopOpacity={0.1}/>
-          </linearGradient>
-          <linearGradient id="colorBRate" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/>
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-        <XAxis dataKey="name" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-        <YAxis fontSize={12} stroke="#94a3b8" domain={[0, 'dataMax * 1.2']} />
-        <Tooltip 
-          contentStyle={{ 
-            borderRadius: '8px', 
-            border: 'none', 
-            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
-            background: 'rgba(255, 255, 255, 0.95)',
-            padding: '12px',
-            fontSize: '14px'
-          }} 
-        />
-        <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar dataKey="A" name={`月份 A (${monthA})`} fill="url(#colorARate)" radius={[8, 8, 0, 0]} animationDuration={300} />
-        <Bar dataKey="B" name={`月份 B (${monthB})`} fill="url(#colorBRate)" radius={[8, 8, 0, 0]} animationDuration={300} />
-      </BarChart>
-    </ResponsiveContainer>
-  ));
 
   // Monthly Trend Chart Components with Memo
   const MonthlyViewsLikesChart = React.memo(() => (
@@ -3227,7 +3171,7 @@ export default function App() {
                             <span className="text-blue-500">📊</span> 月度播放量对比
                         </h3>
                         <div className="h-56">
-                            <MonthlyViewsChart />
+                            <MonthlyViewsChart data={monthViewsComparisonData} monthA={monthA} monthB={monthB} />
                         </div>
                     </motion.div>
                 )}
@@ -3245,7 +3189,7 @@ export default function App() {
                             <span className="text-green-500">📊</span> 其他月度指标对比
                         </h3>
                         <div className="h-56">
-                            <MonthlyOtherKPIsChart />
+                            <MonthlyOtherKPIsChart data={monthComparisonChartData} monthA={monthA} monthB={monthB} />
                         </div>
                     </motion.div>
                 )}
@@ -3267,7 +3211,7 @@ export default function App() {
                             <span className="text-yellow-500">💬</span> 月度评论量对比
                         </h3>
                         <div className="h-56">
-                            <MonthlyCommentChart />
+                            <MonthlyCommentChart data={monthCommentComparisonData} monthA={monthA} monthB={monthB} />
                         </div>
                     </motion.div>
                 )}
@@ -3285,7 +3229,7 @@ export default function App() {
                             <span className="text-red-500">📈</span> 月度完播率和互动率对比
                         </h3>
                         <div className="h-56">
-                            <MonthlyRateChart />
+                            <MonthlyRateChart data={monthRateComparisonData} monthA={monthA} monthB={monthB} />
                         </div>
                     </motion.div>
                 )}
