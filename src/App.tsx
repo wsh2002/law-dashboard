@@ -338,10 +338,21 @@ export default function App() {
     });
   }, [dataDateRange, showAnalysis, platformTimeRanges, tabPlatforms]);
 
-  // 当切换标签页时，更新 selectedPlatform 为该标签页的平台选择
+  // 当切换标签页时，更新 selectedPlatform；若当前平台无数据则自动切到有数据的平台
   useEffect(() => {
-    setSelectedPlatform(tabPlatforms[activeTab]);
-  }, [activeTab, tabPlatforms]);
+    const platform = tabPlatforms[activeTab];
+    const allKeys: ('douyin' | 'kuaishou' | 'wechat')[] = ['douyin', 'kuaishou', 'wechat'];
+    const hasCurrent = platformData[platform]?.length > 0;
+    if (!hasCurrent) {
+      const fallback = allKeys.find(p => platformData[p]?.length > 0);
+      if (fallback) {
+        setTabPlatforms(() => Object.fromEntries(allKeys.map(k => [k, fallback])) as Record<string, 'douyin' | 'kuaishou' | 'wechat'>);
+        setSelectedPlatform(fallback);
+        return;
+      }
+    }
+    setSelectedPlatform(platform);
+  }, [activeTab, tabPlatforms, platformData]);
 
   // 平台选择处理函数
   const handlePlatformSelect = useCallback(async (platform: 'douyin' | 'kuaishou' | 'wechat') => {
