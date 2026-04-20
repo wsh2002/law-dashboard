@@ -272,6 +272,7 @@ const ViralVideosSection = () => {
 
             if (eventType === 'result' && data.subtitles) {
               console.log('收到结果，开始更新状态');
+              setTranscribeError(''); // 识别成功，立即清除状态提示
               setSubtitles(data.subtitles);
               const text = data.subtitles.map((s: { text: string }) => s.text).join('\n');
               setManualTranscript(text);
@@ -341,7 +342,8 @@ const ViralVideosSection = () => {
             } else if (eventType === 'queued') {
               setTranscribeError(`⏳ ${data.hint}`);
             } else if (eventType === 'progress') {
-              setTranscribeError(`⏳ 识别进度: ${data.progress}%`);
+              const pct = data.progress != null ? `${data.progress}%` : '处理中...';
+              setTranscribeError(`⏳ 识别进度: ${pct}`);
             }
           } catch (e) {
             console.error('解析 SSE 数据失败:', e);
@@ -356,18 +358,16 @@ const ViralVideosSection = () => {
       setTranscribeError('无法连接到识别服务,请确认 Whisper 服务已启动');
     }
     console.error('识别错误:', e);
-    // 错误时也更新状态
     if (currentVideo) {
-      console.log('识别错误，更新状态为 false');
       setIsDeepTranscribing(prev => ({ ...prev, [currentVideo.id]: false }));
     }
   } finally {
     clearTimeout(timeoutId);
-    // 再次确保状态被更新
     if (currentVideo) {
-      console.log('finally 块，更新状态为 false');
       setIsDeepTranscribing(prev => ({ ...prev, [currentVideo.id]: false }));
     }
+    // 识别完成后清除状态提示
+    setTranscribeError('');
   }
 };
 
@@ -625,6 +625,7 @@ ${analysisResult}
                             const data = JSON.parse(eventData);
 
                             if (eventType === 'result' && data.subtitles) {
+                              setTranscribeError(''); // 识别成功，立即清除状态提示
                               const text = data.subtitles.map((s: { text: string }) => s.text).join('\n');
 
                               // 保存到文案库
@@ -663,7 +664,8 @@ ${analysisResult}
                             } else if (eventType === 'queued') {
                               setTranscribeError(`⏳ ${data.hint}`);
                             } else if (eventType === 'progress') {
-                              setTranscribeError(`⏳ 识别进度: ${data.progress}%`);
+                              const pct = data.progress != null ? `${data.progress}%` : '处理中...';
+                              setTranscribeError(`⏳ 识别进度: ${pct}`);
                             }
                           } catch (e) {
                             console.error('解析 SSE 数据失败:', e);
@@ -681,6 +683,7 @@ ${analysisResult}
                   } finally {
                     clearTimeout(timeoutId);
                     setIsTranscribing(false);
+                    setTranscribeError('');
                   }
                 }
               }}

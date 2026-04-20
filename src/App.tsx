@@ -2658,9 +2658,9 @@ export default function App() {
                         <TrendingUp className="w-5 h-5 text-orange-500" />
                         粉丝增长趋势 (双轴)
                     </h3>
-                    <div className="h-64">
+                    <div className="h-80">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={finalDetailTrend} margin={{ top: 5, right: 30, left: 10, bottom: 5 }} barSize={4}>
+                            <BarChart data={finalDetailTrend.map((d: any) => ({ ...d, netFans: Math.max(0, d.netFans || 0), compareNetFans: Math.max(0, d.compareNetFans || 0) }))} margin={{ top: 5, right: 30, left: 10, bottom: 20 }} barSize={4}>
                                 <defs>
                                   <linearGradient id="colorNetFansCurrent" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%" stopColor="#f97316" stopOpacity={0.85}/>
@@ -2673,7 +2673,7 @@ export default function App() {
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                 <XAxis dataKey="date" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-                                <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f97316" tickLine={false} axisLine={{ stroke: '#f97316', strokeWidth: 1 }} label={{ value: '日增粉丝', angle: 90, position: 'insideRight', offset: 8, style: { fill: '#f97316', fontSize: 12 } }} />
+                                <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f97316" tickLine={false} axisLine={{ stroke: '#f97316', strokeWidth: 1 }} domain={[0, 'dataMax + 10']} label={{ value: '日增粉丝', angle: 90, position: 'insideRight', offset: 8, style: { fill: '#f97316', fontSize: 12 } }} />
                                 <Tooltip 
                                   content={<ComparisonTooltip />}
                                   contentStyle={{ 
