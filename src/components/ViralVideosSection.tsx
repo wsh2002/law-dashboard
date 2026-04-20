@@ -138,6 +138,8 @@ const ViralVideosSection = () => {
   const [analysisResult, setAnalysisResult] = useState<string>('');
   const [manualTranscript, setManualTranscript] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isSavingToLibrary, setIsSavingToLibrary] = useState(false);
+  const [savedToLibrary, setSavedToLibrary] = useState(false);
   const [analysisStep, setAnalysisStep] = useState<'idle' | 'analyzing'>('idle');
   const [activeTab, setActiveTab] = useState<'analysis' | 'document'>('document');
   const [scriptViewMode, setScriptViewMode] = useState<'timestamp' | 'plain'>('timestamp');
@@ -196,6 +198,7 @@ const ViralVideosSection = () => {
     setActiveTab('document');
     setTranscribeError('');
     setSubtitles(video.subtitles || []);
+    setSavedToLibrary(false);
 
     // 如果本地没有台词，尝试从云端加载其他人识别过的结果
     if (!video.content) {
@@ -1221,22 +1224,66 @@ ${analysisResult}
                    </button>
                  )}
                  {manualTranscript && activeTab === 'document' && (
-                   <button
-                     onClick={() => { setActiveTab('analysis'); handleStartAnalysis(); }}
-                     disabled={isAnalyzing}
-                     className={cn(
-                       "px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-2",
-                       isAnalyzing
-                         ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                         : "bg-purple-600 text-white hover:bg-purple-700 shadow-md shadow-purple-200"
-                     )}
-                   >
-                     {isAnalyzing ? (
-                       <><Loader2 className="w-4 h-4 animate-spin" /> 分析中...</>
-                     ) : (
-                       <><Sparkles className="w-4 h-4" /> 开始 AI 深度分析</>
-                     )}
-                   </button>
+                   <>
+                     <button
+                       onClick={async () => {
+                         if (!analyzingVideo || isSavingToLibrary || savedToLibrary) return;
+                         setIsSavingToLibrary(true);
+                         try {
+                           const scriptItem = {
+                             id: Date.now().toString(),
+                             video_id: analyzingVideo.id,
+                             title: analyzingVideo.title,
+                             author: analyzingVideo.author,
+                             platform: analyzingVideo.platform || 'douyin',
+                             content: manualTranscript,
+                             subtitles: subtitles,
+                             timestamp: new Date().toISOString()
+                           };
+                           const { error } = await supabase.from('script_library').insert(scriptItem);
+                           if (error) throw error;
+                           setSavedToLibrary(true);
+                         } catch (e) {
+                           alert('保存失败，请重试');
+                         } finally {
+                           setIsSavingToLibrary(false);
+                         }
+                       }}
+                       disabled={isSavingToLibrary || savedToLibrary}
+                       className={cn(
+                         "px-4 py-2 rounded-lg font-bold transition-all flex items-center gap-2 text-sm",
+                         savedToLibrary
+                           ? "bg-green-100 text-green-700 border border-green-300 cursor-default"
+                           : isSavingToLibrary
+                           ? "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed"
+                           : "bg-white text-blue-600 border border-blue-300 hover:bg-blue-50"
+                       )}
+                     >
+                       {isSavingToLibrary ? (
+                         <><Loader2 className="w-4 h-4 animate-spin" /> 保存中...</>
+                       ) : savedToLibrary ? (
+                         <><Book className="w-4 h-4" /> 已存入文案库</>
+                       ) : (
+                         <><Book className="w-4 h-4" /> 存入文案库</>
+                       )}
+                     </button>
+                     <button
+                       onClick={() => { setActiveTab('analysis'); handleStartAnalysis(); }}
+                       disabled={isAnalyzing}
+                       className={cn(
+                         "px-6 py-2 rounded-lg font-bold transition-all flex items-center gap-2",
+                         isAnalyzing
+                           ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                           : "bg-purple-600 text-white hover:bg-purple-700 shadow-md shadow-purple-200"
+                       )}
+                     >
+                       {isAnalyzing ? (
+                         <><Loader2 className="w-4 h-4 animate-spin" /> 分析中...</>
+                       ) : (
+                         <><Sparkles className="w-4 h-4" /> 开始 AI 深度分析</>
+                       )}
+                     </button>
+                   </>
                  )}
                  {analysisResult && activeTab === 'analysis' && (
                    <button
