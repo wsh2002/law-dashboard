@@ -686,12 +686,20 @@ export default function App() {
         // 上传数据后自动显示分析内容
         setShowAnalysis(true);
 
-        // 如果当前平台没有数据，自动切换到第一个有数据的平台
-        const platforms: ('douyin' | 'kuaishou' | 'wechat')[] = ['douyin', 'kuaishou', 'wechat'];
-        const hasDataForCurrent = groupedData[firstPlatform || 'douyin']?.length > 0;
-        if (!hasDataForCurrent) {
-            const fallback = platforms.find(p => groupedData[p]?.length > 0);
-            if (fallback) handlePlatformSelect(fallback);
+        // 找到第一个有数据的平台
+        const allPlatformKeys: ('douyin' | 'kuaishou' | 'wechat')[] = ['douyin', 'kuaishou', 'wechat'];
+        const targetPlatform = firstPlatform || allPlatformKeys.find(p => groupedData[p]?.length > 0);
+
+        if (targetPlatform) {
+            // 把所有 tab 都同步到这个平台，避免切换 tab 时平台不一致
+            setTabPlatforms({
+                overview: targetPlatform,
+                monthly: targetPlatform,
+                range: targetPlatform,
+                personal: targetPlatform,
+                viral: targetPlatform
+            });
+            setSelectedPlatform(targetPlatform);
         }
 
         // 如果没有识别到任何平台数据，提示用户检查文件名
