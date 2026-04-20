@@ -685,6 +685,20 @@ export default function App() {
         
         // 上传数据后自动显示分析内容
         setShowAnalysis(true);
+
+        // 如果当前平台没有数据，自动切换到第一个有数据的平台
+        const platforms: ('douyin' | 'kuaishou' | 'wechat')[] = ['douyin', 'kuaishou', 'wechat'];
+        const hasDataForCurrent = groupedData[firstPlatform || 'douyin']?.length > 0;
+        if (!hasDataForCurrent) {
+            const fallback = platforms.find(p => groupedData[p]?.length > 0);
+            if (fallback) handlePlatformSelect(fallback);
+        }
+
+        // 如果没有识别到任何平台数据，提示用户检查文件名
+        const totalLoaded = Object.values(groupedData).reduce((sum, arr) => sum + arr.length, 0);
+        if (totalLoaded === 0) {
+            alert('未能识别平台数据。\n\n请确保文件名包含平台名称，例如：\n• 抖音数据.xlsx\n• 快手数据.csv\n• 视频号数据.xlsx');
+        }
     }
   };
 
@@ -3028,7 +3042,8 @@ export default function App() {
         {activeTab === 'monthly' && showAnalysis && !(platformData[selectedPlatform]?.length > 0) && (
           <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-3">
             <span className="text-4xl">📂</span>
-            <p className="text-sm">当前平台暂无数据，请先上传 <strong>{selectedPlatform}</strong> 的数据文件</p>
+            <p className="text-sm">当前平台暂无数据，请先上传 <strong>{selectedPlatform === 'douyin' ? '抖音' : selectedPlatform === 'kuaishou' ? '快手' : '视频号'}</strong> 的数据文件</p>
+            <p className="text-xs text-gray-300">文件名需包含平台名称，如"抖音数据.xlsx"</p>
           </div>
         )}
         {activeTab === 'monthly' && showAnalysis && platformData[selectedPlatform]?.length > 0 && (
@@ -3304,7 +3319,8 @@ export default function App() {
         {activeTab === 'personal' && showAnalysis && !(platformData[selectedPlatform]?.length > 0) && (
           <div className="flex flex-col items-center justify-center h-64 text-gray-400 gap-3">
             <span className="text-4xl">📂</span>
-            <p className="text-sm">当前平台暂无数据，请先上传 <strong>{selectedPlatform}</strong> 的数据文件</p>
+            <p className="text-sm">当前平台暂无数据，请先上传 <strong>{selectedPlatform === 'douyin' ? '抖音' : selectedPlatform === 'kuaishou' ? '快手' : '视频号'}</strong> 的数据文件</p>
+            <p className="text-xs text-gray-300">文件名需包含平台名称，如"抖音数据.xlsx"</p>
           </div>
         )}
         {activeTab === 'personal' && showAnalysis && platformData[selectedPlatform]?.length > 0 && (
