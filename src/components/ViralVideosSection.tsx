@@ -183,9 +183,8 @@ const ViralVideosSection = () => {
   const [subtitles, setSubtitles] = useState<{ start: string; end: string; text: string }[]>([]);
 
   
-  const handleDeepAnalysis = (video: ViralVideo) => {
+  const handleDeepAnalysis = async (video: ViralVideo) => {
     setAnalyzingVideo(video);
-    // 检查分析缓存
     if (analysisCache[video.id]) {
       setAnalysisResult(analysisCache[video.id]);
       setActiveTab('analysis');
@@ -196,7 +195,24 @@ const ViralVideosSection = () => {
     setAnalysisStep('idle');
     setActiveTab('document');
     setTranscribeError('');
-        setSubtitles(video.subtitles || []);
+    setSubtitles(video.subtitles || []);
+
+    // 如果本地没有台词，尝试从云端加载其他人识别过的结果
+    if (!video.content) {
+      const { data } = await supabase
+        .from('video_transcripts')
+        .select('content, subtitles')
+        .eq('video_id', video.id)
+        .single();
+      if (data?.content) {
+        setManualTranscript(data.content);
+        setSubtitles(data.subtitles || []);
+        // 同步到本地，下次打开不用再请求
+        setVideos(prev => prev.map(v =>
+          v.id === video.id ? { ...v, content: data.content, subtitles: data.subtitles } : v
+        ));
+      }
+    }
   };
 
   // ✅ 自动识别函数（保留时间戳）
@@ -292,6 +308,16 @@ const ViralVideosSection = () => {
                   localStorage.setItem('viral_videos', JSON.stringify(videosToSave));
                   
                   return updatedVideos;
+                });
+
+                // 同步台词到云端，让其他用户打开同一视频时也能看到
+                supabase.from('video_transcripts').upsert({
+                  video_id: currentVideo.id,
+                  content: text,
+                  subtitles: data.subtitles,
+                  updated_at: new Date().toISOString()
+                }).then(({ error }) => {
+                  if (error) console.error('台词云端同步失败:', error);
                 });
 
                 // 保存到文案库
@@ -462,14 +488,19 @@ ${analysisResult}
         if (response.ok) {
           const realData = await response.json();
           const formatted = realData
-            .map((v: { title?: string; desc?: string; author?: string; likes?: number; digg?: number; comments?: number; comment?: number; shares?: number; views?: string; play?: string; publishTime?: string; time?: string; url?: string; duration?: string; cover?: string; platform?: string; content?: string; video_text?: string }, index: number) => {
+            .map((v: { title?: string; desc?: string; author?: string; likes?: number; digg?: number; comments?: number; comment?: number; shares?: number; views?: string; play?: string; publishTime?: string; time?: string; url?: string; duration?: string; cover?: string; platform?: string; content?: string; video_text?: string; id?: string | number }, index: number) => {
               let category: 'land' | 'general' = 'general';
               const titleText = (v.title || v.desc || '').toLowerCase();
               if (titleText.includes('征地') || titleText.includes('拆迁') || titleText.includes('补偿') || titleText.includes('土地') || titleText.includes('征收')) {
                 category = 'land';
               }
+              // 从 URL 中提取视频唯一 ID（如抖音 URL 末尾的数字），确保更新数据后 ID 不漂移
+              const urlId = (v.url || '').match(/video\/(\d+)/)?.[1];
+              const stableId = urlId
+                ? `real-${urlId}`
+                : `real-${(v.title || v.desc || '').slice(0, 20)}-${(v.author || '')}`.replace(/\s+/g, '_') || `real-${index}`;
               return {
-                id: `real-${index}`,
+                id: stableId,
                 rank: index + 1,
                 title: v.title || v.desc || '未知标题',
                 author: v.author || '未知作者',
@@ -1397,10 +1428,15 @@ ${analysisResult}
                             </div>
                           </div>
                           <button
-                            onClick={(e) => {
+                            onClick={async (e) => {
                               e.stopPropagation();
-                              // 从 Supabase 删除数据
-                              supabase.from('script_library').delete().eq('id', item.id);
+                              const { error } = await supabase.from('script_library').delete().eq('id', item.id);
+                              if (error) {
+                                console.error('删除失败:', error);
+                                alert('删除失败，请重试');
+                              } else {
+                                setScriptLibrary(prev => prev.filter(s => s.id !== item.id));
+                              }
                             }}
                             className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                           >
