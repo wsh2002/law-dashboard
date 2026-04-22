@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KpiStatCard } from '@/components/KpiStatCard';
 import { AppSidebar } from '@/components/AppSidebar';
-import { SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 
 // ---- 月度对比图表组件（定义在 App 外部，避免每次渲染重建组件类型导致图表空白）----
 const tooltipStyle = { borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255,255,255,0.95)', padding: '12px', fontSize: '14px' };
@@ -1727,6 +1727,7 @@ export default function App() {
   ));
 
   return (
+    <SidebarProvider defaultOpen>
     <div className="flex min-h-svh w-full text-slate-900">
       <AppSidebar
         activeTab={activeTab}
@@ -3811,5 +3812,6 @@ export default function App() {
         </div>
       </SidebarInset>
     </div>
+    </SidebarProvider>
   );
 }
