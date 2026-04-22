@@ -12,7 +12,13 @@ import { Upload, Calendar, ArrowUp, ArrowDown, FileSpreadsheet, TrendingUp, Acti
 // @ts-ignore
 import ReactWordcloud from 'react-wordcloud';
 import { format, parse, addDays, isValid, startOfDay, subDays, startOfMonth, subMonths, startOfWeek, endOfWeek, eachWeekOfInterval } from 'date-fns';
-import { cn } from './lib/utils';
+import { cn } from '@/lib/utils';
+import MyAgentPanel from './components/MyAgentPanel';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { KpiStatCard } from '@/components/KpiStatCard';
+import { AppSidebar } from '@/components/AppSidebar';
+import { SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 
 // ---- 月度对比图表组件（定义在 App 外部，避免每次渲染重建组件类型导致图表空白）----
 const tooltipStyle = { borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255,255,255,0.95)', padding: '12px', fontSize: '14px' };
@@ -94,7 +100,6 @@ const MonthlyRateChart = React.memo(({ data, monthA, monthB }: { data: any[]; mo
 const ViralVideosSection = lazy(() => import('./components/ViralVideosSection'));
 const AARRRAnalysis = lazy(() => import('./components/AARRRAnalysis'));
 const AIAnalysisCard = lazy(() => import('./components/AIAnalysisCard'));
-const AnimatedBackground = lazy(() => import('./components/AnimatedBackground'));
 const Login = lazy(() => import('./components/Login'));
 const PlatformChartsWrapper = lazy(() => import('./components/PlatformChartsWrapper'));
 
@@ -334,7 +339,7 @@ export default function App() {
     personal: 'douyin',
     viral: 'douyin'
   });
-  const [activeTab, setActiveTab] = useState<'overview' | 'monthly' | 'range' | 'personal' | 'viral' | 'platform'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'monthly' | 'range' | 'personal' | 'viral' | 'platform' | 'myAgent'>('overview');
   
 
   
@@ -418,6 +423,7 @@ export default function App() {
 
   // 当切换标签页时，更新 selectedPlatform；若当前平台无数据则自动切到有数据的平台
   useEffect(() => {
+    if (activeTab === 'myAgent' || activeTab === 'platform') return;
     const platform = tabPlatforms[activeTab];
     const allKeys: ('douyin' | 'kuaishou' | 'wechat')[] = ['douyin', 'kuaishou', 'wechat'];
     const hasCurrent = platformData[platform]?.length > 0;
@@ -1721,143 +1727,60 @@ export default function App() {
   ));
 
   return (
-    <div className="min-h-screen relative font-sans text-slate-800 overflow-x-hidden">
-      <Suspense fallback={<div className="flex justify-center items-center h-screen">加载中...</div>}>
-        <AnimatedBackground />
-      </Suspense>
-      <div className="max-w-7xl mx-auto space-y-4 p-4 sm:p-6 lg:p-8 relative z-10">
-        
-        {/* Header */}
-        <div className="relative max-w-3xl mx-auto">
-          
-          {/* 头部内容 */}
-          <motion.div
-            initial={{ opacity: 1, y: 0, height: 'auto' }}
-            animate={{ opacity: 1, y: 0, height: 'auto' }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-white/50 overflow-hidden"
-          >
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                <FileSpreadsheet className="w-6 h-6 text-blue-600" />
-                多平台运营诊断
-              </h1>
-              <p className="text-slate-500 mt-1 text-sm">支持 CSV/Excel 导入 · 自动识别日期范围</p>
-              {data.length > 0 && dataDateRange && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 bg-blue-50 border border-blue-100 text-blue-700 rounded-full text-xs font-medium"
-                >
-                  <Calendar className="w-3 h-3" />
-                  <span>数据统计范围: {dataDateRange.start} 至 {dataDateRange.end}</span>
-                </motion.div>
-              )}
-            </div>
-            
-            <div className="flex flex-col items-end gap-1 w-full md:w-auto">
-              <div className="flex flex-col sm:flex-row items-center gap-1 w-full md:w-auto">
-                <motion.label 
-                  whileHover={{ scale: 1.03, y: -1 }}
-                  whileTap={{ scale: 0.97 }}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-md cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md w-full sm:w-auto"
-                >
-                  <Upload className="w-4 h-4" />
-                  <span className="text-sm font-medium">上传</span>
-                  <input type="file" className="hidden" accept=".csv, .xlsx, .xls" onChange={handleFileUpload} multiple />
-                </motion.label>
-                 <motion.span 
-                   initial={{ opacity: 0, y: 5 }}
-                   animate={{ opacity: 1, y: 0 }}
-                   transition={{ delay: 0.2 }}
-                   className="text-[9px] text-gray-500 text-center sm:text-right"
-                 >
-                   200MB • CSV, XLSX, XLS
-                 </motion.span>
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[10px] text-gray-400 truncate max-w-[160px]">{session.user.email}</span>
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => supabase.auth.signOut()}
-                  className="flex items-center gap-1 px-2.5 py-1 text-xs text-gray-500 hover:text-red-500 border border-gray-200 hover:border-red-200 rounded-lg transition-all"
-                >
-                  退出登录
-                </motion.button>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="fixed left-4 top-20 z-50">
-          <div
-            className="bg-white/80 backdrop-blur-md border border-white/50 rounded-xl shadow-lg p-2"
-          >
-
-            {/* 导航菜单 */}
-            <motion.div
-              initial={{ opacity: 1 }}
-              animate={{ opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="bg-white/90 backdrop-blur-md border border-white/50 rounded-xl shadow-lg p-2 min-w-[180px] overflow-hidden flex flex-col"
-            >
-              <div className="flex flex-col gap-1">
-                {
-              [
-              { key: 'overview', label: '数据概览和AI诊断', icon: '📊' },
-              { key: 'platform', label: '平台数据对比', icon: '🔄' },
-              { key: 'monthly', label: '月度对比分析', icon: '📈' },
-              { key: 'range', label: '时段对比KPI', icon: '📅' },
-              { key: 'personal', label: '个人行业爆款视频', icon: '👤' },
-              { key: 'viral', label: '行业爆款视频', icon: '🔥' },
-              { key: 'coze', label: 'Coze智能体', icon: '🤖', url: 'https://www.coze.cn/store/agent/7626943462554435603?bot_id=true' }
-            ].map((tab) => (
-                  tab.url ? (
-                    <a
-                      key={tab.key}
-                      href={tab.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={cn(
-                        "relative px-3 py-1.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2",
-                        "text-gray-600 hover:bg-gray-100 hover:text-gray-800"
-                      )}
-                    >
-                      <span>{tab.icon}</span>
-                      <span>{tab.label}</span>
-                    </a>
-                  ) : (
-                    <button
-                      key={tab.key}
-                      onClick={() => setActiveTab(tab.key as any)}
-                      className={cn(
-                        "relative px-3 py-1.5 text-sm font-bold rounded-lg transition-all flex items-center gap-2",
-                        activeTab === tab.key
-                          ? "bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md"
-                          : "text-gray-600 hover:bg-gray-100 hover:text-gray-800"
-                      )}
-                    >
-                      <span>{tab.icon}</span>
-                      <span>{tab.label}</span>
-                      {activeTab === tab.key && (
-                        <motion.div 
-                          layoutId="activeTab"
-                          className="absolute right-0 top-0 bottom-0 w-0.5 bg-white"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                        />
-                      )}
-                    </button>
-                  )
-                ))}
-              </div>
-            </motion.div>
+    <div className="flex min-h-svh w-full text-slate-900">
+      <AppSidebar
+        activeTab={activeTab}
+        onSelect={(k) => setActiveTab(k as Parameters<typeof setActiveTab>[0])}
+      />
+      <SidebarInset className="min-w-0 border-slate-200 bg-slate-50/90">
+        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3 md:px-5">
+          <SidebarTrigger className="text-slate-600" />
+          <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+            <h1 className="truncate text-sm font-semibold tracking-tight text-slate-900 md:text-base">
+              多平台运营诊断
+            </h1>
+            {data.length > 0 && dataDateRange && (
+              <p className="text-xs text-slate-500">数据范围 {dataDateRange.start} – {dataDateRange.end}</p>
+            )}
+            {data.length === 0 && (
+              <p className="text-xs text-slate-500">支持 CSV/Excel 导入，自动识别日期范围</p>
+            )}
           </div>
-        </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="hidden text-xs text-slate-400 md:inline">200MB 内</span>
+            <Button
+              asChild
+              size="default"
+              className="bg-slate-900 text-white shadow-sm hover:bg-slate-800"
+            >
+              <label className="inline-flex cursor-pointer items-center gap-0">
+                <Upload data-icon="inline-start" />
+                <span className="pl-0.5">上传数据</span>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".csv, .xlsx, .xls"
+                  onChange={handleFileUpload}
+                  multiple
+                />
+              </label>
+            </Button>
+            <span className="hidden max-w-[10rem] truncate text-xs text-slate-500 md:inline" title={session.user.email ?? undefined}>
+              {session.user.email}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="border-slate-200 text-slate-700 shadow-sm"
+              onClick={() => supabase.auth.signOut()}
+            >
+              退出
+            </Button>
+          </div>
+        </header>
 
-        <div className="ml-24">
+        <div className="w-full min-w-0 space-y-5 p-4 md:space-y-6 md:p-6">
           {data.length > 0 ? (
           <>
 
@@ -1870,146 +1793,125 @@ export default function App() {
             transition={{ duration: 0.2 }}
             className="space-y-6"
           >
-            {/* 顶部 KPI 指标卡片 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.15 }}
-                whileHover={{ scale: 1.02, translateY: -2 }}
-                className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+            {/* 顶部 KPI：浅色卡片 + 色条/图标，偏现代后台而非炫彩大色块 */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
+              <KpiStatCard
+                label="总播放量"
+                sublabel="累计视频播放"
+                value={currentKPIs.views.toLocaleString()}
+                icon={Play}
+                delay={0}
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs opacity-80 font-medium">总播放量</span>
-                  <Play className="w-5 h-5 opacity-80" />
-                </div>
-                <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.views.toLocaleString()}</div>
-                <div className="flex items-center gap-2 text-xs opacity-70">
-                  <span>累计视频播放</span>
-                  {compareKPIs.views > 0 && (
-                    <span className={currentKPIs.views > compareKPIs.views ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
-                      {currentKPIs.views > compareKPIs.views ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                      {Math.abs(((currentKPIs.views - compareKPIs.views) / compareKPIs.views) * 100).toFixed(1)}%
-                    </span>
-                  )}
-                </div>
-              </motion.div>
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.15, delay: 0.05 }}
-                whileHover={{ scale: 1.02, translateY: -2 }}
-                className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+                {compareKPIs.views > 0 && (
+                  <span
+                    className={cn(
+                      'ml-auto inline-flex items-center gap-0.5 font-medium',
+                      currentKPIs.views > compareKPIs.views ? 'text-emerald-600' : 'text-rose-600'
+                    )}
+                  >
+                    {currentKPIs.views > compareKPIs.views ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}
+                    {Math.abs(((currentKPIs.views - compareKPIs.views) / compareKPIs.views) * 100).toFixed(1)}%
+                  </span>
+                )}
+              </KpiStatCard>
+              <KpiStatCard
+                label="总点赞量"
+                sublabel="用户互动点赞"
+                value={currentKPIs.likes.toLocaleString()}
+                icon={Heart}
+                delay={0.04}
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs opacity-80 font-medium">总点赞量</span>
-                  <Heart className="w-5 h-5 opacity-80" />
-                </div>
-                <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.likes.toLocaleString()}</div>
-                <div className="flex items-center gap-2 text-xs opacity-70">
-                  <span>用户互动点赞</span>
-                  {compareKPIs.likes > 0 && (
-                    <span className={currentKPIs.likes > compareKPIs.likes ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
-                      {currentKPIs.likes > compareKPIs.likes ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                      {Math.abs(((currentKPIs.likes - compareKPIs.likes) / compareKPIs.likes) * 100).toFixed(1)}%
-                    </span>
-                  )}
-                </div>
-              </motion.div>
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.15, delay: 0.1 }}
-                whileHover={{ scale: 1.02, translateY: -2 }}
-                className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+                {compareKPIs.likes > 0 && (
+                  <span
+                    className={cn(
+                      'ml-auto inline-flex items-center gap-0.5 font-medium',
+                      currentKPIs.likes > compareKPIs.likes ? 'text-emerald-600' : 'text-rose-600'
+                    )}
+                  >
+                    {currentKPIs.likes > compareKPIs.likes ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}
+                    {Math.abs(((currentKPIs.likes - compareKPIs.likes) / compareKPIs.likes) * 100).toFixed(1)}%
+                  </span>
+                )}
+              </KpiStatCard>
+              <KpiStatCard
+                label="粉丝净增"
+                sublabel="新增粉丝数量"
+                value={currentKPIs.netFans.toLocaleString()}
+                icon={Users}
+                delay={0.08}
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs opacity-80 font-medium">粉丝净增</span>
-                  <Users className="w-5 h-5 opacity-80" />
-                </div>
-                <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.netFans.toLocaleString()}</div>
-                <div className="flex items-center gap-2 text-xs opacity-70">
-                  <span>新增粉丝数量</span>
-                  {compareKPIs.netFans > 0 && (
-                    <span className={currentKPIs.netFans > compareKPIs.netFans ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
-                      {currentKPIs.netFans > compareKPIs.netFans ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                      {Math.abs(((currentKPIs.netFans - compareKPIs.netFans) / compareKPIs.netFans) * 100).toFixed(1)}%
-                    </span>
-                  )}
-                </div>
-              </motion.div>
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.15, delay: 0.15 }}
-                whileHover={{ scale: 1.02, translateY: -2 }}
-                className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+                {compareKPIs.netFans > 0 && (
+                  <span
+                    className={cn(
+                      'ml-auto inline-flex items-center gap-0.5 font-medium',
+                      currentKPIs.netFans > compareKPIs.netFans ? 'text-emerald-600' : 'text-rose-600'
+                    )}
+                  >
+                    {currentKPIs.netFans > compareKPIs.netFans ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}
+                    {Math.abs(((currentKPIs.netFans - compareKPIs.netFans) / compareKPIs.netFans) * 100).toFixed(1)}%
+                  </span>
+                )}
+              </KpiStatCard>
+              <KpiStatCard
+                label="总评论量"
+                sublabel="用户评论互动"
+                value={currentKPIs.comments.toLocaleString()}
+                icon={MessageCircle}
+                delay={0.12}
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs opacity-80 font-medium">总评论量</span>
-                  <MessageCircle className="w-5 h-5 opacity-80" />
-                </div>
-                <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.comments.toLocaleString()}</div>
-                <div className="flex items-center gap-2 text-xs opacity-70">
-                  <span>用户评论互动</span>
-                  {compareKPIs.comments > 0 && (
-                    <span className={currentKPIs.comments > compareKPIs.comments ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
-                      {currentKPIs.comments > compareKPIs.comments ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                      {Math.abs(((currentKPIs.comments - compareKPIs.comments) / compareKPIs.comments) * 100).toFixed(1)}%
-                    </span>
-                  )}
-                </div>
-              </motion.div>
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.15, delay: 0.2 }}
-                whileHover={{ scale: 1.02, translateY: -2 }}
-                className="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+                {compareKPIs.comments > 0 && (
+                  <span
+                    className={cn(
+                      'ml-auto inline-flex items-center gap-0.5 font-medium',
+                      currentKPIs.comments > compareKPIs.comments ? 'text-emerald-600' : 'text-rose-600'
+                    )}
+                  >
+                    {currentKPIs.comments > compareKPIs.comments ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}
+                    {Math.abs(((currentKPIs.comments - compareKPIs.comments) / compareKPIs.comments) * 100).toFixed(1)}%
+                  </span>
+                )}
+              </KpiStatCard>
+              <KpiStatCard
+                label="总转发量"
+                sublabel="内容传播分享"
+                value={currentKPIs.shares.toLocaleString()}
+                icon={Share2}
+                delay={0.16}
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs opacity-80 font-medium">总转发量</span>
-                  <Share2 className="w-5 h-5 opacity-80" />
-                </div>
-                <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.shares.toLocaleString()}</div>
-                <div className="flex items-center gap-2 text-xs opacity-70">
-                  <span>内容传播分享</span>
-                  {compareKPIs.shares > 0 && (
-                    <span className={currentKPIs.shares > compareKPIs.shares ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
-                      {currentKPIs.shares > compareKPIs.shares ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                      {Math.abs(((currentKPIs.shares - compareKPIs.shares) / compareKPIs.shares) * 100).toFixed(1)}%
-                    </span>
-                  )}
-                </div>
-              </motion.div>
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.15, delay: 0.25 }}
-                whileHover={{ scale: 1.02, translateY: -2 }}
-                className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-5 text-white shadow-xl relative overflow-hidden"
+                {compareKPIs.shares > 0 && (
+                  <span
+                    className={cn(
+                      'ml-auto inline-flex items-center gap-0.5 font-medium',
+                      currentKPIs.shares > compareKPIs.shares ? 'text-emerald-600' : 'text-rose-600'
+                    )}
+                  >
+                    {currentKPIs.shares > compareKPIs.shares ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}
+                    {Math.abs(((currentKPIs.shares - compareKPIs.shares) / compareKPIs.shares) * 100).toFixed(1)}%
+                  </span>
+                )}
+              </KpiStatCard>
+              <KpiStatCard
+                label="互动率"
+                sublabel="用户互动比例"
+                value={`${currentKPIs.avgInteractionRate.toFixed(2)}%`}
+                icon={Activity}
+                delay={0.2}
               >
-                <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs opacity-80 font-medium">互动率</span>
-                  <Activity className="w-5 h-5 opacity-80" />
-                </div>
-                <div className="text-2xl md:text-3xl font-bold mb-2">{currentKPIs.avgInteractionRate.toFixed(2)}%</div>
-                <div className="flex items-center gap-2 text-xs opacity-70">
-                  <span>用户互动比例</span>
-                  {compareKPIs.avgInteractionRate > 0 && (
-                    <span className={currentKPIs.avgInteractionRate > compareKPIs.avgInteractionRate ? "text-green-300 flex items-center" : "text-red-300 flex items-center"}>
-                    {currentKPIs.avgInteractionRate > compareKPIs.avgInteractionRate ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                    {Math.abs(((currentKPIs.avgInteractionRate - compareKPIs.avgInteractionRate) / compareKPIs.avgInteractionRate) * 100).toFixed(1)}%
-                    </span>
-                  )}
-                </div>
-              </motion.div>
+                {compareKPIs.avgInteractionRate > 0 && (
+                  <span
+                    className={cn(
+                      'ml-auto inline-flex items-center gap-0.5 font-medium',
+                      currentKPIs.avgInteractionRate > compareKPIs.avgInteractionRate ? 'text-emerald-600' : 'text-rose-600'
+                    )}
+                  >
+                    {currentKPIs.avgInteractionRate > compareKPIs.avgInteractionRate ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />}
+                    {Math.abs(
+                      ((currentKPIs.avgInteractionRate - compareKPIs.avgInteractionRate) / compareKPIs.avgInteractionRate) * 100
+                    ).toFixed(1)}
+                    %
+                  </span>
+                )}
+              </KpiStatCard>
             </div>
 
             {/* 整体数据趋势图表 */}
@@ -2017,13 +1919,14 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
-              className="bg-white/85 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
             >
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        <TrendingUp className="w-5 h-5 text-blue-600" />
+            <Card className="overflow-hidden rounded-lg border border-slate-200 bg-white p-0 shadow-sm ring-0">
+                <CardHeader className="border-b border-slate-200">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                        <TrendingUp className="shrink-0 text-slate-700" />
                         整体数据趋势
-                    </h3>
+                    </CardTitle>
                     <div className="flex flex-wrap items-center gap-3">
                         <div className="flex items-center gap-2 bg-white/70 p-2 rounded-lg border border-gray-200">
                             {platformData.douyin?.length > 0 && (
@@ -2199,7 +2102,9 @@ export default function App() {
                         </div>
                     </div>
                 </div>
-                <div className="h-[350px]">
+                </CardHeader>
+                <CardContent className="p-0">
+                <div className="h-[350px] px-4 pb-4 sm:px-6 sm:pb-6">
                     <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={trendData}>
                             <defs>
@@ -2244,6 +2149,8 @@ export default function App() {
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
+                </CardContent>
+            </Card>
             </motion.div>
 
             {/* 播放量与粉丝趋势图表 */}
@@ -2251,11 +2158,11 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2, delay: 0.05 }}
-              className="bg-white/85 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+              className="panel-surface p-6"
             >
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                       <TrendingUp className="w-5 h-5 text-blue-600" />
+                <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                       <TrendingUp className="shrink-0 text-slate-700" />
                        播放量与粉丝趋势 (Views & Fans)
                     </h3>
                     <div className="flex flex-wrap items-center gap-3">
@@ -2432,7 +2339,7 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2, delay: 0.1 }}
-              className="bg-white/85 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+              className="panel-surface p-6"
             >
                 <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                     <Activity className="w-5 h-5 text-purple-600" />
@@ -2448,7 +2355,7 @@ export default function App() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2, delay: 0.15 }}
-              className="bg-white/85 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+              className="panel-surface p-6"
             >
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -2530,7 +2437,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             viewport={{ once: true }}
-            className="bg-white/80 backdrop-blur-md p-4 rounded-xl shadow-lg border border-white/50 grid grid-cols-1 md:grid-cols-2 gap-4"
+            className="panel-surface grid grid-cols-1 gap-4 p-4 md:grid-cols-2"
         >
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
@@ -2637,7 +2544,7 @@ export default function App() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: 0.1 }}
-                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                    className="panel-surface p-6"
                 >
                     <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-orange-500" />
@@ -2684,7 +2591,7 @@ export default function App() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: 0.2 }}
-                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                    className="panel-surface p-6"
                 >
                     <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                         <Activity className="w-5 h-5 text-green-500" />
@@ -2721,7 +2628,7 @@ export default function App() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: 0.2 }}
-                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                    className="panel-surface p-6"
                 >
                     <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                         <Activity className="w-5 h-5 text-purple-500" />
@@ -2759,7 +2666,7 @@ export default function App() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: 0.3 }}
-                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                    className="panel-surface p-6"
                 >
                     <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-blue-500" />
@@ -2796,7 +2703,7 @@ export default function App() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: 0.3 }}
-                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                    className="panel-surface p-6"
                 >
                     <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-orange-500" />
@@ -2833,7 +2740,7 @@ export default function App() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: 0.4 }}
-                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                    className="panel-surface p-6"
                 >
                     <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                         <Heart className="w-5 h-5 text-pink-500" />
@@ -2871,7 +2778,7 @@ export default function App() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.5 }}
-                className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                className="panel-surface p-6"
             >
                 <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                     <GitMerge className="w-5 h-5 text-indigo-500" />
@@ -2920,7 +2827,7 @@ export default function App() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.5 }}
-                className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                className="panel-surface p-6"
             >
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                     <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -2960,49 +2867,8 @@ export default function App() {
                 </div>
             </motion.div>
         </div>
-
-
-
-
-
-
-
-
-
-
-
-
-      </div>
-    )}
-
-          </>
-        ) : (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center justify-center min-h-[60vh] text-center"
-          >
-            <div className="bg-white/80 backdrop-blur-md p-12 rounded-3xl shadow-xl border border-white/50 max-w-2xl">
-              <div className="bg-blue-100 p-6 rounded-full inline-flex mb-6">
-                <Upload className="w-12 h-12 text-blue-600" />
-              </div>
-              <h2 className="text-3xl font-bold text-gray-800 mb-4">开始您的数据分析之旅</h2>
-              <p className="text-lg text-gray-600 mb-8 max-w-md mx-auto">
-                请点击右上角的上传按钮，或直接将 CSV/Excel 文件拖入上方区域，即可生成全方位的运营诊断报表。
-              </p>
-              <div className="flex flex-wrap gap-4 justify-center text-sm text-gray-500">
-                <span className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full">
-                  <FileSpreadsheet className="w-4 h-4" /> 支持 .xlsx, .csv
-                </span>
-                <span className="flex items-center gap-2 px-3 py-1 bg-gray-100 rounded-full">
-                  <Activity className="w-4 h-4" /> 自动生成图表
-                </span>
-              </div>
-            </div>
-          </motion.div>
+        </div>
         )}
-
-
 
         {/* 月度对比分析 */}
         {activeTab === 'monthly' && showAnalysis && !(platformData[selectedPlatform]?.length > 0) && (
@@ -3168,7 +3034,7 @@ export default function App() {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ delay: 0.1 }}
-                        className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                        className="panel-surface p-6"
                     >
                         <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                             <span className="text-blue-500">📊</span> 月度播放量对比
@@ -3186,7 +3052,7 @@ export default function App() {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ delay: 0.1 }}
-                        className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                        className="panel-surface p-6"
                     >
                         <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                             <span className="text-green-500">📊</span> 其他月度指标对比
@@ -3208,7 +3074,7 @@ export default function App() {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ delay: 0.1 }}
-                        className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                        className="panel-surface p-6"
                     >
                         <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                             <span className="text-yellow-500">💬</span> 月度评论量对比
@@ -3226,7 +3092,7 @@ export default function App() {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ delay: 0.1 }}
-                        className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                        className="panel-surface p-6"
                     >
                         <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                             <span className="text-red-500">📈</span> 月度完播率和互动率对比
@@ -3247,7 +3113,7 @@ export default function App() {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ delay: 0.2 }}
-                        className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                        className="panel-surface p-6"
                     >
                         <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                             <Calendar className="w-5 h-5 text-blue-500" />
@@ -3266,7 +3132,7 @@ export default function App() {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ delay: 0.3 }}
-                    className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                    className="panel-surface p-6"
                 >
                     <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-green-500" />
@@ -3302,7 +3168,7 @@ export default function App() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: 0.3 }}
-                    className="bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-white/50 overflow-hidden"
+                    className="panel-surface overflow-hidden"
                 >
                     <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -3568,7 +3434,7 @@ export default function App() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: 0.4 }}
-                    className="bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-white/50 overflow-hidden"
+                    className="panel-surface overflow-hidden"
                 >
                     <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -3627,7 +3493,7 @@ export default function App() {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ delay: 0.3 }}
-                        className="bg-white/80 backdrop-blur-md p-6 rounded-xl shadow-lg border border-white/50"
+                        className="panel-surface p-6"
                     >
                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
                             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -3889,7 +3755,7 @@ export default function App() {
                         </div>
                     </motion.div>
                 ) : (
-                    <div className="bg-white/80 backdrop-blur-md p-12 rounded-xl shadow-lg border border-white/50 flex flex-col items-center justify-center">
+                    <div className="panel-surface flex flex-col items-center justify-center p-12">
                         <Activity className="w-16 h-16 text-gray-400 mb-4" />
                         <h3 className="text-lg font-bold text-gray-700 mb-2">暂无平台数据</h3>
                         <p className="text-gray-500 text-center mb-6">请先上传Excel文件数据，然后再查看平台数据对比</p>
@@ -3904,8 +3770,46 @@ export default function App() {
             </motion.div>
         )}
 
+        </>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex min-h-[50vh] flex-col items-center justify-center p-4 text-center"
+          >
+            <div className="panel-surface flex max-w-2xl flex-col p-10 md:p-12">
+              <div className="mb-6 inline-flex rounded-full bg-slate-100 p-6">
+                <Upload className="h-12 w-12 text-slate-700" />
+              </div>
+              <h2 className="mb-3 text-2xl font-semibold text-slate-900 md:text-3xl">开始您的数据分析之旅</h2>
+              <p className="mb-6 max-w-md text-slate-600">
+                请使用顶栏「上传数据」导入 CSV/Excel，即可生成就绪的运营诊断与图表。
+              </p>
+              <div className="flex flex-wrap justify-center gap-2 text-sm text-slate-500">
+                <span className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5">
+                  <FileSpreadsheet className="h-4 w-4" /> 支持 .xlsx, .csv
+                </span>
+                <span className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5">
+                  <Activity className="h-4 w-4" /> 自动生成图表
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'myAgent' && (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="space-y-4"
+          >
+            <MyAgentPanel userId={userId} />
+          </motion.div>
+        )}
+
         </div>
-      </div>
+      </SidebarInset>
     </div>
   );
 }

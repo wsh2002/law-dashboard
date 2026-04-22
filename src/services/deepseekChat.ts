@@ -1,0 +1,78 @@
+/** DeepSeek 官方 API（OpenAI 兼容），deepseek-chat 对应 DeepSeek-V3.2 非思考模式 */
+
+import type { ZhipuMessage } from './zhipuChat';
+
+function parseErrorBody(text: string): string {
+  try {
+    const j = JSON.parse(text) as { error?: { message?: string }; message?: string };
+    return j.error?.message ?? j.message ?? text;
+  } catch {
+    return text;
+  }
+}
+
+export type DeepseekChatOptions = {
+  temperature?: number;
+  max_tokens?: number;
+  signal?: AbortSignal;
+};
+
+/**
+ * 开发：走 `/api/deepseek` 代理 + DEEPSEEK_API_KEY。
+ * 生产：需 VITE_DEEPSEEK_API_KEY 直连（会进入打包产物）。
+ */
+export async function deepseekChatCompletion(
+  messages: ZhipuMessage[],
+  options?: DeepseekChatOptions
+): Promise<string> {
+  const temperature = options?.temperature ?? 0.75;
+  const max_tokens = options?.max_tokens ?? 8192;
+
+  const isDev = import.meta.env.DEV;
+  const url = isDev
+    ? '/api/deepseek/chat/completions'
+    : 'https://api.deepseek.com/chat/completions';
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  const viteKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+  if (viteKey) {
+    headers.Authorization = `Bearer ${viteKey}`;
+  } else if (!isDev) {
+    throw new Error(
+      '未配置 DeepSeek：请在 law-dashboard/.env 中设置 VITE_DEEPSEEK_API_KEY；本地开发可只设 DEEPSEEK_API_KEY 由代理转发。'
+    );
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers,
+    signal: options?.signal,
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages,
+      temperature,
+      max_tokens,
+    }),
+  });
+
+  const raw = await res.text();
+  if (!res.ok) {
+    throw new Error(parseErrorBody(raw) || `请求失败 HTTP ${res.status}`);
+  }
+
+  let data: { choices?: { message?: { content?: string | null } }[] };
+  try {
+    data = JSON.parse(raw) as typeof data;
+  } catch {
+    throw new Error('响应不是合法 JSON');
+  }
+
+  const content = data.choices?.[0]?.message?.content;
+  if (typeof content !== 'string' || !content.trim()) {
+    throw new Error('模型未返回有效内容');
+  }
+  return content;
+}
