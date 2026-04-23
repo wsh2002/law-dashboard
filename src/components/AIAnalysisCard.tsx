@@ -484,7 +484,7 @@ const AIAnalysisCard = ({ data, title, mode = 'all', platform = 'default' }: AIA
         {mode !== 'aarrr-only' && (
         <div className="space-y-4">
              {aiResult ? (
-                 <div className="h-full bg-white/80 p-4 rounded-lg border border-indigo-100 shadow-inner overflow-y-auto max-h-[400px]">
+                 <div className="h-full bg-white/80 p-4 rounded-lg border border-indigo-100 shadow-inner overflow-y-auto max-h-[700px]">
                      <div className="prose prose-sm prose-indigo max-w-none">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-bold text-indigo-600 px-2 py-0.5 bg-indigo-50 rounded">✨ AI 深度分析报告</span>
