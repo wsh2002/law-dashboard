@@ -3,7 +3,9 @@ import { motion } from 'framer-motion';
 import { Sparkles, TrendingUp, AlertTriangle, Lightbulb, CheckCircle2, Settings, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { DataItem } from '../App';
+import { normalizeAIReportMarkdown } from '../utils/aiReportMarkdown';
 import { AIAnalysisConfig, DEFAULT_CONFIG, generateAnalysisPrompt, fetchAIAnalysis } from '../services/aiAnalysis';
 
 interface AIAnalysisCardProps {
@@ -485,7 +487,7 @@ const AIAnalysisCard = ({ data, title, mode = 'all', platform = 'default' }: AIA
         <div className="space-y-4">
              {aiResult ? (
                  <div className="h-full bg-white/80 p-4 rounded-lg border border-indigo-100 shadow-inner overflow-y-auto max-h-[700px]">
-                     <div className="prose prose-sm prose-indigo max-w-none">
+                     <div className="prose prose-sm prose-indigo max-w-none prose-headings:scroll-mt-4 prose-p:leading-relaxed">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-bold text-indigo-600 px-2 py-0.5 bg-indigo-50 rounded">✨ AI 深度分析报告</span>
                             <button onClick={() => {
@@ -493,7 +495,32 @@ const AIAnalysisCard = ({ data, title, mode = 'all', platform = 'default' }: AIA
                               localStorage.removeItem(`ai_result_${platform}`);
                             }} className="text-xs text-gray-400 hover:text-gray-600">清除</button>
                         </div>
-                        <ReactMarkdown>{aiResult}</ReactMarkdown>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            table: ({ children, ...rest }) => (
+                              <div className="not-prose my-3 w-full max-w-full overflow-x-auto rounded-lg border border-slate-200/90 bg-slate-50/40 shadow-sm">
+                                <table className="w-full min-w-[28rem] border-collapse text-left text-[13px] leading-snug text-slate-800" {...rest}>
+                                  {children}
+                                </table>
+                              </div>
+                            ),
+                            thead: ({ children, ...rest }) => <thead className="text-indigo-900" {...rest}>{children}</thead>,
+                            th: ({ children, ...rest }) => (
+                              <th className="whitespace-nowrap border-b-2 border-indigo-200/80 bg-indigo-50/90 px-2.5 py-2 text-xs font-semibold" {...rest}>
+                                {children}
+                              </th>
+                            ),
+                            td: ({ children, ...rest }) => (
+                              <td className="border-b border-slate-100/90 px-2.5 py-2 align-top text-xs [&_p]:my-0" {...rest}>
+                                {children}
+                              </td>
+                            ),
+                            tr: ({ children, ...rest }) => <tr className="even:bg-white/60" {...rest}>{children}</tr>,
+                          }}
+                        >
+                          {normalizeAIReportMarkdown(aiResult)}
+                        </ReactMarkdown>
                      </div>
                  </div>
              ) : (
