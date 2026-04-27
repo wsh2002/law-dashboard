@@ -466,7 +466,7 @@ ${manualTranscript}
 
 ---
 
-## 3. AI 深度拆解分析 (DeepSeek-V3.2)
+## 3. AI 深度拆解分析 (deepseek-v4-flash)
 ${analysisResult}
     `.trim();
 
@@ -1068,7 +1068,7 @@ ${analysisResult}
                       isAnalyzing && analysisStep === 'analyzing' ? (
                         <div className="py-20 flex flex-col items-center justify-center text-gray-400">
                           <Loader2 className="w-10 h-10 animate-spin text-purple-600 mb-4" />
-                          <p className="text-lg font-medium text-gray-600">DeepSeek-V3.2 正在进行深度分析...</p>
+                          <p className="text-lg font-medium text-gray-600">deepseek-v4-flash 正在进行深度分析...</p>
                           <p className="text-sm mt-2">正在分析法律核心、视觉策略与用户心理</p>
                         </div>
                       ) : analysisResult ? (
@@ -1216,7 +1216,7 @@ ${analysisResult}
               <div className="p-6 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
                <div className="text-xs text-gray-400 flex items-center gap-2">
                  <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                 由 DeepSeek-V3.2 提供 AI 分析能力
+                 由 deepseek-v4-flash 提供 AI 分析能力
                </div>
                <div className="flex items-center gap-3">
                  {analysisResult && (

@@ -9,13 +9,13 @@ export interface AIAnalysisConfig {
 export const DEFAULT_CONFIG: AIAnalysisConfig = {
   apiKey: 'sk-be6a2391b68e4bddade06a308adbe6b1',
   baseUrl: 'https://api.deepseek.com',
-  model: 'deepseek-chat',
+  model: 'deepseek-v4-flash',
 };
 
 export const getProviderModels = () => {
   return {
     R1: 'deepseek-reasoning',
-    V3: 'deepseek-chat'
+    V3: 'deepseek-v4-flash'
   };
 };
 

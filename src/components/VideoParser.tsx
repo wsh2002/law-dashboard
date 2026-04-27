@@ -131,7 +131,7 @@ export const VideoParser: React.FC = () => {
       </button>
 
       <p className="text-xs text-gray-400 text-center mt-3">
-        视频转文档使用 <strong>DeepSeek R1</strong> 模型，深度分析使用 <strong>DeepSeek V3.2</strong> 模型
+        视频转文档使用 <strong>DeepSeek R1</strong> 模型，深度分析使用 <strong>deepseek-v4-flash</strong> 模型
       </p>
 
       {/* AI Analysis Modal */}
@@ -165,7 +165,7 @@ export const VideoParser: React.FC = () => {
                 {analysisStep === 'analyzing' && (
                   <div className="flex flex-col items-center justify-center py-12">
                     <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mb-4" />
-                    <p className="text-gray-600 font-medium">正在使用 <strong>DeepSeek V3.2</strong> 模型进行深度分析...</p>
+                    <p className="text-gray-600 font-medium">正在使用 <strong>deepseek-v4-flash</strong> 模型进行深度分析...</p>
                   </div>
                 )}
                 
