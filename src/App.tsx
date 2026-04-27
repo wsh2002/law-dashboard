@@ -2380,7 +2380,7 @@ export default function App() {
                     </div>
                 </div>
                 <Suspense fallback={<div className="flex justify-center items-center h-64">加载中...</div>}>
-                    <AIAnalysisCard data={aiData} title="AI 智能运营诊断 (Intelligent Advisor)" mode="general-only" platform={selectedPlatform} />
+                    <AIAnalysisCard data={aiData} title="deepseek-v4-flash" mode="general-only" platform={selectedPlatform} />
                 </Suspense>
             </motion.div>
         </motion.div>

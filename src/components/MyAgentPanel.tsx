@@ -615,7 +615,7 @@ export default function MyAgentPanel({ userId }: { userId: string }) {
                         aria-label="选择对话模型"
                       >
                         <option value="zhipu">智谱 GLM-4.5-Air</option>
-                        <option value="deepseek">DeepSeek V3.2</option>
+                        <option value="deepseek">deepseek-v4-flash</option>
                         <option value="doubao">Doubao-Seed-2.0-pro</option>
                         <option value="qwen">qwen3.6-plus</option>
                       </select>

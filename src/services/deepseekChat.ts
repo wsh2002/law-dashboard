@@ -1,4 +1,4 @@
-/** DeepSeek 官方 API（OpenAI 兼容），deepseek-chat 对应 DeepSeek-V3.2 非思考模式 */
+/** DeepSeek 官方 API（OpenAI 兼容），用于文案助手的 DeepSeek 模型 */
 
 import type { ZhipuMessage } from './zhipuChat';
 
@@ -51,7 +51,7 @@ export async function deepseekChatCompletion(
     headers,
     signal: options?.signal,
     body: JSON.stringify({
-      model: 'deepseek-chat',
+      model: 'deepseek-v4-flash',
       messages,
       temperature,
       max_tokens,
