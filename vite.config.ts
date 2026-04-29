@@ -71,48 +71,32 @@ export default defineConfig(({ mode }) => {
         target: 'https://open.bigmodel.cn',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/zhipu/, '/api/paas/v4'),
-        configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq) => {
-            if (zhipuKey) {
-              proxyReq.setHeader('Authorization', `Bearer ${zhipuKey}`)
-            }
-          })
+        headers: {
+          'Authorization': `Bearer ${zhipuKey}`,
         },
       },
       '/api/deepseek': {
         target: 'https://api.deepseek.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/deepseek/, ''),
-        configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq) => {
-            if (deepseekKey) {
-              proxyReq.setHeader('Authorization', `Bearer ${deepseekKey}`)
-            }
-          })
+        headers: {
+          'Authorization': `Bearer ${deepseekKey}`,
         },
       },
       '/api/doubao': {
         target: 'https://ark.cn-beijing.volces.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/doubao/, '/api/v3'),
-        configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq) => {
-            if (doubaoKey) {
-              proxyReq.setHeader('Authorization', `Bearer ${doubaoKey}`)
-            }
-          })
+        headers: {
+          'Authorization': `Bearer ${doubaoKey}`,
         },
       },
       '/api/qwen': {
         target: 'https://dashscope.aliyuncs.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/qwen/, '/compatible-mode/v1'),
-        configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq) => {
-            if (dashscopeKey) {
-              proxyReq.setHeader('Authorization', `Bearer ${dashscopeKey}`)
-            }
-          })
+        headers: {
+          'Authorization': `Bearer ${dashscopeKey}`,
         },
       },
     }
