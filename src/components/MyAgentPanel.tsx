@@ -215,7 +215,8 @@ export default function MyAgentPanel({ userId }: { userId: string }) {
   }, [userId]);
 
   useEffect(() => {
-    // 1. 先从 localStorage 立即渲染（无网络延迟）
+    let cancelled = false;
+
     const { sessions: local, activeId: localActiveId } = loadAgentSessions(userId);
     if (local.length > 0) {
       const aid = localActiveId && local.some((x) => x.id === localActiveId) ? localActiveId : local[0].id;
@@ -224,9 +225,9 @@ export default function MyAgentPanel({ userId }: { userId: string }) {
       setHydrated(true);
     }
 
-    // 2. 从 Supabase 拉取云端数据（换机/清缓存后也能恢复）
     loadAgentSessionsRemote(userId)
       .then((remote) => {
+        if (cancelled) return;
         if (remote.length > 0) {
           setSessions(remote);
           setActiveSessionId((prev) =>
@@ -234,7 +235,6 @@ export default function MyAgentPanel({ userId }: { userId: string }) {
           );
           persistAgentSessions(remote, remote[0].id, userId);
         } else if (local.length === 0) {
-          // 云端和本地都没有数据，创建初始会话
           const s = createAgentSession([...INITIAL_MESSAGES]);
           setSessions([s]);
           setActiveSessionId(s.id);
@@ -243,7 +243,7 @@ export default function MyAgentPanel({ userId }: { userId: string }) {
         }
       })
       .catch(() => {
-        // 网络失败，退回本地数据
+        if (cancelled) return;
         if (local.length === 0) {
           const s = createAgentSession([...INITIAL_MESSAGES]);
           setSessions([s]);
@@ -251,13 +251,20 @@ export default function MyAgentPanel({ userId }: { userId: string }) {
         }
       })
       .finally(() => {
-        setHydrated(true);
+        if (!cancelled) setHydrated(true);
       });
+
+    return () => { cancelled = true; };
   }, [userId]);
 
+  const persistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!hydrated || !activeSessionId) return;
-    persistAgentSessions(sessions, activeSessionId, userId);
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = setTimeout(() => {
+      persistAgentSessions(sessions, activeSessionId, userId);
+    }, 300);
+    return () => { if (persistTimerRef.current) clearTimeout(persistTimerRef.current); };
   }, [sessions, activeSessionId, hydrated, userId]);
 
   // 仅在会话内容实际变化时才写 Supabase（按 updatedAt 判断，避免频繁写入）
@@ -474,17 +481,17 @@ export default function MyAgentPanel({ userId }: { userId: string }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-      className="relative mx-auto max-w-6xl space-y-5"
+      className="relative min-h-[calc(100svh-60px)] bg-slate-50/80"
     >
       <div
         className="pointer-events-none absolute -top-24 left-1/2 h-64 w-[min(100%,48rem)] -translate-x-1/2 rounded-full bg-gradient-to-r from-violet-400/20 via-indigo-300/15 to-cyan-300/20 blur-3xl"
         aria-hidden
       />
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,220px)_1fr]">
+      <div className="relative grid h-[calc(100svh-60px)] grid-cols-1 gap-0 lg:grid-cols-[minmax(0,240px)_1fr]">
         {/* 历史会话 */}
-        <aside className="order-2 flex flex-col gap-2 lg:order-1">
-          <div className="flex items-center justify-between gap-2 rounded-2xl border border-white/70 bg-white/75 px-3 py-2.5 shadow-sm backdrop-blur-xl">
+        <aside className="order-2 flex flex-col gap-2 overflow-hidden border-r border-slate-200/60 bg-white/60 px-3 py-3 lg:order-1">
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-200/70 bg-white/90 px-3 py-2.5 shadow-sm">
             <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
               <MessageSquare className="h-3.5 w-3.5 text-indigo-500" />
               历史对话
@@ -499,7 +506,7 @@ export default function MyAgentPanel({ userId }: { userId: string }) {
               新建
             </button>
           </div>
-          <div className="max-h-[min(40vh,320px)] space-y-1.5 overflow-y-auto rounded-2xl border border-white/70 bg-white/60 p-2 shadow-sm backdrop-blur-xl lg:max-h-[min(70vh,560px)]">
+          <div className="flex-1 space-y-1.5 overflow-y-auto rounded-xl border border-slate-200/70 bg-white/80 p-2 shadow-sm">
             {sortedSessions.map((s) => (
               <div
                 key={s.id}
@@ -534,7 +541,7 @@ export default function MyAgentPanel({ userId }: { userId: string }) {
             ))}
           </div>
 
-          <div className="rounded-2xl border border-white/70 bg-white/75 p-3 shadow-sm backdrop-blur-xl">
+          <div className="shrink-0 rounded-xl border border-slate-200/70 bg-white/90 p-3 shadow-sm">
             <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
               <FileText className="h-3.5 w-3.5 shrink-0 text-amber-600" />
               文案风格参考
@@ -586,9 +593,9 @@ export default function MyAgentPanel({ userId }: { userId: string }) {
           </div>
         </aside>
 
-        <div className="order-1 space-y-5 lg:order-2">
+        <div className="order-1 flex flex-col overflow-hidden lg:order-2">
           {/* 标题卡 */}
-          <div className="relative overflow-hidden rounded-2xl border border-white/70 bg-white/75 p-1 shadow-[0_20px_50px_-12px_rgba(99,102,241,0.15)] backdrop-blur-xl">
+          <div className="relative shrink-0 overflow-hidden border-b border-slate-200/60 bg-white/85 p-1 backdrop-blur-xl">
             <div className="absolute inset-0 bg-gradient-to-br from-violet-50/90 via-white/40 to-indigo-50/50" />
             <div className="relative flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
               <div className="flex min-w-0 gap-4">
@@ -671,12 +678,12 @@ export default function MyAgentPanel({ userId }: { userId: string }) {
           </div>
 
           {/* 对话主卡片 */}
-          <div className="relative overflow-hidden rounded-2xl border border-white/80 bg-white/70 shadow-[0_25px_60px_-15px_rgba(15,23,42,0.12)] backdrop-blur-xl">
+          <div className="relative flex flex-1 flex-col overflow-hidden bg-white/50">
             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-violet-300/50 to-transparent" />
 
             <div
               ref={scrollRef}
-              className="agent-chat-scroll max-h-[min(70vh,640px)] min-h-[380px] space-y-5 overflow-y-auto px-4 py-6 sm:px-6"
+              className="agent-chat-scroll flex-1 space-y-5 overflow-y-auto px-4 py-6 sm:px-6"
             >
               {messages.map((m, idx) => (
                 <motion.div

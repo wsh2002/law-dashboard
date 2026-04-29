@@ -31,11 +31,7 @@ export async function qwenDashscopeChatCompletion(
   const temperature = options?.temperature ?? 0.75;
   const max_tokens = options?.max_tokens ?? 8192;
 
-  const isDev = import.meta.env.DEV;
-  const prodBase =
-    (import.meta.env.VITE_DASHSCOPE_BASE_URL as string | undefined)?.trim() ||
-    'https://dashscope.aliyuncs.com/compatible-mode/v1';
-  const url = isDev ? '/api/qwen/chat/completions' : `${prodBase.replace(/\/$/, '')}/chat/completions`;
+  const url = '/api/qwen/chat/completions';
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -44,10 +40,6 @@ export async function qwenDashscopeChatCompletion(
   const viteKey = import.meta.env.VITE_DASHSCOPE_API_KEY;
   if (viteKey) {
     headers.Authorization = `Bearer ${viteKey}`;
-  } else if (!isDev) {
-    throw new Error(
-      '未配置通义：请在 law-dashboard/.env 中设置 VITE_DASHSCOPE_API_KEY；本地开发可只设 DASHSCOPE_API_KEY 由代理转发。'
-    );
   }
 
   const res = await fetch(url, {

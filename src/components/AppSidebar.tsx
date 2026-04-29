@@ -1,4 +1,4 @@
-import { Bot, CalendarRange, Flame, GitCompare, LayoutDashboard, Sparkles, TrendingUp, User } from 'lucide-react'
+import { Bot, CalendarRange, Flame, GitCompare, LayoutDashboard, Sparkles, TrendingUp, User, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   Sidebar,
@@ -12,6 +12,7 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from '@/components/ui/sidebar'
+
 const WORKSPACE = [
   { key: 'overview', label: '数据概览和AI诊断', icon: LayoutDashboard },
   { key: 'platform', label: '平台数据对比', icon: GitCompare },
@@ -26,20 +27,29 @@ const COZE_HREF = 'https://www.coze.cn/store/agent/7626943462554435603?bot_id=tr
 type Props = {
   activeTab: string
   onSelect: (key: string) => void
+  userEmail?: string
+  onLogout?: () => void
 }
 
-export function AppSidebar({ activeTab, onSelect }: Props) {
+export function AppSidebar({ activeTab, onSelect, userEmail, onLogout }: Props) {
   return (
-    <Sidebar collapsible="offcanvas" className="border-slate-200">
-      <SidebarHeader className="border-b border-slate-200 px-2 py-3">
-        <div className="flex flex-col gap-0.5 px-2">
-          <span className="text-xs font-semibold uppercase tracking-widest text-slate-500">企业诊断</span>
-          <span className="text-sm font-semibold text-slate-900">多平台运营</span>
+    <Sidebar collapsible="offcanvas" className="border-r-0">
+      <SidebarHeader className="border-b border-slate-200/60 px-4 py-4">
+        <div className="flex items-center gap-3 px-0.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 shadow-sm">
+            <BarChart3 className="h-4.5 w-4.5 text-white" />
+          </div>
+          <div className="flex flex-col gap-0">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-slate-400">企业诊断</span>
+            <span className="text-sm font-bold text-slate-900 tracking-tight">多平台运营</span>
+          </div>
         </div>
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="px-2">
         <SidebarGroup>
-          <SidebarGroupLabel>工作区</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-[10px] uppercase tracking-[0.12em] text-slate-400 font-semibold px-2">
+            工作区
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {WORKSPACE.map((item) => {
@@ -52,13 +62,15 @@ export function AppSidebar({ activeTab, onSelect }: Props) {
                       isActive={isActive}
                       onClick={() => onSelect(item.key)}
                       className={cn(
-                        isActive &&
-                          '!bg-slate-900 !text-white hover:!bg-slate-800 hover:!text-white data-[active=true]:!bg-slate-900 data-[active=true]:!text-white'
+                        'rounded-lg transition-all duration-200',
+                        isActive
+                          ? '!bg-gradient-to-r !from-slate-800 !to-slate-900 !text-white !shadow-sm hover:!from-slate-700 hover:!to-slate-800 data-[active=true]:!bg-slate-900 data-[active=true]:!text-white'
+                          : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
                       )}
                       tooltip={item.label}
                     >
-                      <Icon />
-                      <span>{item.label}</span>
+                      <Icon className={cn('shrink-0', isActive ? 'text-blue-300' : '')} />
+                      <span className="font-medium">{item.label}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )
@@ -66,21 +78,23 @@ export function AppSidebar({ activeTab, onSelect }: Props) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarSeparator className="bg-slate-200" />
+        <SidebarSeparator className="bg-slate-200/60 mx-2" />
         <SidebarGroup>
-          <SidebarGroupLabel>工具</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-[10px] uppercase tracking-[0.12em] text-slate-400 font-semibold px-2">
+            工具
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
                   isActive={false}
-                  className="text-slate-700"
+                  className="rounded-lg text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 transition-all duration-200"
                   tooltip="Coze 智能体"
                 >
                   <a href={COZE_HREF} target="_blank" rel="noopener noreferrer">
                     <Bot />
-                    <span>Coze 智能体</span>
+                    <span className="font-medium">Coze 智能体</span>
                   </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -90,19 +104,43 @@ export function AppSidebar({ activeTab, onSelect }: Props) {
                   isActive={activeTab === 'myAgent'}
                   onClick={() => onSelect('myAgent')}
                   className={cn(
-                    activeTab === 'myAgent' &&
-                      '!bg-slate-900 !text-white hover:!bg-slate-800 data-[active=true]:!bg-slate-900'
+                    'rounded-lg transition-all duration-200',
+                    activeTab === 'myAgent'
+                      ? '!bg-gradient-to-r !from-slate-800 !to-slate-900 !text-white !shadow-sm hover:!from-slate-700 hover:!to-slate-800 data-[active=true]:!bg-slate-900'
+                      : 'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900'
                   )}
                   tooltip="我的智能体"
                 >
-                  <Sparkles />
-                  <span>我的智能体</span>
+                  <Sparkles className={cn(activeTab === 'myAgent' ? 'text-amber-300' : '')} />
+                  <span className="font-medium">我的智能体</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      {/* 底部用户信息区域 */}
+      {userEmail && (
+        <div className="mt-auto border-t border-slate-200/60 p-3">
+          <div className="flex items-center gap-2.5 rounded-lg bg-slate-50/80 px-3 py-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-violet-500 text-xs font-bold text-white shadow-sm">
+              {userEmail.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-slate-700">{userEmail}</p>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="text-[10px] text-slate-400 hover:text-red-500 transition-colors font-medium"
+                >
+                  退出登录
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </Sidebar>
   )
 }

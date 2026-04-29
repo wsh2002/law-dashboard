@@ -1,0 +1,269 @@
+/* ========================================================
+   App.css — 全局增强样式：阴影体系、动画、面板质感
+   ======================================================== */
+
+/* --- 高级阴影体系 --- */
+.shadow-premium-sm {
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 2px 6px rgb(0 0 0 / 0.03);
+}
+.shadow-premium {
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 0.06),
+    0 4px 12px rgb(0 0 0 / 0.04),
+    0 0 0 1px rgb(0 0 0 / 0.02);
+}
+.shadow-premium-lg {
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 0.04),
+    0 8px 24px rgb(0 0 0 / 0.06),
+    0 0 0 1px rgb(0 0 0 / 0.02);
+}
+.shadow-premium-xl {
+  box-shadow:
+    0 4px 6px rgb(0 0 0 / 0.03),
+    0 12px 40px rgb(0 0 0 / 0.08),
+    0 0 0 1px rgb(0 0 0 / 0.02);
+}
+
+/* --- 毛玻璃顶栏 --- */
+.glass-header {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px) saturate(1.8);
+  -webkit-backdrop-filter: blur(16px) saturate(1.8);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+/* --- 面板卡片增强 --- */
+.panel-premium {
+  background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.9) 100%);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 0.04),
+    0 4px 16px rgb(0 0 0 / 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+.panel-premium:hover {
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 0.04),
+    0 8px 28px rgb(0 0 0 / 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* --- 品牌渐变按钮 --- */
+.btn-brand {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #1e293b 100%);
+  background-size: 200% 100%;
+  color: #fff;
+  border: none;
+  position: relative;
+  overflow: hidden;
+  transition: background-position 0.4s ease, box-shadow 0.3s ease;
+}
+.btn-brand:hover {
+  background-position: 100% 0;
+  box-shadow: 0 4px 16px rgba(30, 41, 59, 0.25);
+}
+.btn-brand::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+/* --- 渐变品牌按钮（蓝色主题） --- */
+.btn-brand-blue {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
+  background-size: 200% 100%;
+  color: #fff;
+  border: none;
+  position: relative;
+  overflow: hidden;
+  transition: background-position 0.4s ease, box-shadow 0.3s ease, transform 0.2s ease;
+}
+.btn-brand-blue:hover {
+  background-position: 100% 0;
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.35);
+  transform: translateY(-1px);
+}
+.btn-brand-blue:active {
+  transform: translateY(0);
+}
+
+/* --- 输入框增强 --- */
+.input-premium {
+  background: rgba(248, 250, 252, 0.6);
+  border: 1.5px solid rgba(203, 213, 225, 0.5);
+  border-radius: 12px;
+  transition: all 0.25s ease;
+}
+.input-premium:focus {
+  background: #fff;
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08), 0 2px 8px rgba(59, 130, 246, 0.06);
+}
+
+/* --- 登录页左面板渐变 --- */
+.login-brand-panel {
+  background: linear-gradient(160deg, #0f172a 0%, #1e293b 35%, #334155 100%);
+  position: relative;
+  overflow: hidden;
+}
+.login-brand-panel::before {
+  content: '';
+  position: absolute;
+  top: -30%;
+  right: -20%;
+  width: 60%;
+  height: 80%;
+  background: radial-gradient(ellipse, rgba(59, 130, 246, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+.login-brand-panel::after {
+  content: '';
+  position: absolute;
+  bottom: -20%;
+  left: -10%;
+  width: 50%;
+  height: 60%;
+  background: radial-gradient(ellipse, rgba(139, 92, 246, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* --- 网格装饰背景 --- */
+.grid-pattern {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* --- 浮动光斑动画 --- */
+@keyframes float-slow {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(12px, -18px) scale(1.05); }
+  66% { transform: translate(-8px, 10px) scale(0.97); }
+}
+@keyframes float-medium {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(-16px, 14px) rotate(4deg); }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.08); }
+}
+.animate-float-slow { animation: float-slow 20s ease-in-out infinite; }
+.animate-float-medium { animation: float-medium 14s ease-in-out infinite; }
+.animate-pulse-soft { animation: pulse-soft 4s ease-in-out infinite; }
+
+/* --- 侧栏增强 --- */
+.sidebar-brand-gradient {
+  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+}
+
+/* --- 数据网格装饰 --- */
+.data-grid-decoration {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, transparent 80%);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, transparent 80%);
+  pointer-events: none;
+}
+
+/* --- 微光效果 --- */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.shimmer-effect {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer-effect::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    transparent 100%
+  );
+  animation: shimmer 8s ease-in-out infinite;
+}
+
+/* --- 文字渐变 --- */
+.text-gradient-brand {
+  background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* --- 空状态引导区 --- */
+.empty-state-container {
+  position: relative;
+}
+.empty-state-container::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(ellipse, rgba(59, 130, 246, 0.04) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* --- 全局滚动条美化 --- */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* --- 统计数字动画 --- */
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-count-up {
+  animation: count-up 0.5s ease-out forwards;
+}
+
+/* --- 选中平台标签增强 --- */
+.platform-tab-active {
+  position: relative;
+}
+.platform-tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  border-radius: 2px;
+}

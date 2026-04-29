@@ -28,10 +28,7 @@ export async function deepseekChatCompletion(
   const temperature = options?.temperature ?? 0.75;
   const max_tokens = options?.max_tokens ?? 8192;
 
-  const isDev = import.meta.env.DEV;
-  const url = isDev
-    ? '/api/deepseek/chat/completions'
-    : 'https://api.deepseek.com/chat/completions';
+  const url = '/api/deepseek/chat/completions';
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -40,10 +37,6 @@ export async function deepseekChatCompletion(
   const viteKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
   if (viteKey) {
     headers.Authorization = `Bearer ${viteKey}`;
-  } else if (!isDev) {
-    throw new Error(
-      '未配置 DeepSeek：请在 law-dashboard/.env 中设置 VITE_DEEPSEEK_API_KEY；本地开发可只设 DEEPSEEK_API_KEY 由代理转发。'
-    );
   }
 
   const res = await fetch(url, {

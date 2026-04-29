@@ -45,11 +45,7 @@ export async function doubaoChatCompletion(
   const max_tokens = options?.max_tokens ?? 8192;
   const model = doubaoModelId();
 
-  const isDev = import.meta.env.DEV;
-  const prodBase =
-    (import.meta.env.VITE_DOUBAO_BASE_URL as string | undefined)?.trim() ||
-    'https://ark.cn-beijing.volces.com/api/v3';
-  const url = isDev ? '/api/doubao/chat/completions' : `${prodBase.replace(/\/$/, '')}/chat/completions`;
+  const url = '/api/doubao/chat/completions';
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -58,10 +54,6 @@ export async function doubaoChatCompletion(
   const viteKey = import.meta.env.VITE_DOUBAO_API_KEY;
   if (viteKey) {
     headers.Authorization = `Bearer ${viteKey}`;
-  } else if (!isDev) {
-    throw new Error(
-      '未配置豆包：请在 law-dashboard/.env 中设置 VITE_DOUBAO_API_KEY；本地开发可只设 DOUBAO_API_KEY 由代理转发。'
-    );
   }
 
   const res = await fetch(url, {

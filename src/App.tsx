@@ -1,5 +1,5 @@
-﻿import React, { useState, useMemo, useEffect, useCallback, ChangeEvent, lazy, Suspense } from 'react';
-import * as XLSX from 'xlsx';
+﻿import React, { useState, useMemo, useEffect, useCallback, useRef, ChangeEvent, lazy, Suspense } from 'react';
+// xlsx is dynamically imported in handleFileUpload
 import { motion } from 'framer-motion';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from './services/supabase';
@@ -10,11 +10,10 @@ import {
 } from 'recharts';
 import { Upload, Calendar, ArrowUp, ArrowDown, FileSpreadsheet, TrendingUp, Activity, Heart, GitMerge, Sparkles, Play, MessageCircle, Share2, Users, Search } from 'lucide-react';
 // @ts-ignore
-import ReactWordcloud from 'react-wordcloud';
+const ReactWordcloud = lazy(() => import('react-wordcloud'));
 import { format, parse, addDays, isValid, startOfDay, subDays, startOfMonth, subMonths, startOfWeek, endOfWeek, eachWeekOfInterval } from 'date-fns';
 import { cn } from '@/lib/utils';
-import MyAgentPanel from './components/MyAgentPanel';
-import { Button } from '@/components/ui/button';
+const MyAgentPanel = lazy(() => import('./components/MyAgentPanel'));
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KpiStatCard } from '@/components/KpiStatCard';
 import { AppSidebar } from '@/components/AppSidebar';
@@ -95,6 +94,47 @@ const MonthlyRateChart = React.memo(({ data, monthA, monthB }: { data: any[]; mo
   </ResponsiveContainer>
 ));
 // ---- 月度对比图表组件结束 ----
+
+const MonthlyViewsLikesChart = React.memo(({ data }: { data: any[] }) => (
+  <ResponsiveContainer width="100%" height="100%">
+    <ComposedChart data={data}>
+      <defs>
+        <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
+          <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.1}/>
+        </linearGradient>
+      </defs>
+      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+      <XAxis dataKey="month" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+      <YAxis yAxisId="left" fontSize={12} stroke="#3b82f6" label={{ value: '月播放量', angle: -90, position: 'insideLeft' }} domain={[0, 'dataMax * 1.2']} />
+      <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f43f5e" label={{ value: '月点赞量', angle: 90, position: 'insideRight' }} domain={[0, 'dataMax * 1.2']} />
+      <Tooltip contentStyle={tooltipStyle} />
+      <Legend wrapperStyle={{ paddingTop: '10px' }} />
+      <Bar yAxisId="left" dataKey="views" name="月播放量" fill="url(#colorViews)" radius={[8, 8, 0, 0]} animationDuration={300} />
+      <Line yAxisId="right" type="monotone" dataKey="likes" name="月点赞量" stroke="#f43f5e" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f43f5e', stroke: '#fff', strokeWidth: 2 }} animationDuration={300} />
+    </ComposedChart>
+  </ResponsiveContainer>
+));
+
+const MonthlyNetFansChart = React.memo(({ data }: { data: any[] }) => (
+  <ResponsiveContainer width="100%" height="100%">
+    <ComposedChart data={data}>
+      <defs>
+        <linearGradient id="colorNetFans" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
+          <stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/>
+        </linearGradient>
+      </defs>
+      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+      <XAxis dataKey="month" fontSize={12} tickMargin={10} stroke="#94a3b8" />
+      <YAxis fontSize={12} stroke="#10b981" label={{ value: '月净增粉', angle: -90, position: 'insideLeft' }} domain={['auto', 'auto']} />
+      <Tooltip contentStyle={tooltipStyle} />
+      <Legend wrapperStyle={{ paddingTop: '10px' }} />
+      <Line type="monotone" dataKey="netFans" name="月净增粉" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={300} />
+      <Bar dataKey="netFans" name="月净增粉" fill="url(#colorNetFans)" radius={[8, 8, 0, 0]} animationDuration={300} />
+    </ComposedChart>
+  </ResponsiveContainer>
+));
 
 // 懒加载组件
 const ViralVideosSection = lazy(() => import('./components/ViralVideosSection'));
@@ -303,30 +343,20 @@ export default function App() {
   const userId = session?.user?.id ?? 'guest';
   const stateKey = `lawDashboardState_${userId}`;
 
-  // 从 localStorage 加载状态，如果没有则使用默认值
-  const loadState = () => {
+  const [savedState] = useState(() => {
     try {
-      const savedState = localStorage.getItem(stateKey);
-      if (savedState) {
-        return JSON.parse(savedState);
-      }
-    } catch (error) {
-      console.error('Error loading state from localStorage:', error);
-    }
-    return null;
-  };
+      const raw = localStorage.getItem(stateKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  });
 
-  // 保存状态到 localStorage
-  const saveState = (state: any) => {
-    try {
-      localStorage.setItem(stateKey, JSON.stringify(state));
-    } catch (error) {
-      console.error('Error saving state to localStorage:', error);
-    }
-  };
-
-  // 加载保存的状态或使用默认值
-  const savedState = loadState();
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveState = useCallback((state: any) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      try { localStorage.setItem(stateKey, JSON.stringify(state)); } catch {}
+    }, 500);
+  }, [stateKey]);
   const [data, setData] = useState<DataItem[]>([]);
   const [platformData, setPlatformData] = useState<Record<string, DataItem[]>>({});
   const [selectedPlatform, setSelectedPlatform] = useState<'douyin' | 'kuaishou' | 'wechat'>('douyin');
@@ -645,17 +675,15 @@ export default function App() {
     const allUserNames: Record<string, string> = {};
     let firstPlatform: 'douyin' | 'kuaishou' | 'wechat' | undefined;
 
-    // 处理单个文件的函数
+    const XLSX = await import('xlsx');
+
     const processFile = (file: File, index: number): Promise<void> => {
         return new Promise((resolve) => {
-            // Extract name from filename
-            // Logic: Take part before "的", or filename without extension if "的" not present
             const filename = file.name;
-            let name = filename.substring(0, filename.lastIndexOf('.')); // Remove extension
+            let name = filename.substring(0, filename.lastIndexOf('.'));
             if (name.includes('的')) {
                 name = name.split('的')[0];
             }
-            // Extract platform from filename
             let platform: 'douyin' | 'kuaishou' | 'wechat' | undefined;
             if (filename.includes('抖音')) {
                 platform = 'douyin';
@@ -665,12 +693,10 @@ export default function App() {
                 platform = 'wechat';
             }
             
-            // Store user name for each platform
             if (platform) {
                 allUserNames[platform] = name;
             }
             
-            // Set the first extracted platform as the current selected platform
             if (platform && index === 0) {
                 firstPlatform = platform;
             }
@@ -1125,73 +1151,34 @@ export default function App() {
     })).sort((a: any, b: any) => a.sortKey.localeCompare(b.sortKey));
   };
 
-  const monthlyDetailTrend = useMemo(() => {
-    const currentTrend = aggregateMonthlyDetailData(currentData);
-    const compareTrend = aggregateMonthlyDetailData(compareData);
-
-    // Merge logic
-    return currentTrend.map((item, index) => {
-        const compareItem = compareTrend[index] || {};
-        return {
-            ...item,
-            compareDate: compareItem.date || 'N/A',
-            compareViews: compareItem.views || 0,
-            compareLikes: compareItem.likes || 0,
-            compareNetFans: compareItem.netFans || 0,
-            compareFans: compareItem.fans || 0,
-            compareInteractions: compareItem.interactions || 0,
-            compareCompletionRate: compareItem.completionRate || 0,
-            compareInteractionRate: compareItem.interactionRate || 0,
-        };
-    });
-  }, [currentData, compareData, selectedPlatform]);
-
-  const quarterlyDetailTrend = useMemo(() => {
-    const currentTrend = aggregateQuarterlyDetailData(currentData);
-    const compareTrend = aggregateQuarterlyDetailData(compareData);
-    return currentTrend.map((item, index) => {
-        const compareItem = compareTrend[index] || {};
-        return {
-            ...item,
-            compareDate: compareItem.date || 'N/A',
-            compareViews: compareItem.views || 0,
-            compareLikes: compareItem.likes || 0,
-            compareNetFans: compareItem.netFans || 0,
-            compareFans: compareItem.fans || 0,
-            compareInteractions: compareItem.interactions || 0,
-            compareCompletionRate: compareItem.completionRate || 0,
-            compareInteractionRate: compareItem.interactionRate || 0,
-        };
-    });
-  }, [currentData, compareData, selectedPlatform]);
-
-  const weeklyDetailTrend = useMemo(() => {
-    const currentTrend = aggregateWeeklyDetailData(currentData, dateRange);
-    const compareTrend = aggregateWeeklyDetailData(compareData, compareRange);
-    return currentTrend.map((item, index) => {
-        const compareItem = compareTrend[index] || {};
-        return {
-            ...item,
-            compareDate: compareItem.date || 'N/A',
-            compareViews: compareItem.views || 0,
-            compareLikes: compareItem.likes || 0,
-            compareNetFans: compareItem.netFans || 0,
-            compareFans: compareItem.fans || 0,
-            compareInteractions: compareItem.interactions || 0,
-            compareCompletionRate: compareItem.completionRate || 0,
-            compareInteractionRate: compareItem.interactionRate || 0,
-        };
-    });
-  }, [currentData, compareData, dateRange, compareRange, selectedPlatform]);
-
   const finalDetailTrend = useMemo(() => {
-      switch (detailTrendMode) {
-          case 'monthly': return monthlyDetailTrend;
-          case 'quarterly': return quarterlyDetailTrend;
-          case 'weekly': return weeklyDetailTrend;
-          default: return dailyTrend;
-      }
-  }, [detailTrendMode, dailyTrend, monthlyDetailTrend, quarterlyDetailTrend, weeklyDetailTrend]);
+    const mergeTrends = (currentTrend: any[], compareTrend: any[]) =>
+      currentTrend.map((item, index) => {
+        const compareItem = compareTrend[index] || {};
+        return {
+          ...item,
+          compareDate: compareItem.date || 'N/A',
+          compareViews: compareItem.views || 0,
+          compareLikes: compareItem.likes || 0,
+          compareNetFans: compareItem.netFans || 0,
+          compareFans: compareItem.fans || 0,
+          compareInteractions: compareItem.interactions || 0,
+          compareCompletionRate: compareItem.completionRate || 0,
+          compareInteractionRate: compareItem.interactionRate || 0,
+        };
+      });
+
+    switch (detailTrendMode) {
+      case 'monthly':
+        return mergeTrends(aggregateMonthlyDetailData(currentData), aggregateMonthlyDetailData(compareData));
+      case 'quarterly':
+        return mergeTrends(aggregateQuarterlyDetailData(currentData), aggregateQuarterlyDetailData(compareData));
+      case 'weekly':
+        return mergeTrends(aggregateWeeklyDetailData(currentData, dateRange), aggregateWeeklyDetailData(compareData, compareRange));
+      default:
+        return dailyTrend;
+    }
+  }, [detailTrendMode, currentData, compareData, dateRange, compareRange, selectedPlatform, dailyTrend]);
 
   // Explosive Videos (Top 10 by Views)
   const explosiveVideos = useMemo(() => {
@@ -1547,8 +1534,7 @@ export default function App() {
     return denom === 0 ? 0 : num / denom;
   };
 
-  // 词云图配置
-  const wordcloudOptions = {
+  const wordcloudOptions = useMemo(() => ({
     rotations: 2,
     rotationAngles: [0, 90] as [number, number],
     fontSizes: [12, 60] as [number, number],
@@ -1558,10 +1544,8 @@ export default function App() {
     randomSeed: "42",
     deterministic: true,
     enableTooltip: true,
-    tooltipOptions: {
-      theme: 'light' as const,
-    },
-  };
+    tooltipOptions: { theme: 'light' as const },
+  }), []);
 
   // 提取标题关键词并计算频率
   const getWordcloudData = (videos: DataItem[]) => {
@@ -1650,8 +1634,16 @@ export default function App() {
 
   if (authLoading) {
     return (
-      <div className="flex justify-center items-center h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-        <div className="text-slate-500 text-sm">加载中...</div>
+      <div className="flex flex-col justify-center items-center h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/40">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-400/15 to-violet-400/15 blur-xl scale-150" />
+            <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 shadow-lg">
+              <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            </div>
+          </div>
+          <p className="text-sm font-medium text-slate-500">加载中...</p>
+        </div>
       </div>
     );
   }
@@ -1664,67 +1656,9 @@ export default function App() {
     );
   }
 
-  // Chart Components with Memo
-
-  // Monthly Trend Chart Components with Memo
-  const MonthlyViewsLikesChart = React.memo(() => (
-    <ResponsiveContainer width="100%" height="100%">
-      <ComposedChart data={monthlyData}>
-        <defs>
-          <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.1}/>
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-        <XAxis dataKey="month" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-        <YAxis yAxisId="left" fontSize={12} stroke="#3b82f6" label={{ value: '月播放量', angle: -90, position: 'insideLeft' }} domain={[0, 'dataMax * 1.2']} />
-        <YAxis yAxisId="right" orientation="right" fontSize={12} stroke="#f43f5e" label={{ value: '月点赞量', angle: 90, position: 'insideRight' }} domain={[0, 'dataMax * 1.2']} />
-        <Tooltip 
-          contentStyle={{ 
-            borderRadius: '8px', 
-            border: 'none', 
-            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
-            background: 'rgba(255, 255, 255, 0.95)',
-            padding: '12px',
-            fontSize: '14px'
-          }} 
-        />
-        <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Bar yAxisId="left" dataKey="views" name="月播放量" fill="url(#colorViews)" radius={[8, 8, 0, 0]} animationDuration={300} />
-        <Line yAxisId="right" type="monotone" dataKey="likes" name="月点赞量" stroke="#f43f5e" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#f43f5e', stroke: '#fff', strokeWidth: 2 }} animationDuration={300} />
-      </ComposedChart>
-    </ResponsiveContainer>
-  ));
-
-  const MonthlyNetFansChart = React.memo(() => (
-    <ResponsiveContainer width="100%" height="100%">
-      <ComposedChart data={monthlyData}>
-        <defs>
-          <linearGradient id="colorNetFans" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
-            <stop offset="100%" stopColor="#10b981" stopOpacity={0.1}/>
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-        <XAxis dataKey="month" fontSize={12} tickMargin={10} stroke="#94a3b8" />
-        <YAxis fontSize={12} stroke="#10b981" label={{ value: '月净增粉', angle: -90, position: 'insideLeft' }} domain={['auto', 'auto']} />
-        <Tooltip 
-          contentStyle={{ 
-            borderRadius: '8px', 
-            border: 'none', 
-            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', 
-            background: 'rgba(255, 255, 255, 0.95)',
-            padding: '12px',
-            fontSize: '14px'
-          }} 
-        />
-        <Legend wrapperStyle={{ paddingTop: '10px' }} />
-        <Line type="monotone" dataKey="netFans" name="月净增粉" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} animationDuration={300} />
-        <Bar dataKey="netFans" name="月净增粉" fill="url(#colorNetFans)" radius={[8, 8, 0, 0]} animationDuration={300} />
-      </ComposedChart>
-    </ResponsiveContainer>
-  ));
+  // references to outer-defined chart components use data prop
+  const monthlyViewsLikesData = monthlyData;
+  const monthlyNetFansData = monthlyData;
 
   return (
     <SidebarProvider defaultOpen>
@@ -1732,52 +1666,42 @@ export default function App() {
       <AppSidebar
         activeTab={activeTab}
         onSelect={(k) => setActiveTab(k as Parameters<typeof setActiveTab>[0])}
+        userEmail={session.user.email ?? undefined}
+        onLogout={() => supabase.auth.signOut()}
       />
-      <SidebarInset className="min-w-0 border-slate-200 bg-slate-50/90">
-        <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-3 border-b border-slate-200 bg-white px-3 md:px-5">
-          <SidebarTrigger className="text-slate-600" />
-          <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-            <h1 className="truncate text-sm font-semibold tracking-tight text-slate-900 md:text-base">
+      <SidebarInset className="min-w-0 border-l border-slate-200/50 bg-gradient-to-br from-slate-50/95 via-white/40 to-blue-50/30">
+        <header className="glass-header sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 px-3 md:h-[60px] md:px-5">
+          <SidebarTrigger className="text-slate-500 hover:text-slate-800 transition-colors" />
+
+          <div className="h-5 w-px bg-slate-200/80 hidden md:block" />
+
+          <div className="flex min-w-0 flex-1 flex-col justify-center gap-0">
+            <h1 className="truncate text-sm font-bold tracking-tight text-slate-900">
               多平台运营诊断
             </h1>
             {data.length > 0 && dataDateRange && (
-              <p className="text-xs text-slate-500">数据范围 {dataDateRange.start} – {dataDateRange.end}</p>
+              <p className="text-[11px] text-slate-400 font-medium">
+                {dataDateRange.start} – {dataDateRange.end}
+              </p>
             )}
             {data.length === 0 && (
-              <p className="text-xs text-slate-500">支持 CSV/Excel 导入，自动识别日期范围</p>
+              <p className="text-[11px] text-slate-400">支持 CSV/Excel 导入，自动识别日期范围</p>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="hidden text-xs text-slate-400 md:inline">200MB 内</span>
-            <Button
-              asChild
-              size="default"
-              className="bg-slate-900 text-white shadow-sm hover:bg-slate-800"
-            >
-              <label className="inline-flex cursor-pointer items-center gap-0">
-                <Upload data-icon="inline-start" />
-                <span className="pl-0.5">上传数据</span>
-                <input
-                  type="file"
-                  className="hidden"
-                  accept=".csv, .xlsx, .xls"
-                  onChange={handleFileUpload}
-                  multiple
-                />
-              </label>
-            </Button>
-            <span className="hidden max-w-[10rem] truncate text-xs text-slate-500 md:inline" title={session.user.email ?? undefined}>
-              {session.user.email}
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="border-slate-200 text-slate-700 shadow-sm"
-              onClick={() => supabase.auth.signOut()}
-            >
-              退出
-            </Button>
+
+          <div className="flex shrink-0 items-center gap-2.5">
+            <span className="hidden text-[11px] text-slate-400 md:inline font-medium">200MB 内</span>
+            <label className="btn-brand inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold shadow-sm transition-all">
+              <Upload className="h-4 w-4" />
+              <span>上传数据</span>
+              <input
+                type="file"
+                className="hidden"
+                accept=".csv, .xlsx, .xls"
+                onChange={handleFileUpload}
+                multiple
+              />
+            </label>
           </div>
         </header>
 
@@ -1790,7 +1714,6 @@ export default function App() {
         <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.2 }}
             className="space-y-6"
           >
@@ -3121,7 +3044,7 @@ export default function App() {
                             按月运营趋势 (播放量 & 点赞量)
                         </h3>
                         <div className="h-56">
-                            <MonthlyViewsLikesChart />
+                            <MonthlyViewsLikesChart data={monthlyViewsLikesData} />
                         </div>
                     </motion.div>
                 )}
@@ -3140,7 +3063,7 @@ export default function App() {
                         按月运营趋势 (净增粉)
                     </h3>
                     <div className="h-56">
-                        <MonthlyNetFansChart />
+                        <MonthlyNetFansChart data={monthlyNetFansData} />
                     </div>
                 </motion.div>
                 )}
@@ -3449,10 +3372,12 @@ export default function App() {
                     <div className="p-6">
                         <div className="h-80">
                             {wordcloudData.length > 0 ? (
-                                <ReactWordcloud
-                                    options={wordcloudOptions}
-                                    words={wordcloudData}
-                                />
+                                <Suspense fallback={<div className="h-full flex items-center justify-center text-slate-400 text-sm">加载词云...</div>}>
+                                  <ReactWordcloud
+                                      options={wordcloudOptions}
+                                      words={wordcloudData}
+                                  />
+                                </Suspense>
                             ) : (
                                 <div className="h-full flex items-center justify-center text-gray-400">
                                     无足够数据生成词云
@@ -3757,12 +3682,14 @@ export default function App() {
                     </motion.div>
                 ) : (
                     <div className="panel-surface flex flex-col items-center justify-center p-12">
-                        <Activity className="w-16 h-16 text-gray-400 mb-4" />
-                        <h3 className="text-lg font-bold text-gray-700 mb-2">暂无平台数据</h3>
-                        <p className="text-gray-500 text-center mb-6">请先上传Excel文件数据，然后再查看平台数据对比</p>
+                        <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200/80">
+                          <Activity className="w-8 h-8 text-slate-400" />
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-700 mb-2">暂无平台数据</h3>
+                        <p className="text-slate-500 text-center mb-6">请先上传Excel文件数据，然后再查看平台数据对比</p>
                         <button
                             onClick={() => document.getElementById('fileInput')?.click()}
-                            className="px-6 py-3 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors font-medium"
+                            className="btn-brand-blue px-6 py-3 rounded-xl font-medium shadow-lg transition-all"
                         >
                             上传数据
                         </button>
@@ -3774,26 +3701,193 @@ export default function App() {
         </>
         ) : (
           <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex min-h-[50vh] flex-col items-center justify-center p-4 text-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6 }}
+            className="relative -mx-4 -mt-5 md:-mx-6 md:-mt-6 min-h-[calc(100svh-60px)] flex items-center justify-center overflow-hidden"
           >
-            <div className="panel-surface flex max-w-2xl flex-col p-10 md:p-12">
-              <div className="mb-6 inline-flex rounded-full bg-slate-100 p-6">
-                <Upload className="h-12 w-12 text-slate-700" />
-              </div>
-              <h2 className="mb-3 text-2xl font-semibold text-slate-900 md:text-3xl">开始您的数据分析之旅</h2>
-              <p className="mb-6 max-w-md text-slate-600">
-                请使用顶栏「上传数据」导入 CSV/Excel，即可生成就绪的运营诊断与图表。
-              </p>
-              <div className="flex flex-wrap justify-center gap-2 text-sm text-slate-500">
-                <span className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5">
-                  <FileSpreadsheet className="h-4 w-4" /> 支持 .xlsx, .csv
-                </span>
-                <span className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5">
-                  <Activity className="h-4 w-4" /> 自动生成图表
-                </span>
-              </div>
+            {/* ===== 深色沉浸式背景 ===== */}
+            <div className="absolute inset-0 bg-gradient-to-br from-[#0c1222] via-[#111b30] to-[#0f172a]" />
+
+            {/* 网格纹理 */}
+            <div className="absolute inset-0 grid-pattern opacity-60" />
+
+            {/* 大型渐变光斑 */}
+            <motion.div
+              className="absolute top-[-15%] left-[20%] w-[500px] h-[500px] rounded-full opacity-30"
+              style={{ background: 'radial-gradient(ellipse, rgba(59,130,246,0.25) 0%, transparent 70%)' }}
+              animate={{ x: [0, 30, 0], y: [0, 20, 0], scale: [1, 1.05, 1] }}
+              transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }}
+            />
+            <motion.div
+              className="absolute bottom-[-10%] right-[10%] w-[450px] h-[450px] rounded-full opacity-25"
+              style={{ background: 'radial-gradient(ellipse, rgba(139,92,246,0.2) 0%, transparent 70%)' }}
+              animate={{ x: [0, -25, 0], y: [0, -15, 0], scale: [1, 1.08, 1] }}
+              transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut' }}
+            />
+            <motion.div
+              className="absolute top-[40%] right-[35%] w-[300px] h-[300px] rounded-full opacity-20"
+              style={{ background: 'radial-gradient(ellipse, rgba(6,182,212,0.2) 0%, transparent 70%)' }}
+              animate={{ x: [0, 18, 0], y: [0, -12, 0] }}
+              transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+            />
+
+            {/* 装饰几何元素 */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              <motion.div
+                className="absolute left-[8%] top-[18%] w-20 h-20 rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-sm rotate-12"
+                animate={{ rotate: [12, 18, 12], y: [0, -10, 0] }}
+                transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+              />
+              <motion.div
+                className="absolute right-[12%] top-[22%] w-14 h-14 rounded-full border border-blue-400/[0.1] bg-blue-400/[0.03]"
+                animate={{ scale: [1, 1.15, 1], opacity: [0.5, 0.8, 0.5] }}
+                transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+              />
+              <motion.div
+                className="absolute left-[18%] bottom-[15%] w-16 h-16 rounded-xl border border-violet-400/[0.08] bg-violet-400/[0.02] -rotate-6"
+                animate={{ rotate: [-6, 2, -6], x: [0, 8, 0] }}
+                transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
+              />
+              <motion.div
+                className="absolute right-[20%] bottom-[20%] w-24 h-24 rounded-3xl border border-cyan-400/[0.06] bg-cyan-400/[0.02] rotate-45"
+                animate={{ rotate: [45, 50, 45], y: [0, 12, 0] }}
+                transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut' }}
+              />
+              <motion.div
+                className="absolute left-[45%] top-[10%] w-10 h-10 rounded-lg border border-white/[0.05] bg-white/[0.01] rotate-45"
+                animate={{ y: [0, -16, 0], opacity: [0.3, 0.6, 0.3] }}
+                transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
+              />
+
+              {/* 连接线装饰 */}
+              <svg className="absolute inset-0 w-full h-full opacity-[0.04]" xmlns="http://www.w3.org/2000/svg">
+                <line x1="10%" y1="30%" x2="40%" y2="20%" stroke="white" strokeWidth="1" />
+                <line x1="60%" y1="15%" x2="90%" y2="35%" stroke="white" strokeWidth="1" />
+                <line x1="20%" y1="70%" x2="50%" y2="85%" stroke="white" strokeWidth="1" />
+                <line x1="70%" y1="75%" x2="85%" y2="60%" stroke="white" strokeWidth="1" />
+                <circle cx="10%" cy="30%" r="2" fill="rgba(96,165,250,0.3)" />
+                <circle cx="40%" cy="20%" r="2" fill="rgba(139,92,246,0.3)" />
+                <circle cx="90%" cy="35%" r="2" fill="rgba(96,165,250,0.3)" />
+                <circle cx="50%" cy="85%" r="2" fill="rgba(6,182,212,0.3)" />
+              </svg>
+            </div>
+
+            {/* ===== 主内容区 ===== */}
+            <div className="relative z-10 flex flex-col items-center px-6 py-12 text-center max-w-3xl">
+              {/* 上传图标 */}
+              <motion.div
+                initial={{ scale: 0.7, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.2, type: 'spring', stiffness: 180, damping: 20 }}
+                className="mb-10 relative"
+              >
+                <div className="absolute inset-0 rounded-3xl bg-blue-500/20 blur-3xl scale-[2]" />
+                <div className="absolute inset-0 rounded-3xl bg-violet-500/10 blur-2xl scale-[1.8] animate-pulse-soft" />
+                <div className="relative flex h-28 w-28 items-center justify-center rounded-3xl bg-gradient-to-br from-white/[0.12] to-white/[0.04] border border-white/[0.1] backdrop-blur-xl shadow-2xl shadow-blue-500/10">
+                  <Upload className="h-12 w-12 text-white/90" />
+                </div>
+              </motion.div>
+
+              {/* 标题 */}
+              <motion.h2
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.5 }}
+                className="mb-4 text-3xl font-bold tracking-tight text-white md:text-5xl"
+              >
+                开始您的
+                <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-violet-400 bg-clip-text text-transparent"> 数据分析 </span>
+                之旅
+              </motion.h2>
+
+              <motion.p
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4, duration: 0.5 }}
+                className="mb-10 max-w-lg text-base text-white/45 leading-relaxed"
+              >
+                导入 CSV/Excel 数据文件，即刻生成
+                <span className="text-white/70 font-medium"> 运营诊断报告 </span>
+                与
+                <span className="text-white/70 font-medium"> 可视化图表</span>
+              </motion.p>
+
+              {/* CTA 按钮 */}
+              <motion.label
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.5 }}
+                className="group relative inline-flex cursor-pointer items-center gap-2.5 rounded-2xl px-10 py-4 text-base font-semibold text-white transition-all duration-300 mb-12 overflow-hidden"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-blue-500 to-violet-500 transition-opacity duration-300" />
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-violet-500 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="absolute inset-[1px] rounded-[15px] bg-gradient-to-b from-white/[0.12] to-transparent pointer-events-none" />
+                <Upload className="relative h-5 w-5" />
+                <span className="relative">上传数据文件</span>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".csv, .xlsx, .xls"
+                  onChange={handleFileUpload}
+                  multiple
+                  id="fileInput"
+                />
+              </motion.label>
+
+              {/* 功能亮点卡片 */}
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6, duration: 0.5 }}
+                className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-xl"
+              >
+                {[
+                  { icon: FileSpreadsheet, label: '支持 .xlsx, .csv', color: 'blue' },
+                  { icon: Activity, label: '自动生成图表', color: 'emerald' },
+                  { icon: Sparkles, label: 'AI 智能诊断', color: 'violet' },
+                ].map((item, i) => (
+                  <motion.div
+                    key={item.label}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.65 + i * 0.08 }}
+                    className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.03] backdrop-blur-sm px-4 py-3 text-sm text-white/50 hover:bg-white/[0.06] hover:text-white/70 transition-all duration-300 group"
+                  >
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border ${
+                      item.color === 'blue' ? 'border-blue-400/20 bg-blue-400/10' :
+                      item.color === 'emerald' ? 'border-emerald-400/20 bg-emerald-400/10' :
+                      'border-violet-400/20 bg-violet-400/10'
+                    }`}>
+                      <item.icon className={`h-4 w-4 ${
+                        item.color === 'blue' ? 'text-blue-400' :
+                        item.color === 'emerald' ? 'text-emerald-400' :
+                        'text-violet-400'
+                      }`} />
+                    </div>
+                    <span className="font-medium">{item.label}</span>
+                  </motion.div>
+                ))}
+              </motion.div>
+
+              {/* 底部数据点缀 */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.9 }}
+                className="mt-14 flex gap-8 sm:gap-14"
+              >
+                {[
+                  { num: '3+', label: '支持平台' },
+                  { num: '20+', label: '分析维度' },
+                  { num: '实时', label: 'AI 诊断' },
+                ].map((stat) => (
+                  <div key={stat.label} className="text-center">
+                    <div className="text-xl font-bold text-white/80 sm:text-2xl">{stat.num}</div>
+                    <div className="text-[11px] text-white/30 mt-1 tracking-wide">{stat.label}</div>
+                  </div>
+                ))}
+              </motion.div>
             </div>
           </motion.div>
         )}
@@ -3803,9 +3897,11 @@ export default function App() {
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.05 }}
-            className="space-y-4"
+            className="-mx-4 -mt-5 md:-mx-6 md:-mt-6"
           >
-            <MyAgentPanel userId={userId} />
+            <Suspense fallback={<div className="flex h-64 items-center justify-center text-slate-400 text-sm">加载中...</div>}>
+              <MyAgentPanel userId={userId} />
+            </Suspense>
           </motion.div>
         )}
 

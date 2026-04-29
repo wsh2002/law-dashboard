@@ -146,6 +146,8 @@ const ViralVideosSection = () => {
   const [showScriptLibrary, setShowScriptLibrary] = useState(false);
   const [scriptLibrary, setScriptLibrary] = useState<any[]>([]);
   const [expandedScriptId, setExpandedScriptId] = useState<string | null>(null);
+  const [libraryPage, setLibraryPage] = useState(1);
+  const LIBRARY_PAGE_SIZE = 10;
   // 分析结果缓存
   const [analysisCache, setAnalysisCache] = useState<Record<string, string>>(() => {
     const saved = localStorage.getItem('analysis_cache');
@@ -746,7 +748,7 @@ ${analysisResult}
 
           {/* 文案库按钮 */}
           <button
-            onClick={() => setShowScriptLibrary(!showScriptLibrary)}
+            onClick={() => { setShowScriptLibrary(!showScriptLibrary); setLibraryPage(1); }}
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-bold transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
           >
             <Book className="w-4 h-4" />
@@ -1432,7 +1434,7 @@ ${analysisResult}
                     <p className="text-sm mt-2">使用"一键识别台词"功能后，文案会自动保存到这里</p>
                   </div>
                 ) : (
-                  scriptLibrary.map((item) => {
+                  scriptLibrary.slice((libraryPage - 1) * LIBRARY_PAGE_SIZE, libraryPage * LIBRARY_PAGE_SIZE).map((item) => {
                     const expanded = expandedScriptId === item.id;
                     return (
                       <div 
@@ -1488,7 +1490,12 @@ ${analysisResult}
                                 console.error('删除失败:', error);
                                 alert('删除失败，请重试');
                               } else {
-                                setScriptLibrary(prev => prev.filter(s => s.id !== item.id));
+                                setScriptLibrary(prev => {
+                                  const next = prev.filter(s => s.id !== item.id);
+                                  const maxPage = Math.max(1, Math.ceil(next.length / LIBRARY_PAGE_SIZE));
+                                  setLibraryPage(p => Math.min(p, maxPage));
+                                  return next;
+                                });
                               }
                             }}
                             className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -1504,17 +1511,52 @@ ${analysisResult}
             </div>
 
             {/* Modal Footer */}
-            <div className="p-6 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+            <div className="p-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50 gap-4 flex-wrap">
               <div className="text-xs text-gray-400 flex items-center gap-2">
                 <Book className="w-3.5 h-3.5 text-blue-400" />
-                共 {scriptLibrary.length} 个文案
+                共 {scriptLibrary.length} 个文案，第 {libraryPage} / {Math.max(1, Math.ceil(scriptLibrary.length / LIBRARY_PAGE_SIZE))} 页
               </div>
-              <button
-                onClick={() => setShowScriptLibrary(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-bold hover:bg-gray-200 transition-all"
-              >
-                关闭
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setLibraryPage(p => Math.max(1, p - 1))}
+                  disabled={libraryPage === 1}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  上一页
+                </button>
+                {Array.from({ length: Math.ceil(scriptLibrary.length / LIBRARY_PAGE_SIZE) }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === Math.ceil(scriptLibrary.length / LIBRARY_PAGE_SIZE) || Math.abs(p - libraryPage) <= 1)
+                  .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && (p as number) - (arr[idx - 1] as number) > 1) acc.push('...');
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, idx) =>
+                    p === '...'
+                      ? <span key={`ellipsis-${idx}`} className="text-xs text-gray-400 px-1">…</span>
+                      : <button
+                          key={p}
+                          onClick={() => setLibraryPage(p as number)}
+                          className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${libraryPage === p ? 'bg-blue-600 text-white shadow' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                        >
+                          {p}
+                        </button>
+                  )
+                }
+                <button
+                  onClick={() => setLibraryPage(p => Math.min(Math.ceil(scriptLibrary.length / LIBRARY_PAGE_SIZE), p + 1))}
+                  disabled={libraryPage >= Math.ceil(scriptLibrary.length / LIBRARY_PAGE_SIZE)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  下一页
+                </button>
+                <button
+                  onClick={() => setShowScriptLibrary(false)}
+                  className="px-4 py-1.5 bg-gray-200 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-300 transition-all"
+                >
+                  关闭
+                </button>
+              </div>
             </div>
           </motion.div>
         </div>

@@ -37,10 +37,7 @@ export async function zhipuChatCompletion(
   const max_tokens = options?.max_tokens ?? 4096;
   const thinkingType = options?.thinking ?? 'disabled';
 
-  const isDev = import.meta.env.DEV;
-  const url = isDev
-    ? '/api/zhipu/chat/completions'
-    : 'https://open.bigmodel.cn/api/paas/v4/chat/completions';
+  const url = '/api/zhipu/chat/completions';
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -49,10 +46,6 @@ export async function zhipuChatCompletion(
   const viteKey = import.meta.env.VITE_ZHIPU_API_KEY;
   if (viteKey) {
     headers.Authorization = `Bearer ${viteKey}`;
-  } else if (!isDev) {
-    throw new Error(
-      '未配置智谱 API：请在 law-dashboard/.env 中设置 VITE_ZHIPU_API_KEY 后重新构建；本地开发也可只设 ZHIPU_API_KEY 由代理转发。'
-    );
   }
 
   const res = await fetch(url, {

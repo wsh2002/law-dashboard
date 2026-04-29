@@ -34,15 +34,19 @@ export default defineConfig(({ mode }) => {
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-is'],
-          'recharts': ['recharts'],
-          'framer-motion': ['framer-motion'],
-          'xlsx': ['xlsx'],
-          'date-fns': ['date-fns'],
-          'markdown': ['react-markdown'],
-          'wordcloud': ['react-wordcloud'],
-          'icons': ['lucide-react']
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react-dom') || id.includes('react-is') || (id.includes('/react/') && !id.includes('react-'))) return 'react-vendor';
+            if (id.includes('recharts') || id.includes('d3-')) return 'recharts';
+            if (id.includes('framer-motion')) return 'framer-motion';
+            if (id.includes('xlsx') || id.includes('sheetjs')) return 'xlsx';
+            if (id.includes('date-fns')) return 'date-fns';
+            if (id.includes('react-markdown') || id.includes('remark') || id.includes('rehype') || id.includes('unified') || id.includes('micromark') || id.includes('mdast') || id.includes('hast')) return 'markdown';
+            if (id.includes('react-wordcloud')) return 'wordcloud';
+            if (id.includes('lucide-react')) return 'icons';
+            if (id.includes('@supabase')) return 'supabase';
+            if (id.includes('radix-ui') || id.includes('@radix')) return 'radix-ui';
+          }
         }
       }
     },
