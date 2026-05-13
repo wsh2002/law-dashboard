@@ -8,7 +8,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, ComposedChart, ScatterChart, Scatter, ZAxis, ReferenceLine
 } from 'recharts';
-import { Upload, Calendar, ArrowUp, ArrowDown, FileSpreadsheet, TrendingUp, Activity, Heart, GitMerge, Sparkles, Play, MessageCircle, Share2, Users, Search } from 'lucide-react';
+import { Upload, Calendar, ArrowUp, ArrowDown, FileSpreadsheet, TrendingUp, Activity, Heart, GitMerge, Sparkles, Play, MessageCircle, Share2, Users } from 'lucide-react';
 // @ts-ignore
 const ReactWordcloud = lazy(() => import('react-wordcloud'));
 import { format, parse, addDays, isValid, startOfDay, subDays, startOfMonth, subMonths, startOfWeek, endOfWeek, eachWeekOfInterval } from 'date-fns';
@@ -635,10 +635,41 @@ export default function App() {
   };
 
   const [topVideosMode, setTopVideosMode] = useState<'range' | 'month'>('range');
+  const [personalTimeScope, setPersonalTimeScope] = useState<'year' | 'quarter' | 'half'>('year');
   const [showPlatformComparison, setShowPlatformComparison] = useState<boolean>(false);
   const [comparePlatform, setComparePlatform] = useState<'douyin' | 'kuaishou' | 'wechat'>('douyin');
   const [platformCompareMode, setPlatformCompareMode] = useState<'overall' | 'monthly'>('overall');
   const [selectedCompareMonth, setSelectedCompareMonth] = useState<string>('');
+
+  const applyPersonalTimeScope = useCallback((scope: 'year' | 'quarter' | 'half') => {
+    setPersonalTimeScope(scope);
+
+    const platformItems = platformData[selectedPlatform] || [];
+    const validDates = platformItems
+      .map(item => item.parsedDate)
+      .filter(date => date instanceof Date && isValid(date))
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    if (!validDates.length) return;
+
+    const maxDate = validDates[validDates.length - 1];
+    const year = maxDate.getFullYear();
+    let startDate: Date;
+
+    if (scope === 'quarter') {
+      const quarterStartMonth = Math.floor(maxDate.getMonth() / 3) * 3;
+      startDate = new Date(year, quarterStartMonth, 1);
+    } else if (scope === 'half') {
+      startDate = new Date(year, maxDate.getMonth() < 6 ? 0 : 6, 1);
+    } else {
+      startDate = new Date(year, 0, 1);
+    }
+
+    setPlatformDateRange({
+      start: format(startDate, 'yyyy-MM-dd'),
+      end: format(maxDate, 'yyyy-MM-dd')
+    });
+  }, [platformData, selectedPlatform]);
 
   // 计算可用的月份
   const availableMonths = useMemo(() => {
@@ -3129,6 +3160,25 @@ export default function App() {
                                 )}
                             </div>
                             <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
+                                {[
+                                    { key: 'year', label: '全年' },
+                                    { key: 'half', label: '半年' },
+                                    { key: 'quarter', label: '季度' },
+                                ].map(item => (
+                                    <button
+                                        key={item.key}
+                                        type="button"
+                                        onClick={() => applyPersonalTimeScope(item.key as 'year' | 'quarter' | 'half')}
+                                        className={cn(
+                                            'px-3 py-1 rounded-md transition-all',
+                                            personalTimeScope === item.key ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'
+                                        )}
+                                    >
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="bg-gray-100 p-1 rounded-lg inline-flex text-xs">
                                 <button onClick={() => setTopVideosMode('range')} className={cn("px-3 py-1 rounded-md transition-all", topVideosMode === 'range' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500')}>按分析周期</button>
                                 <button onClick={() => setTopVideosMode('month')} className={cn("px-3 py-1 rounded-md transition-all", topVideosMode === 'month' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500')}>按月份</button>
                             </div>
@@ -3174,62 +3224,6 @@ export default function App() {
                                     )}
                                 </div>
                             )}
-                            
-                            {/* 平台搜索框 */}
-                            <div className="relative w-full sm:w-64">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: selectedPlatform === 'douyin' ? '#ff0000' : selectedPlatform === 'kuaishou' ? '#fe2c55' : '#07C160' }} />
-                                <input
-                                    type="text"
-                                    placeholder={`${selectedPlatform === 'douyin' ? '抖音' : selectedPlatform === 'kuaishou' ? '快手' : '视频号'}搜索视频...`}
-                                    className="w-full pl-10 pr-24 py-2 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl text-sm focus:ring-2 outline-none transition-all"
-                                    style={{ boxShadow: selectedPlatform === 'douyin' ? '0 0 0 2px rgba(255, 0, 0, 0.2)' : selectedPlatform === 'kuaishou' ? '0 0 0 2px rgba(254, 44, 85, 0.2)' : '0 0 0 2px rgba(7, 193, 96, 0.2)' }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            const query = (e.target as HTMLInputElement).value;
-                                            if (query) {
-                                                let searchUrl = '';
-                                                switch (selectedPlatform) {
-                                                    case 'douyin':
-                                                        searchUrl = `https://www.douyin.com/search/${encodeURIComponent(query)}`;
-                                                        break;
-                                                    case 'kuaishou':
-                                                        searchUrl = `https://www.kuaishou.com/search/video?keyword=${encodeURIComponent(query)}`;
-                                                        break;
-                                                    case 'wechat':
-                                                        searchUrl = `https://channels.weixin.qq.com/search?query=${encodeURIComponent(query)}`;
-                                                        break;
-                                                }
-                                                window.open(searchUrl, '_blank');
-                                            }
-                                        }
-                                    }}
-                                />
-                                <button
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 rounded-lg text-white text-xs font-bold transition-colors"
-                                    style={{ backgroundColor: selectedPlatform === 'douyin' ? '#ff0000' : selectedPlatform === 'kuaishou' ? '#fe2c55' : '#07C160' }}
-                                    onClick={(e) => {
-                                        const input = (e.currentTarget.previousSibling as HTMLInputElement);
-                                        const query = input.value;
-                                        if (query) {
-                                            let searchUrl = '';
-                                            switch (selectedPlatform) {
-                                                case 'douyin':
-                                                    searchUrl = `https://www.douyin.com/search/${encodeURIComponent(query)}`;
-                                                    break;
-                                                case 'kuaishou':
-                                                    searchUrl = `https://www.kuaishou.com/search/video?keyword=${encodeURIComponent(query)}`;
-                                                    break;
-                                                case 'wechat':
-                                                    searchUrl = `https://channels.weixin.qq.com/search?query=${encodeURIComponent(query)}`;
-                                                    break;
-                                            }
-                                            window.open(searchUrl, '_blank');
-                                        }
-                                    }}
-                                >
-                                    搜索
-                                </button>
-                            </div>
                         </div>
                     </div>
                     <div className="overflow-x-auto">

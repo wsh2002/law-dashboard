@@ -1,4 +1,4 @@
-import { Bot, CalendarRange, Flame, GitCompare, LayoutDashboard, Sparkles, TrendingUp, User, BarChart3 } from 'lucide-react'
+import { CalendarRange, Flame, GitCompare, LayoutDashboard, Sparkles, TrendingUp, User, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   Sidebar,
@@ -21,8 +21,6 @@ const WORKSPACE = [
   { key: 'personal', label: '个人行业爆款', icon: User },
   { key: 'viral', label: '行业爆款视频', icon: Flame },
 ] as const
-
-const COZE_HREF = 'https://www.coze.cn/store/agent/7626943462554435603?bot_id=true' as const
 
 type Props = {
   activeTab: string
@@ -85,19 +83,6 @@ export function AppSidebar({ activeTab, onSelect, userEmail, onLogout }: Props) 
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={false}
-                  className="rounded-lg text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 transition-all duration-200"
-                  tooltip="Coze 智能体"
-                >
-                  <a href={COZE_HREF} target="_blank" rel="noopener noreferrer">
-                    <Bot />
-                    <span className="font-medium">Coze 智能体</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   type="button"

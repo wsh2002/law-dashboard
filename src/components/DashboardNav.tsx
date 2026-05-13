@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion'
 import {
-  Bot,
   CalendarRange,
   Flame,
   GitCompare,
@@ -25,14 +24,6 @@ const PRIMARY_NAV: {
   { key: 'personal', label: '个人行业爆款', shortLabel: '个人', icon: User },
   { key: 'viral', label: '行业爆款视频', shortLabel: '爆款', icon: Flame },
 ]
-
-const COZE = {
-  key: 'coze',
-  label: 'Coze 智能体',
-  shortLabel: 'Coze',
-  href: 'https://www.coze.cn/store/agent/7626943462554435603?bot_id=true' as const,
-  icon: Bot,
-}
 
 const MY_AGENT = { key: 'myAgent', label: '我的智能体', shortLabel: '智能体', icon: Sparkles }
 
@@ -82,15 +73,6 @@ export function DashboardNav({ activeTab, onSelect }: Props) {
         <Separator className="my-1.5 bg-border/80" />
 
         <p className="px-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">工具</p>
-        <a
-          href={COZE.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
-        >
-          <COZE.icon className="size-4 shrink-0 opacity-90" />
-          <span className="min-w-0 flex-1 leading-snug pl-0.5">{COZE.label}</span>
-        </a>
         <button
           type="button"
           onClick={() => onSelect(MY_AGENT.key)}
@@ -136,14 +118,6 @@ export function MobileTabStrip({ activeTab, onSelect }: Props) {
             {tab.shortLabel}
           </button>
         ))}
-        <a
-          href={COZE.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="shrink-0 rounded-full border border-border/60 bg-card/90 px-3 py-1.5 text-xs font-medium text-muted-foreground"
-        >
-          {COZE.shortLabel}
-        </a>
         <button
           type="button"
           onClick={() => onSelect(MY_AGENT.key)}
