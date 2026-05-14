@@ -262,7 +262,7 @@ const ViralVideosSection = () => {
     let buffer = '';
 
     let done = false;
-    while (!done) {
+    readLoop: while (!done) {
       const { done: readerDone, value } = await reader.read();
       done = readerDone;
       if (done) {
@@ -292,87 +292,87 @@ const ViralVideosSection = () => {
             const data = JSON.parse(eventData);
             console.log('收到事件:', eventType, data);
 
-            if (eventType === 'result' && data.subtitles) {
-              console.log('收到结果，开始更新状态');
-              setTranscribeError(''); // 识别成功，立即清除状态提示
-              setSubtitles(data.subtitles);
-              const text = data.subtitles.map((s: { text: string }) => s.text).join('\n');
-              setManualTranscript(text);
+            if (eventType === 'result') {
+              if (Array.isArray(data.subtitles) && data.subtitles.length > 0) {
+                console.log('收到结果，开始更新状态');
+                setTranscribeError('');
+                setSubtitles(data.subtitles);
+                const text = data.subtitles.map((s: { text: string }) => s.text).join('\n');
+                setManualTranscript(text);
 
-              // 保存到视频对象，实现永久保存
-              if (currentVideo) {
-                setVideos(prev => {
-                  const updatedVideos = prev.map(v => 
-                    v.id === currentVideo.id ? { ...v, content: text , subtitles: data.subtitles} : v
-                  );
-                  
-                  // 保存到本地存储
-                  const videosToSave = updatedVideos.reduce((acc, v) => {
-                    acc[v.id] = { content: v.content || '' , subtitles: v.subtitles || []};
-                    return acc;
-                  }, {} as Record<string, Partial<ViralVideo>>);
-                  localStorage.setItem('viral_videos', JSON.stringify(videosToSave));
-                  
-                  return updatedVideos;
-                });
+                if (currentVideo) {
+                  setVideos(prev => {
+                    const updatedVideos = prev.map(v =>
+                      v.id === currentVideo.id ? { ...v, content: text, subtitles: data.subtitles } : v
+                    );
 
-                // 同步台词到云端，让其他用户打开同一视频时也能看到
-                supabase.from('video_transcripts').upsert({
-                  video_id: currentVideo.id,
-                  content: text,
-                  subtitles: data.subtitles,
-                  updated_at: new Date().toISOString()
-                }).then(({ error }) => {
-                  if (error) console.error('台词云端同步失败:', error);
-                });
+                    const videosToSave = updatedVideos.reduce((acc, v) => {
+                      acc[v.id] = { content: v.content || '', subtitles: v.subtitles || [] };
+                      return acc;
+                    }, {} as Record<string, Partial<ViralVideo>>);
+                    localStorage.setItem('viral_videos', JSON.stringify(videosToSave));
 
-                // 保存到文案库
-                const scriptItem = {
-                  id: Date.now().toString(),
-                  videoId: currentVideo.id,
-                  title: currentVideo.title,
-                  author: currentVideo.author,
-                  platform: currentVideo.platform || 'douyin',
-                  content: text,
-                  subtitles: data.subtitles,
-                  timestamp: new Date().toISOString()
-                };
-
-                // 保存到 Supabase 文案库
-                try {
-                  await supabase.from('script_library').insert({
-                    id: scriptItem.id,
-                    video_id: scriptItem.videoId,
-                    title: scriptItem.title,
-                    author: scriptItem.author,
-                    platform: scriptItem.platform,
-                    content: scriptItem.content,
-                    subtitles: scriptItem.subtitles,
-                    timestamp: scriptItem.timestamp
+                    return updatedVideos;
                   });
-                  console.log(`视频 "${currentVideo.title}" 已保存到文案库`);
-                  // 主动刷新文案库，不依赖 Realtime 推送
-                  loadScriptLibrary(setScriptLibrary);
-                } catch (firebaseError) {
-                  console.error(`保存到文案库失败:`, firebaseError);
+
+                  supabase.from('video_transcripts').upsert({
+                    video_id: currentVideo.id,
+                    content: text,
+                    subtitles: data.subtitles,
+                    updated_at: new Date().toISOString()
+                  }).then(({ error }) => {
+                    if (error) console.error('台词云端同步失败:', error);
+                  });
+
+                  const scriptItem = {
+                    id: Date.now().toString(),
+                    videoId: currentVideo.id,
+                    title: currentVideo.title,
+                    author: currentVideo.author,
+                    platform: currentVideo.platform || 'douyin',
+                    content: text,
+                    subtitles: data.subtitles,
+                    timestamp: new Date().toISOString()
+                  };
+
+                  try {
+                    await supabase.from('script_library').insert({
+                      id: scriptItem.id,
+                      video_id: scriptItem.videoId,
+                      title: scriptItem.title,
+                      author: scriptItem.author,
+                      platform: scriptItem.platform,
+                      content: scriptItem.content,
+                      subtitles: scriptItem.subtitles,
+                      timestamp: scriptItem.timestamp
+                    });
+                    console.log(`视频 "${currentVideo.title}" 已保存到文案库`);
+                    loadScriptLibrary(setScriptLibrary);
+                  } catch (saveErr) {
+                    console.error('保存到文案库失败:', saveErr);
+                  }
                 }
+
+                console.log('识别完成，更新状态为 false');
+                if (currentVideo) {
+                  setIsDeepTranscribing(prev => ({ ...prev, [currentVideo.id]: false }));
+                }
+              } else {
+                setTranscribeError('未收到可用的字幕数据，请稍后重试');
               }
-              
-              // 立即更新识别状态为 false
-              console.log('识别完成，更新状态为 false');
-              if (currentVideo) {
-                setIsDeepTranscribing(prev => ({ ...prev, [currentVideo.id]: false }));
-              }
+              void reader.cancel().catch(() => {});
+              break readLoop;
             } else if (eventType === 'error') {
               if (data.message === 'COOKIE_EXPIRED') {
                 setTranscribeError('Cookie 已过期,请更新 cookies.txt 后重启服务');
               } else {
                 setTranscribeError(`识别失败:${data.message}`);
               }
-              // 错误时也更新状态
               if (currentVideo) {
                 setIsDeepTranscribing(prev => ({ ...prev, [currentVideo.id]: false }));
               }
+              void reader.cancel().catch(() => {});
+              break readLoop;
             } else if (eventType === 'queued') {
               setTranscribeError(`⏳ ${data.hint}`);
             } else if (eventType === 'progress') {
@@ -644,7 +644,7 @@ ${analysisResult}
                   let buffer = '';
                   let done = false;
 
-                  while (!done) {
+                  readLoop: while (!done) {
                     const { done: readerDone, value } = await reader.read();
                     done = readerDone;
                     if (done) break;
@@ -670,41 +670,53 @@ ${analysisResult}
                         try {
                           const data = JSON.parse(eventData);
 
-                          if (eventType === 'result' && data.subtitles) {
-                            setTranscribeError('');
-                            const text = data.subtitles.map((s: { text: string }) => s.text).join('\n');
+                          if (eventType === 'result') {
+                            if (Array.isArray(data.subtitles) && data.subtitles.length > 0) {
+                              setTranscribeError('');
+                              const text = data.subtitles.map((s: { text: string }) => s.text).join('\n');
 
-                            const scriptItem = {
-                              id: Date.now().toString(),
-                              videoId: `link-${Date.now()}`,
-                              title: '抖音链接识别',
-                              author: '抖音用户',
-                              platform: 'douyin',
-                              content: text,
-                              subtitles: data.subtitles,
-                              timestamp: new Date().toISOString()
-                            };
+                              const scriptItem = {
+                                id: Date.now().toString(),
+                                videoId: `link-${Date.now()}`,
+                                title: '抖音链接识别',
+                                author: '抖音用户',
+                                platform: 'douyin',
+                                content: text,
+                                subtitles: data.subtitles,
+                                timestamp: new Date().toISOString()
+                              };
 
-                            await supabase.from('script_library').insert({
-                              id: scriptItem.id,
-                              video_id: scriptItem.videoId,
-                              title: scriptItem.title,
-                              author: scriptItem.author,
-                              platform: scriptItem.platform,
-                              content: scriptItem.content,
-                              subtitles: scriptItem.subtitles,
-                              timestamp: scriptItem.timestamp
-                            });
-                            loadScriptLibrary(setScriptLibrary);
-
-                            alert('文案识别成功，已保存到文案库！');
-                            input.value = '';
+                              try {
+                                await supabase.from('script_library').insert({
+                                  id: scriptItem.id,
+                                  video_id: scriptItem.videoId,
+                                  title: scriptItem.title,
+                                  author: scriptItem.author,
+                                  platform: scriptItem.platform,
+                                  content: scriptItem.content,
+                                  subtitles: scriptItem.subtitles,
+                                  timestamp: scriptItem.timestamp
+                                });
+                                loadScriptLibrary(setScriptLibrary);
+                                alert('文案识别成功，已保存到文案库！');
+                                input.value = '';
+                              } catch (saveErr) {
+                                console.error('保存到文案库失败:', saveErr);
+                                setTranscribeError('识别已完成，但保存到文案库失败，请稍后重试');
+                              }
+                            } else {
+                              setTranscribeError('未收到可用的字幕数据，请稍后重试');
+                            }
+                            void reader.cancel().catch(() => {});
+                            break readLoop;
                           } else if (eventType === 'error') {
                             if (data.message === 'COOKIE_EXPIRED') {
                               setTranscribeError('Cookie 已过期,请更新 cookies.txt 后重启服务');
                             } else {
                               setTranscribeError(`识别失败:${data.message}`);
                             }
+                            void reader.cancel().catch(() => {});
+                            break readLoop;
                           } else if (eventType === 'queued') {
                             setTranscribeError(`⏳ ${data.hint}`);
                           } else if (eventType === 'progress') {
