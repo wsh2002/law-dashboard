@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KpiStatCard } from '@/components/KpiStatCard';
 import { AppSidebar } from '@/components/AppSidebar';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import type { AIAnalysisCardProps } from './components/AIAnalysisCard';
 
 // ---- 月度对比图表组件（定义在 App 外部，避免每次渲染重建组件类型导致图表空白）----
 const tooltipStyle = { borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', background: 'rgba(255,255,255,0.95)', padding: '12px', fontSize: '14px' };
@@ -139,7 +140,9 @@ const MonthlyNetFansChart = React.memo(({ data }: { data: any[] }) => (
 // 懒加载组件
 const ViralVideosSection = lazy(() => import('./components/ViralVideosSection'));
 const AARRRAnalysis = lazy(() => import('./components/AARRRAnalysis'));
-const AIAnalysisCard = lazy(() => import('./components/AIAnalysisCard'));
+const AIAnalysisCard = lazy(() => import('./components/AIAnalysisCard')) as React.LazyExoticComponent<
+  React.FC<AIAnalysisCardProps>
+>;
 const Login = lazy(() => import('./components/Login'));
 const PlatformChartsWrapper = lazy(() => import('./components/PlatformChartsWrapper'));
 
@@ -903,6 +906,53 @@ export default function App() {
       return dateMatch;
     });
   }, [platformData, aiDateRange, selectedPlatform]);
+
+  /** AI 诊断：以当前平台数据中最后一条日历日为结束日，回溯 14 天（含首尾共 14 天），且不早于最早上传日 */
+  const applyAiRecentTwoWeeksRange = useCallback(() => {
+    const list = platformData[selectedPlatform] || [];
+    if (list.length === 0) return;
+    const sorted = [...list].sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime());
+    const minTs = sorted[0].parsedDate.getTime();
+    const endDay = startOfDay(sorted[sorted.length - 1].parsedDate);
+    let startDay = subDays(endDay, 13);
+    if (startDay.getTime() < minTs) startDay = startOfDay(sorted[0].parsedDate);
+    setPlatformAiDateRange({
+      start: format(startDay, 'yyyy-MM-dd'),
+      end: format(endDay, 'yyyy-MM-dd'),
+    });
+  }, [platformData, selectedPlatform]);
+
+  /** AI 诊断：覆盖当前平台已上传的全部数据日期范围 */
+  const applyAiFullUploadRange = useCallback(() => {
+    const list = platformData[selectedPlatform] || [];
+    if (list.length === 0) return;
+    const sorted = [...list].sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime());
+    setPlatformAiDateRange({
+      start: format(startOfDay(sorted[0].parsedDate), 'yyyy-MM-dd'),
+      end: format(startOfDay(sorted[sorted.length - 1].parsedDate), 'yyyy-MM-dd'),
+    });
+  }, [platformData, selectedPlatform]);
+
+  /** 与快捷预设对齐时高亮对应按钮（先判全量，再判最近两周，避免短数据两种预设日期相同时的歧义） */
+  const aiAnalysisToolbarActivePreset = useMemo((): 'recent-two-weeks' | 'full-upload' | null => {
+    const list = platformData[selectedPlatform] || [];
+    if (list.length === 0) return null;
+    const sorted = [...list].sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime());
+    const fullStart = format(startOfDay(sorted[0].parsedDate), 'yyyy-MM-dd');
+    const fullEnd = format(startOfDay(sorted[sorted.length - 1].parsedDate), 'yyyy-MM-dd');
+    const { start, end } = aiDateRange;
+    if (start === fullStart && end === fullEnd) return 'full-upload';
+
+    const minTs = sorted[0].parsedDate.getTime();
+    const endDay = startOfDay(sorted[sorted.length - 1].parsedDate);
+    let startDay = subDays(endDay, 13);
+    if (startDay.getTime() < minTs) startDay = startOfDay(sorted[0].parsedDate);
+    const recentStart = format(startDay, 'yyyy-MM-dd');
+    const recentEnd = format(endDay, 'yyyy-MM-dd');
+    if (start === recentStart && end === recentEnd) return 'recent-two-weeks';
+
+    return null;
+  }, [platformData, selectedPlatform, aiDateRange]);
 
   // Helper for trend aggregation
   const getTrendData = (targetRange: {start: string, end: string}, targetMode: 'daily' | 'weekly' | 'monthly' | 'quarterly') => {
@@ -1877,13 +1927,13 @@ export default function App() {
             >
             <Card className="overflow-hidden rounded-lg border border-slate-200 bg-white p-0 shadow-sm ring-0">
                 <CardHeader className="border-b border-slate-200">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-6 lg:gap-8">
+                    <CardTitle className="flex min-w-max shrink-0 items-center gap-2 pr-2 text-base font-semibold text-slate-900 md:pr-4">
                         <TrendingUp className="shrink-0 text-slate-700" />
                         整体数据趋势
                     </CardTitle>
-                    <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2 bg-white/70 p-2 rounded-lg border border-gray-200">
+                    <div className="flex min-w-0 w-full flex-1 flex-wrap items-center gap-2 sm:gap-3 md:flex-nowrap md:justify-end">
+                        <div className="flex shrink-0 items-center gap-2 bg-white/70 p-2 rounded-lg border border-gray-200">
                             {platformData.douyin?.length > 0 && (
                                 <button
                                     onClick={() => handlePlatformSelect('douyin')}
@@ -1924,7 +1974,9 @@ export default function App() {
                                 </button>
                             )}
                         </div>
-                        <div className="flex items-center gap-2 bg-white/70 p-2 rounded-lg border border-gray-200">
+                        <div className="min-w-0 flex-1 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+                        <div className="flex w-max flex-nowrap items-center gap-2 sm:gap-3">
+                        <div className="flex shrink-0 items-center gap-2 bg-white/70 p-2 rounded-lg border border-gray-200">
                             <input 
                                 type="date" 
                                 value={trendRange.start} 
@@ -1945,7 +1997,7 @@ export default function App() {
                                 className="bg-transparent text-sm px-2 py-1.5 outline-none text-gray-600 w-36"
                             />
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex shrink-0 gap-2">
                             <button 
                                 onClick={() => {
                                     if (!dataDateRange) return;
@@ -2055,6 +2107,8 @@ export default function App() {
                                 全年按月
                             </button>
                         </div>
+                        </div>
+                      </div>
                     </div>
                 </div>
                 </CardHeader>
@@ -2115,13 +2169,15 @@ export default function App() {
               transition={{ duration: 0.2, delay: 0.05 }}
               className="panel-surface p-6"
             >
-                <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+                <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-6 lg:gap-8">
+                    <h3 className="flex min-w-max shrink-0 items-center gap-2 pr-2 text-base font-semibold text-slate-900 md:pr-4">
                        <TrendingUp className="shrink-0 text-slate-700" />
                        播放量与粉丝趋势 (Views & Fans)
                     </h3>
-                    <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2 bg-white/70 p-2 rounded-lg border border-gray-200">
+                    <div className="flex min-w-0 w-full flex-1 justify-start md:justify-end">
+                      <div className="max-w-full min-w-0 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+                        <div className="flex w-max flex-wrap items-center gap-2 sm:gap-3 md:flex-nowrap md:justify-start">
+                        <div className="flex shrink-0 items-center gap-2 bg-white/70 p-2 rounded-lg border border-gray-200">
                             <input 
                                 type="date" 
                                 value={viewsTrendRange.start} 
@@ -2142,7 +2198,7 @@ export default function App() {
                                 className="bg-transparent text-sm px-2 py-1.5 outline-none text-gray-600 w-36"
                             />
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex shrink-0 gap-2">
                             <button 
                                 onClick={() => {
                                     if (!dataDateRange) return;
@@ -2252,6 +2308,8 @@ export default function App() {
                                 全年按月
                             </button>
                         </div>
+                        </div>
+                      </div>
                     </div>
                 </div>
                 <div className="h-[400px]">
@@ -2305,36 +2363,28 @@ export default function App() {
                 </Suspense>
             </motion.div>
 
-            {/* AI 智能运营诊断 */}
+            {/* AI 智能运营诊断（时段与预设按钮在卡片内，见 AIAnalysisCard） */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2, delay: 0.15 }}
               className="panel-surface p-6"
             >
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                    <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                        <Sparkles className="w-5 h-5 text-purple-600" />
-                        AI 智能运营诊断
-                    </h3>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <input 
-                            type="date" 
-                            value={aiDateRange.start} 
-                            onChange={e => setPlatformAiDateRange(prev => ({ ...prev, start: e.target.value }))}
-                            className="border border-gray-200 rounded px-3 py-2 text-sm w-full sm:w-auto bg-white/70 focus:ring-2 focus:ring-purple-500 outline-none transition-all"
-                        />
-                        <span className="text-gray-400">-</span>
-                        <input 
-                            type="date" 
-                            value={aiDateRange.end} 
-                            onChange={e => setPlatformAiDateRange(prev => ({ ...prev, end: e.target.value }))}
-                            className="border border-gray-200 rounded px-3 py-2 text-sm w-full sm:w-auto bg-white/70 focus:ring-2 focus:ring-purple-500 outline-none transition-all"
-                        />
-                    </div>
-                </div>
                 <Suspense fallback={<div className="flex justify-center items-center h-64">加载中...</div>}>
-                    <AIAnalysisCard data={aiData} title="deepseek-v4-flash" mode="general-only" platform={selectedPlatform} />
+                    <AIAnalysisCard
+                        data={aiData}
+                        title="deepseek-v4-flash"
+                        mode="general-only"
+                        platform={selectedPlatform}
+                        analysisRangeToolbar={{
+                            range: aiDateRange,
+                            onChangeRange: (next: { start: string; end: string }) => setPlatformAiDateRange(next),
+                            onRecentTwoWeeks: applyAiRecentTwoWeeksRange,
+                            onFullUpload: applyAiFullUploadRange,
+                            presetsDisabled: !(platformData[selectedPlatform]?.length),
+                            activePreset: aiAnalysisToolbarActivePreset,
+                        }}
+                    />
                 </Suspense>
             </motion.div>
         </motion.div>

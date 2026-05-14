@@ -4,18 +4,37 @@ import { Sparkles, TrendingUp, AlertTriangle, Lightbulb, CheckCircle2, Settings,
 import { format } from 'date-fns';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { DataItem } from '../App';
+import type { DataItem } from '../App';
+import { cn } from '@/lib/utils';
 import { normalizeAIReportMarkdown } from '../utils/aiReportMarkdown';
 import { AIAnalysisConfig, DEFAULT_CONFIG, generateAnalysisPrompt, fetchAIAnalysis } from '../services/aiAnalysis';
 
-interface AIAnalysisCardProps {
+export interface AIAnalysisRangeToolbarProps {
+  range: { start: string; end: string };
+  onChangeRange: (next: { start: string; end: string }) => void;
+  onRecentTwoWeeks: () => void;
+  onFullUpload: () => void;
+  presetsDisabled?: boolean;
+  /** 当前日期是否与某一预设完全一致，用于切换按钮高亮 */
+  activePreset?: 'recent-two-weeks' | 'full-upload' | null;
+}
+
+export interface AIAnalysisCardProps {
   data: DataItem[];
   title?: string;
   mode?: 'all' | 'aarrr-only' | 'general-only';
   platform?: string;
+  /** 与概览页的日期筛选联动；传入后在卡片顶部显示时段与快捷预设，避免控件被误判为「没更新」 */
+  analysisRangeToolbar?: AIAnalysisRangeToolbarProps;
 }
 
-const AIAnalysisCard = ({ data, title, mode = 'all', platform = 'default' }: AIAnalysisCardProps) => {
+const AIAnalysisCard = ({
+  data,
+  title,
+  mode = 'all',
+  platform = 'default',
+  analysisRangeToolbar,
+}: AIAnalysisCardProps) => {
   const [showConfig, setShowConfig] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<string | null>(() => {
@@ -339,11 +358,79 @@ const AIAnalysisCard = ({ data, title, mode = 'all', platform = 'default' }: AIA
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-indigo-600" />
-            {title || 'AI 智能运营诊断 (Intelligent Advisor)'}
-        </h3>
+      {analysisRangeToolbar && (
+        <div className="mb-5 mr-14 sm:mr-16 rounded-lg border-2 border-indigo-200/80 bg-indigo-50/90 px-3 py-3 sm:px-4 shadow-sm">
+          <p className="text-xs font-semibold text-indigo-900 mb-2">
+            分析数据时段<span className="font-normal text-indigo-600/90">（指标与 AI prompt 均按此范围）</span>
+          </p>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="date"
+                value={analysisRangeToolbar.range.start}
+                onChange={(e) =>
+                  analysisRangeToolbar.onChangeRange({
+                    ...analysisRangeToolbar.range,
+                    start: e.target.value,
+                  })
+                }
+                className="min-w-[140px] flex-1 sm:flex-none rounded-lg border border-indigo-100 bg-white px-2 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+              <span className="text-indigo-300">—</span>
+              <input
+                type="date"
+                value={analysisRangeToolbar.range.end}
+                onChange={(e) =>
+                  analysisRangeToolbar.onChangeRange({
+                    ...analysisRangeToolbar.range,
+                    end: e.target.value,
+                  })
+                }
+                className="min-w-[140px] flex-1 sm:flex-none rounded-lg border border-indigo-100 bg-white px-2 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={analysisRangeToolbar.onRecentTwoWeeks}
+                disabled={analysisRangeToolbar.presetsDisabled}
+                title="以数据中最新日为结束日，取连续 14 天；不足则从最早上传日开始"
+                className={cn(
+                  'rounded-lg border px-3 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40',
+                  analysisRangeToolbar.activePreset === 'recent-two-weeks'
+                    ? 'border-purple-400 bg-purple-100 text-purple-900 shadow-sm ring-1 ring-purple-200'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+                )}
+              >
+                最近两周分析
+              </button>
+              <button
+                type="button"
+                onClick={analysisRangeToolbar.onFullUpload}
+                disabled={analysisRangeToolbar.presetsDisabled}
+                title="起止日为当前平台已上传数据中最早一天与最晚一天"
+                className={cn(
+                  'rounded-lg border px-3 py-2 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40',
+                  analysisRangeToolbar.activePreset === 'full-upload'
+                    ? 'border-purple-400 bg-purple-100 text-purple-900 shadow-sm ring-1 ring-purple-200'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+                )}
+              >
+                全部上传数据分析
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-500">AI 智能运营诊断</p>
+          <h3 className="text-lg font-bold text-indigo-900 flex items-center gap-2 mt-1">
+            <Sparkles className="w-5 h-5 text-indigo-600 shrink-0" />
+            <span>{title || 'Intelligent Advisor'}</span>
+          </h3>
+        </div>
         
         {/* Generate AI Analysis Button */}
         {!aiResult && (
