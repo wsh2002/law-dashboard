@@ -212,7 +212,7 @@ export type DataItem = {
 // Helper to parse raw data
 const parseData = (raw: any[], platform?: 'douyin' | 'kuaishou' | 'wechat'): DataItem[] => {
   return raw.map(item => {
-    const dateStr = item['日期'] || item['Date'];
+    const dateStr = item['日期'] || item['Date'] || item['时间'];
     // Handle Excel serial date
     let parsedDate = new Date();
     try {
