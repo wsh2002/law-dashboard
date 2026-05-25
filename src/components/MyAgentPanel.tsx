@@ -49,6 +49,7 @@ import {
   STYLE_DOC_MAX_CHARS,
   type StoredStyleDoc,
 } from '../lib/agentStyleDoc';
+import { isSupportedStyleFileName, readStyleFileAsText } from '../lib/readStyleFile';
 
 export type { ChatMessage };
 
@@ -188,22 +189,23 @@ export default function MyAgentPanel({ userId }: { userId: string }) {
   }, [userId]);
 
   const onStyleFileChange = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
+    async (e: ChangeEvent<HTMLInputElement>) => {
       const f = e.target.files?.[0];
       e.target.value = '';
       if (!f) return;
-      const lower = f.name.toLowerCase();
-      if (!lower.endsWith('.txt') && !lower.endsWith('.md')) {
-        setStyleUploadError('当前仅支持 .txt、.md 文件');
+      if (!isSupportedStyleFileName(f.name)) {
+        setStyleUploadError('当前仅支持 .txt、.md、.docx 文件');
         return;
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const raw = typeof reader.result === 'string' ? reader.result : '';
+      const isDocx = f.name.toLowerCase().endsWith('.docx');
+      try {
+        const raw = await readStyleFileAsText(f);
         applyStyleUpload(raw, f.name);
-      };
-      reader.onerror = () => setStyleUploadError('读取文件失败');
-      reader.readAsText(f, 'UTF-8');
+      } catch {
+        setStyleUploadError(
+          isDocx ? '解析 Word 文档失败，请确认文件未损坏' : '读取文件失败'
+        );
+      }
     },
     [applyStyleUpload]
   );
@@ -547,12 +549,12 @@ export default function MyAgentPanel({ userId }: { userId: string }) {
               文案风格参考
             </div>
             <p className="mb-2 text-[10px] leading-relaxed text-slate-500">
-              上传 .txt / .md，模型会按其中语气与结构辅助二创。此为提示注入（非云端训练）；内容仅保存在本机浏览器。
+              上传 .txt / .md / .docx，模型会按其中语气与结构辅助二创。此为提示注入（非云端训练）；内容仅保存在本机浏览器。
             </p>
             <input
               ref={styleFileRef}
               type="file"
-              accept=".txt,.md,text/plain,text/markdown"
+              accept=".txt,.md,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               className="hidden"
               onChange={onStyleFileChange}
             />
